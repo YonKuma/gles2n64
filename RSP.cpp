@@ -211,9 +211,7 @@ void RSP_Init()
     DepthBuffer_Init();
     GBI_Init();
 
-    LOG( "OGL Init \n"); fflush(stdout);
     OGL_Start();
-    LOG( "OGL done\n"); fflush(stdout);
 
 }
 

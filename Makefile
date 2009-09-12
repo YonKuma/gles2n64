@@ -63,7 +63,7 @@ OBJECTS += glN64.o \
 	F3DWRUS.o
 
 # build targets
-all: glN64.$(SO_EXTENSION)
+all: gles2n64.$(SO_EXTENSION)
 
 clean:
 	del -f *.o ".\wes\*.o" *.$(SO_EXTENSION) ui_gln64config.*
@@ -78,7 +78,7 @@ clean:
 ui_gln64config.h: gln64config.ui
 	$(UIC) $< -o $@
 
-glN64.$(SO_EXTENSION): $(OBJECTS)
+gles2n64.$(SO_EXTENSION): $(OBJECTS)
 	$(CXX) $^ $(LDFLAGS) $(ASM_LDFLAGS) $(PLUGIN_LDFLAGS) $(SDL_LIBS) $(LIBGL_LIBS) -shared -o $@
 
 glN64.o: glN64.cpp

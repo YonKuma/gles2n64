@@ -33,7 +33,7 @@ HWND        hToolBar;
 HINSTANCE   hInstance;
 #endif // !__LINUX__
 
-char        pluginName[] = "pnd-glN64 v001";
+char        pluginName[] = "gles2n64 v001";
 char        *screenDirectory;
 u32 last_good_ucode = (u32) -1;
 void        (*CheckInterrupts)( void );
