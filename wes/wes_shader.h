@@ -63,14 +63,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #define WES_FUNC_BLEND						10
 #define WES_FUNC_COMBINE					11
 
+/* ATI Extensions */
+#define WES_FUNC_MODULATE_SUBTRACT          12
+#define WES_FUNC_MODULATE_ADD               13
+#define WES_FUNC_MODULATE_SIGNED_ADD        14
+
 #define WES_SRC_PREVIOUS					1
 #define WES_SRC_CONSTANT					2
 #define WES_SRC_PRIMARY_COLOR				3
 #define WES_SRC_TEXTURE						4
+
+/* Crossbar Extensions  */
 #define WES_SRC_TEXTURE0					5
 #define WES_SRC_TEXTURE1					6
 #define WES_SRC_TEXTURE2					7
 #define WES_SRC_TEXTURE3					8
+
+/* ATI Extensions */
+#define WES_SRC_ONE                         9
+#define WES_SRC_ZERO                        10
+
 
 #define WES_OP_ALPHA						1
 #define WES_OP_ONE_MINUS_ALPHA				2
@@ -83,61 +95,61 @@ typedef struct program_s        program_t;
 
 struct uniformloc_s
 {
-    GLuint  uEnableRescaleNormal;
-    GLuint  uEnableNormalize;
-    GLuint  uEnableTextureGen[WES_MULTITEX_NUM];
-    GLuint  uEnableClipPlane[WES_CLIPPLANE_NUM];
-    GLuint  uEnableLighting;
-    GLuint  uEnableLight[WES_LIGHT_NUM];
-    GLuint  uEnableColorMaterial;
-    GLuint  uEnableFog;
-    GLuint  uEnableAlphaTest;
-    GLuint  uEnableFogCoord;
+    GLint  uEnableRescaleNormal;
+    GLint  uEnableNormalize;
+    GLint  uEnableTextureGen[WES_MULTITEX_NUM];
+    GLint  uEnableClipPlane[WES_CLIPPLANE_NUM];
+    GLint  uEnableLighting;
+    GLint  uEnableLight[WES_LIGHT_NUM];
+    GLint  uEnableColorMaterial;
+    GLint  uEnableFog;
+    GLint  uEnableAlphaTest;
+    GLint  uEnableFogCoord;
 
     struct {
-        GLuint  Position, ColorAmbient, ColorDiffuse, ColorSpec;
-        GLuint  Attenuation, SpotDir;
-        GLuint  SpotVar;
+        GLint  Position, ColorAmbient, ColorDiffuse, ColorSpec;
+        GLint  Attenuation, SpotDir;
+        GLint  SpotVar;
     } uLight[WES_LIGHT_NUM];
 
     struct {
-        GLuint      ColorMaterial;
-        GLuint      ColorAmbient, ColorDiffuse, ColorSpec, ColorEmissive;
-        GLuint   	SpecExponent;
+        GLint      ColorMaterial;
+        GLint      ColorAmbient, ColorDiffuse, ColorSpec, ColorEmissive;
+        GLint   	SpecExponent;
     } uMaterial[WES_FACE_NUM];
 
     struct {
-    	GLuint  ColorAmbient;
-        GLuint  TwoSided, LocalViewer;
-        GLuint  ColorControl;
+    	GLint  ColorAmbient;
+        GLint  TwoSided, LocalViewer;
+        GLint  ColorControl;
     } uLightModel;
 
     struct {
-        GLuint  Func;		// {Tex function, RGB function, Alpha function}
-        GLuint  Arg0;		// {RGB Src, RGB Op, Alpha Src, Alpha Op}
-        GLuint  Arg1;		// {RGB Src, RGB Op, Alpha Src, Alpha Op}
-        GLuint  Arg2;		// {RGB Src, RGB Op, Alpha Src, Alpha Op}
-        GLuint  EnvColor;
-        GLuint  Unit;
+        GLint  Func;		// {Tex function, RGB function, Alpha function}
+        GLint  Arg0;		// {RGB Src, RGB Op, Alpha Src, Alpha Op}
+        GLint  Arg1;		// {RGB Src, RGB Op, Alpha Src, Alpha Op}
+        GLint  Arg2;		// {RGB Src, RGB Op, Alpha Src, Alpha Op}
+        GLint  EnvColor;
+        GLint  Unit;
     } uTexture[WES_MULTITEX_NUM];
 
-    GLuint  uRescaleFactor;
+    GLint  uRescaleFactor;
 
-    GLuint      uFogMode;
-    GLuint    uFogStart, uFogEnd, uFogDensity;
-    GLuint     uFogColor;
+    GLint      uFogMode;
+    GLint    uFogStart, uFogEnd, uFogDensity;
+    GLint     uFogColor;
 
-    GLuint	uTexGenMode[WES_MULTITEX_NUM];
-    GLuint		uTexGenMat[WES_MULTITEX_NUM];
+    GLint	uTexGenMode[WES_MULTITEX_NUM];
+    GLint		uTexGenMat[WES_MULTITEX_NUM];
 
-    GLuint     uClipPlane[WES_CLIPPLANE_NUM];
+    GLint     uClipPlane[WES_CLIPPLANE_NUM];
 
-    GLuint     uMVP;
-    GLuint     uMV;
-    GLuint     uMVIT;
+    GLint     uMVP;
+    GLint     uMV;
+    GLint     uMVIT;
 
-    GLuint      uAlphaFunc;
-    GLuint      uAlphaRef;
+    GLint      uAlphaFunc;
+    GLint      uAlphaRef;
 };
 
 struct progstate_s
@@ -147,8 +159,8 @@ struct progstate_s
 
     int uEnableFog;
     int uEnableClipPlane;
-
     struct {
+        GLboolean Enable;
         GLint Mode;
         GLint RGBCombine, AlphaCombine;
         struct {

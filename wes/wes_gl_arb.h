@@ -39,9 +39,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
 #define GL_MAX_TEXTURE_UNITS_ARB        GL_MAX_TEXTURE_UNITS
-#define GL_TEXTURE0_ARB             GL_TEXTURE0
-#define GL_TEXTURE1_ARB             GL_TEXTURE1
-#define GL_TEXTURE2_ARB             GL_TEXTURE2
+#define GL_TEXTURE0_ARB                 GL_TEXTURE0
+#define GL_TEXTURE1_ARB                 GL_TEXTURE1
+#define GL_TEXTURE2_ARB                 GL_TEXTURE2
+#define GL_TEXTURE3_ARB                 GL_TEXTURE3
 
 
 /* Tex env */
@@ -52,14 +53,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #define GL_COMBINE_RGB_ARB                          GL_COMBINE_RGB
 #define GL_COMBINE_ALPHA_ARB                        GL_COMBINE_ALPHA
 #define GL_SOURCE0_RGB_ARB                          GL_SOURCE0_RGB
-#define GL_SOURCE1_RGB_ARB                          0x8581
-#define GL_SOURCE2_RGB_ARB                          0x8582
-#define GL_SOURCE0_ALPHA_ARB                        0x8588
-#define GL_SOURCE1_ALPHA_ARB                        0x8589
-#define GL_SOURCE2_ALPHA_ARB                        0x858A
-#define GL_OPERAND0_RGB_ARB                         0x8590
-#define GL_OPERAND1_RGB_ARB                         0x8591
-#define GL_OPERAND2_RGB_ARB                         0x8592
+#define GL_SOURCE1_RGB_ARB                          GL_SOURCE1_RGB
+#define GL_SOURCE2_RGB_ARB                          GL_SOURCE2_RGB
+#define GL_SOURCE0_ALPHA_ARB                        GL_SOURCE0_ALPHA
+#define GL_SOURCE1_ALPHA_ARB                        GL_SOURCE1_ALPHA
+#define GL_SOURCE2_ALPHA_ARB                        GL_SOURCE2_ALPHA
+#define GL_OPERAND0_RGB_ARB                         GL_OPERAND0_RGB
+#define GL_OPERAND1_RGB_ARB                         GL_OPERAND1_RGB
+#define GL_OPERAND2_RGB_ARB                         GL_OPERAND2_RGB
 #define GL_OPERAND0_ALPHA_ARB                       0x8598
 #define GL_OPERAND1_ALPHA_ARB                       0x8599
 #define GL_OPERAND2_ALPHA_ARB                       0x859A
@@ -73,6 +74,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #define GL_DOT3_RGB_ARB                             0x86AE
 #define GL_DOT3_RGBA_ARB                            0x86AF
 
+
+/* ATI Extensions */
+#define GL_MODULATE_ADD_ATI                         0x8744
+#define GL_MODULATE_SIGNED_ADD_ATI                  0x8745
+#define GL_MODULATE_SUBTRACT_ATI                    0x8746
 
 /*  Textures    */
 #define GL_UNSIGNED_SHORT_4_4_4_4_EXT                   0x8033

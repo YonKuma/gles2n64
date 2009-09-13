@@ -171,6 +171,8 @@ wes_begin_init()
         vt_const->coord[i].s = vt_const->coord[i].t = vt_const->coord[i].r = 0.0f;
         vt_const->coord[i].q = 1.0;
     }
+    *vt_current = *vt_const;
+
     for(i = 0 ; i != WES_ANUM; i++){
         vt_attrib_pointer[i].isenabled = GL_FALSE;
         vt_attrib_pointer[i].size = 0;
@@ -179,7 +181,6 @@ wes_begin_init()
         vt_attrib_pointer[i].ptr = NULL;
     }
 
-    *vt_current = *vt_const;
 }
 
 GLvoid
@@ -476,13 +477,14 @@ glColorPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr)
 GLvoid
 glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr)
 {
+    int i = WES_ATEXCOORD0 + vt_clienttex;
     wes_vertbuffer_flush();
-    vt_attrib_pointer[WES_ACOLOR0].isenabled = GL_TRUE;
-    vt_attrib_pointer[WES_ACOLOR0].size = size;
-    vt_attrib_pointer[WES_ACOLOR0].type = type;
-    vt_attrib_pointer[WES_ACOLOR0].stride = stride;
-    vt_attrib_pointer[WES_ACOLOR0].ptr = ptr;
-    wes_gl->glVertexAttribPointer(WES_ATEXCOORD0 + vt_clienttex, size, type, GL_FALSE, stride, ptr);
+    vt_attrib_pointer[i].isenabled = GL_TRUE;
+    vt_attrib_pointer[i].size = size;
+    vt_attrib_pointer[i].type = type;
+    vt_attrib_pointer[i].stride = stride;
+    vt_attrib_pointer[i].ptr = ptr;
+    wes_gl->glVertexAttribPointer(i, size, type, GL_FALSE, stride, ptr);
 }
 
 GLvoid

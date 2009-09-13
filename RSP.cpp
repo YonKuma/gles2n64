@@ -28,7 +28,6 @@ RSPInfo     RSP;
 
 void RSP_LoadMatrix( f32 mtx[4][4], u32 address )
 {
-    LOG("RSP_LoadMatrix(%d, %d) \n", mtx, address);
 
     f32 recip = 1.5258789e-05f;
 
@@ -104,7 +103,6 @@ DWORD WINAPI RSP_ThreadProc( LPVOID lpParameter )
 
 void RSP_ProcessDList()
 {
-    LOG("RSP_ProcessDList() \n");
 
     VI_UpdateSize();
     OGL_UpdateScale();

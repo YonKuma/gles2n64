@@ -26,28 +26,27 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "wes_shader.h"
 #include "wes.h"
 
-const char* frag_header = "\
-#define LIGHT_NUM						8\n\
-#define CLIPPLANE_NUM					6\n\
-#define MULTITEX_NUM					4\n\
-#define FACE_NUM						2\n\
-\n\
-struct sMultiTexture {\n\
-    lowp vec4 EnvColor;\n\
-    sampler2D Unit;\n\
-};\n\
-\n\
-uniform lowp vec4		uFogColor;\n\
-uniform sMultiTexture	uTexture[MULTITEX_NUM];\n\
-uniform	highp float		uAlphaRef;\n\
-\n\
-//Varyings:\n\
-varying lowp vec4 		vColor;\n\
-varying lowp vec2 		vFactor;\n\
-varying mediump vec4 	vTexCoord[MULTITEX_NUM];\n\
-\n\
-void main(){\n\
-    gl_FragColor = vColor;\n";
+const char* frag_header = "                     \n  "
+"#define LIGHT_NUM						8       \n  "
+"#define CLIPPLANE_NUM					6       \n  "
+"#define MULTITEX_NUM					4       \n  "
+"#define FACE_NUM						2       \n  "
+"                                               \n  "
+"struct sMultiTexture {                         \n  "
+"    lowp vec4 EnvColor;                        \n  "
+"    sampler2D Unit;                            \n  "
+"};                                             \n  "
+"                                               \n  "
+"uniform lowp vec4		uFogColor;              \n  "
+"uniform sMultiTexture	uTexture[MULTITEX_NUM]; \n  "
+"uniform	highp float		uAlphaRef;          \n  "
+"                                               \n  "
+"//Varyings:                                    \n  "
+"varying lowp vec4 		vColor;                 \n  "
+"varying lowp vec2 		vFactor;                \n  "
+"varying mediump vec4 	vTexCoord[MULTITEX_NUM];\n  "
+"                                               \n  "
+"void main(){                                   \n  ";
 
 
 GLint
@@ -68,8 +67,8 @@ wes_frag_fog(char* buff, progstate_t *s)
     char *str = buff;
     if (s->uEnableFog)
     {
-        str += sprintf(str,"%s\n", "gl_FragColor = gl_FragColor * vFactor.x + \
-                                    (1.0 - vFactor.x) * uFogColor;");
+        str += sprintf(str,"gl_FragColor = mix(uFogColor, gl_FragColor, vFactor.x);\n");
+        //gl_FragColor * vFactor.x + (1.0 - vFactor.x) * uFogColor;");
     }
     return (GLint)(str - buff);
 };
@@ -122,13 +121,13 @@ wes_frag_op(char *buff, progstate_t *s, int tex, int arg)
     switch(s->uTexture[tex].Arg[arg].RGBOp)
     {
         case WES_OP_ALPHA:
-            str += sprintf(str, "arg%i.rgb = vec3(arg%i.a, arg%i.a, arg%i.a);\n", arg, arg, arg, arg);break;
+            str += sprintf(str, "arg%i.rgb = vec3(arg%i.a);\n", arg, arg);break;
         case WES_OP_ONE_MINUS_ALPHA:
-            str += sprintf(str, "arg%i.rgb = vec3(1.0 - arg%i.a, 1.0 - arg%i.a, 1.0 - arg%i.a);\n", arg, arg, arg, arg);break;
+            str += sprintf(str, "arg%i.rgb = vec3(1.0 - arg%i.a);\n", arg, arg);break;
         case WES_OP_COLOR:
             break;
         case WES_OP_ONE_MINUS_COLOR:
-            str += sprintf(str, "arg%i.rgb = vec3(1.0 - arg%i.r, 1.0 - arg%i.g, 1.0 - arg%i.b);\n", arg, arg, arg, arg);break;
+            str += sprintf(str, "arg%i.rgb = vec3(1.0) - arg%i.rgb;\n", arg, arg);break;
     }
 
     switch(s->uTexture[tex].Arg[arg].AlphaOp)
@@ -144,71 +143,118 @@ wes_frag_op(char *buff, progstate_t *s, int tex, int arg)
 }
 
 GLint
+wes_frag_arg_obtain(char *buff, int tex, int arg, int src, int type)
+{
+    char *str = buff;
+
+    char comp[4];
+    switch(type){
+        case 4: strcpy(comp, "rgba");  break;
+        case 3: strcpy(comp, "rgb");   break;
+        case 1: strcpy(comp, "a");     break;
+    }
+
+    switch(src)
+    {
+        case WES_SRC_PREVIOUS:
+            if (tex == 0)
+                str += sprintf(str, "arg%i.%s = vColor.%s;\n", arg, comp, comp);
+            else
+                str += sprintf(str, "arg%i.%s = gl_FragColor.%s;\n", arg, comp, comp);
+            break;
+        case WES_SRC_CONSTANT:
+            str += sprintf(str, "arg%i.%s = uTexture[%i].EnvColor.%s;\n", arg, comp, tex, comp);
+            break;
+        case WES_SRC_PRIMARY_COLOR:
+            str += sprintf(str, "arg%i.%s = vColor.%s;\n", arg, comp, comp);
+            break;
+        case WES_SRC_TEXTURE:
+            str += sprintf(str, "arg%i.%s = tex%i.%s;\n", arg, comp, tex, comp);
+            break;
+
+        /* Crossbar Extensions */
+        case WES_SRC_TEXTURE0:
+            str += sprintf(str, "arg%i.%s = tex%i.%s;\n", arg, comp, 0, comp);
+            break;
+        case WES_SRC_TEXTURE1:
+            str += sprintf(str, "arg%i.%s = tex%i.%s;\n", arg, comp, 1, comp);
+            break;
+        case WES_SRC_TEXTURE2:
+            str += sprintf(str, "arg%i.%s = tex%i.%s;\n", arg, comp, 2, comp);
+            break;
+        case WES_SRC_TEXTURE3:
+            str += sprintf(str, "arg%i.%s = tex%i.%s;\n", arg, comp, 3, comp);
+            break;
+
+        /* ATI Extensions */
+        case WES_SRC_ONE:
+            if (type == 1)
+                str += sprintf(str, "arg%i.%s = 1.0;\n", arg, comp);
+            else
+                str += sprintf(str, "arg%i.%s = vec%i(1.0);\n", arg, comp, type);
+            break;
+        case WES_SRC_ZERO:
+            if (type == 1)
+                str += sprintf(str, "arg%i.%s = 0.0;\n", arg, comp);
+            else
+                str += sprintf(str, "arg%i.%s = vec%i(0.0);\n", arg, comp, type);
+            break;
+
+        default:    PRINT_ERROR("ERROR: No valid SRC for TEX%i ARG%i.%s", tex, arg, comp); break;
+    }
+    return (GLint)(str - buff);
+};
+
+GLint
 wes_frag_arg(char *buff, progstate_t *s, int tex, int arg)
 {
     char *str = buff;
-    if (s->uTexture[tex].Arg[arg].RGBSrc == s->uTexture[tex].Arg[arg].AlphaSrc)
-    {
-        switch(s->uTexture[tex].Arg[arg].RGBSrc)
-        {
-            case WES_SRC_PREVIOUS:
-                str += sprintf(str, "arg%i = gl_FragColor;\n", arg);  break;
-            case WES_SRC_CONSTANT:
-                str += sprintf(str, "arg%i = uTexture[%i].EnvColor;\n", arg, tex);break;
-            case WES_SRC_PRIMARY_COLOR:
-                str += sprintf(str, "arg%i = vColor;\n", arg); break;
-            case WES_SRC_TEXTURE:
-                str += sprintf(str, "arg%i = texture2D(uTexture[%i].Unit, vTexCoord[%i].xy);\n", arg, tex, tex); break;
-            default:{
-                int ind = s->uTexture[tex].Arg[arg].RGBSrc - WES_SRC_TEXTURE0;
-                if (ind > 0 && ind < WES_MULTITEX_NUM){
-                    str += sprintf(str, "arg%i = texture2D(uTexture[%i].Unit, vTexCoord[%i].xy);\n", arg, ind, tex);
-                }
-                break;
-            }
-        }
-    } else {
 
-        switch(s->uTexture[tex].Arg[arg].RGBSrc)
-        {
-            case WES_SRC_PREVIOUS:
-                str += sprintf(str, "arg%i.rgb = gl_FragColor.rgb;\n", arg);break;
-            case WES_SRC_CONSTANT:
-                str += sprintf(str, "arg%i.rgb = uTexture[%i].EnvColor.rgb;\n", arg, tex);break;
-            case WES_SRC_PRIMARY_COLOR:
-                str += sprintf(str, "arg%i.rgb = vColor.rgb;\n", arg);break;
-            case WES_SRC_TEXTURE:
-                str += sprintf(str, "arg%i.rgb = texture2D(uTexture[%i].Unit, vTexCoord[%i].xy).rgb;\n", arg, tex, tex);break;
-            default:{
-                int ind = s->uTexture[tex].Arg[arg].RGBSrc - WES_SRC_TEXTURE0;
-                if (ind > 0 && ind < WES_MULTITEX_NUM){
-                    str += sprintf(str, "arg%i.rgb = texture2D(uTexture[%i].Unit, vTexCoord[%i].xy).rgb;\n", arg, ind, tex);
-                }
-                break;
-            }
-        }
+    GLint rgbsrc = s->uTexture[tex].Arg[arg].RGBSrc;
+    GLint alphasrc = s->uTexture[tex].Arg[arg].AlphaSrc;
 
-        switch(s->uTexture[tex].Arg[arg].AlphaSrc)
-        {
-            case WES_SRC_PREVIOUS:
-                str += sprintf(str, "arg%i.a = gl_FragColor.a;\n", arg);break;
-            case WES_SRC_CONSTANT:
-                str += sprintf(str, "arg%i.a = uTexture[%i].EnvColor.a;\n", arg, tex);break;
-            case WES_SRC_PRIMARY_COLOR:
-                str += sprintf(str, "arg%i.a = vColor.a;\n", arg);break;
-            case WES_SRC_TEXTURE:
-                str += sprintf(str, "arg%i.a = texture2D(uTexture[%i].Unit, vTexCoord[%i].xy).a;\n", arg, tex, tex);break;
-            default:{
-                int ind = s->uTexture[tex].Arg[arg].RGBSrc - WES_SRC_TEXTURE0;
-                if (ind > 0 && ind < WES_MULTITEX_NUM){
-                    str += sprintf(str, "arg%i.a = texture2D(uTexture[%i].Unit, vTexCoord[%i].xy).a;\n", arg, ind, tex);
-                }
-                break;
-            }
+    /* test for duplicate args */
+    int duprgb = 0, dupalpha = 0;
+    if (arg > 0){
+        if (rgbsrc  == s->uTexture[tex].Arg[arg - 1].RGBSrc){
+            str += sprintf(str, "arg%i.rgb = arg%i.rgb;\n", arg, arg - 1);
+            duprgb = 1;
+        }
+        if (alphasrc  == s->uTexture[tex].Arg[arg - 1].AlphaSrc){
+            str += sprintf(str, "arg%i.a = arg%i.a;\n", arg, arg - 1);
+            dupalpha = 1;
+        }
+    }
+    if (arg > 1) {
+        if (!duprgb && (rgbsrc == s->uTexture[tex].Arg[arg - 2].RGBSrc)){
+            str += sprintf(str, "arg%i.rgb = arg%i.rgb;\n", arg, arg - 2);
+            duprgb = 1;
+        }
+        if (!dupalpha && (alphasrc == s->uTexture[tex].Arg[arg - 2].AlphaSrc)){
+            str += sprintf(str, "arg%i.a = arg%i.a;\n", arg, arg - 2);
+            dupalpha = 1;
         }
     }
 
-    str += wes_frag_op(str, s, tex, arg);
+    /* obtain non duplicate components */
+    if ((!dupalpha) && (!duprgb) && (rgbsrc == alphasrc)){
+        str += wes_frag_arg_obtain(str, tex, arg, rgbsrc, 4);
+    } else {
+
+        if (!duprgb){
+            str += wes_frag_arg_obtain(str, tex, arg, rgbsrc, 3);
+        }
+        if (!dupalpha){
+        // Alpha Source it not being set to texture when it should be!
+#if 1
+            if (alphasrc == WES_SRC_PREVIOUS)
+                str += sprintf(str, "arg%i.a = tex%i.a;\n", arg, tex);
+            else
+#endif
+            str += wes_frag_arg_obtain(str, tex, arg, alphasrc, 1);
+        }
+    }
+
     return (GLint)(str - buff);
 }
 
@@ -223,56 +269,114 @@ wes_frag_combine(char *buff, progstate_t *s, int tex)
         {
             case WES_FUNC_REPLACE:
                 str += wes_frag_arg(str, s, tex, 0);
+                str += wes_frag_op(str, s, tex, 0);
                 str += sprintf(str, "gl_FragColor = arg0;\n");
                 break;
 
             case WES_FUNC_MODULATE:
                 str += wes_frag_arg(str, s, tex, 0);
                 str += wes_frag_arg(str, s, tex, 1);
+                str += wes_frag_op(str, s, tex, 1);
+                str += wes_frag_op(str, s, tex, 0);
                 str += sprintf(str, "gl_FragColor = arg0 * arg1;\n");
                 break;
 
             case WES_FUNC_ADD:
                 str += wes_frag_arg(str, s, tex, 0);
                 str += wes_frag_arg(str, s, tex, 1);
+                str += wes_frag_op(str, s, tex, 1);
+                str += wes_frag_op(str, s, tex, 0);
                 str += sprintf(str, "gl_FragColor = arg0 + arg1;\n");
                 break;
 
             case WES_FUNC_ADD_SIGNED:
                 str += wes_frag_arg(str, s, tex, 0);
                 str += wes_frag_arg(str, s, tex, 1);
-                str += sprintf(str, "gl_FragColor = arg0 + arg1 - vec4(0.5,0.5,0.5,0.5);\n");
+                str += wes_frag_op(str, s, tex, 1);
+                str += wes_frag_op(str, s, tex, 0);
+                str += sprintf(str, "gl_FragColor = arg0 + arg1 - vec4(0.5);\n");
                 break;
 
             case WES_FUNC_INTERPOLATE:
                 str += wes_frag_arg(str, s, tex, 0);
                 str += wes_frag_arg(str, s, tex, 1);
                 str += wes_frag_arg(str, s, tex, 2);
-                str += sprintf(str, "gl_FragColor = arg0 * arg2 + arg1 * (vec4(1.0, 1.0, 1.0, 1.0) - arg2);\n");
+                str += wes_frag_op(str, s, tex, 2);
+                str += wes_frag_op(str, s, tex, 1);
+                str += wes_frag_op(str, s, tex, 0);
+                str += sprintf(str, "gl_FragColor = mix(arg1, arg0, arg2);\n");
+                //arg0 * arg2 + arg1 * (vec4(1.0) - arg2);\n");
                 break;
 
             case WES_FUNC_SUBTRACT:
                 str += wes_frag_arg(str, s, tex, 0);
                 str += wes_frag_arg(str, s, tex, 1);
+                str += wes_frag_op(str, s, tex, 1);
+                str += wes_frag_op(str, s, tex, 0);
                 str += sprintf(str, "gl_FragColor = arg0 - arg1;\n");
                 break;
+
+            /*ATI Extensions */
+            case WES_FUNC_MODULATE_SUBTRACT:
+                str += wes_frag_arg(str, s, tex, 0);
+                str += wes_frag_arg(str, s, tex, 1);
+                str += wes_frag_arg(str, s, tex, 2);
+                str += wes_frag_op(str, s, tex, 2);
+                str += wes_frag_op(str, s, tex, 1);
+                str += wes_frag_op(str, s, tex, 0);
+                str += sprintf(str, "gl_FragColor.rgb = arg0.rgb * arg2.rgb - arg1.rgb;\n");
+                break;
+
+            case WES_FUNC_MODULATE_ADD:
+                str += wes_frag_arg(str, s, tex, 0);
+                str += wes_frag_arg(str, s, tex, 1);
+                str += wes_frag_arg(str, s, tex, 2);
+                str += wes_frag_op(str, s, tex, 2);
+                str += wes_frag_op(str, s, tex, 1);
+                str += wes_frag_op(str, s, tex, 0);
+                str += sprintf(str, "gl_FragColor.rgb = arg0.rgb * arg2.rgb + arg1.rgb;\n");
+                break;
+
+            case WES_FUNC_MODULATE_SIGNED_ADD:
+                str += wes_frag_arg(str, s, tex, 0);
+                str += wes_frag_arg(str, s, tex, 1);
+                str += wes_frag_arg(str, s, tex, 2);
+                str += wes_frag_op(str, s, tex, 2);
+                str += wes_frag_op(str, s, tex, 1);
+                str += wes_frag_op(str, s, tex, 0);
+                str += sprintf(str, "gl_FragColor.rgb = arg0.rgb * arg2.rgb + arg1.rgb - vec3(0.5);\n");
+                break;
+
+            default:    PRINT_ERROR("ERROR: No valid FUNC for TEX%i", tex); break;
+
         }
 
     } else if (s->uTexture[tex].RGBCombine == WES_FUNC_DOT3_RGBA){
         str += wes_frag_arg(str, s, tex, 0);
         str += wes_frag_arg(str, s, tex, 1);
-        str += sprintf(str, "lowp vec3 col0 = arg0.rgb - vec3(0.5,0.5,0.5);\n");
-        str += sprintf(str, "lowp vec3 col1 = arg1.rgb - vec3(0.5,0.5,0.5);\n");
-        str += sprintf(str, "lowp float f = 4 * dot(col0, col1);\n");
-        str += sprintf(str, "gl_FragColor = vec4(f, f, f, f);\n");
+        str += wes_frag_op(str, s, tex, 1);
+        str += wes_frag_op(str, s, tex, 0);
+        str += sprintf(str, "lowp vec3 col0 = arg0.rgb - vec3(0.5);\n");
+        str += sprintf(str, "lowp vec3 col1 = arg1.rgb - vec3(0.5);\n");
+        str += sprintf(str, "gl_FragColor = vec4(4.0 * dot(col0, col1));\n");
     } else {
 
         str += wes_frag_arg(str, s, tex, 0);
         str += wes_frag_arg(str, s, tex, 1);
         if (s->uTexture[tex].RGBCombine == WES_FUNC_INTERPOLATE ||
-            s->uTexture[tex].AlphaCombine == WES_FUNC_INTERPOLATE){
+            s->uTexture[tex].AlphaCombine == WES_FUNC_INTERPOLATE ||
+            s->uTexture[tex].RGBCombine == WES_FUNC_MODULATE_SUBTRACT ||
+            s->uTexture[tex].AlphaCombine == WES_FUNC_MODULATE_SUBTRACT ||
+            s->uTexture[tex].RGBCombine == WES_FUNC_MODULATE_ADD ||
+            s->uTexture[tex].AlphaCombine == WES_FUNC_MODULATE_ADD ||
+            s->uTexture[tex].RGBCombine == WES_FUNC_MODULATE_SIGNED_ADD ||
+            s->uTexture[tex].AlphaCombine == WES_FUNC_MODULATE_SIGNED_ADD
+            ){
             str += wes_frag_arg(str, s, tex, 2);
+            str += wes_frag_op(str, s, tex, 2);
         }
+        str += wes_frag_op(str, s, tex, 1);
+        str += wes_frag_op(str, s, tex, 0);
 
         switch(s->uTexture[tex].RGBCombine)
         {
@@ -289,11 +393,12 @@ wes_frag_combine(char *buff, progstate_t *s, int tex)
                 break;
 
             case WES_FUNC_ADD_SIGNED:
-                str += sprintf(str, "gl_FragColor.rgb = arg0.rgb + arg1.rgb - vec3(0.5,0.5,0.5);\n");
+                str += sprintf(str, "gl_FragColor.rgb = arg0.rgb + arg1.rgb - vec3(0.5);\n");
                 break;
 
             case WES_FUNC_INTERPOLATE:
-                str += sprintf(str, "gl_FragColor.rgb = arg0.rgb * arg2.rgb + arg1.rgb * (vec3(1.0, 1.0, 1.0) - arg2.rgb);\n");
+                str += sprintf(str, "gl_FragColor.rgb = mix(arg1.rgb, arg0.rgb, arg2.rgb);\n");
+                //arg0.rgb * arg2.rgb + arg1.rgb * (vec3(1.0) - arg2.rgb);\n");
                 break;
 
             case WES_FUNC_SUBTRACT:
@@ -301,13 +406,26 @@ wes_frag_combine(char *buff, progstate_t *s, int tex)
                 break;
 
             case WES_FUNC_DOT3_RGB:
-                str += sprintf(str, "lowp vec3 col0 = arg0.rgb - vec3(0.5,0.5,0.5);\n");
-                str += sprintf(str, "lowp vec3 col1 = arg1.rgb - vec3(0.5,0.5,0.5);\n");
-                str += sprintf(str, "lowp float f = 4 * dot(col0, col1);\n");
-                str += sprintf(str, "gl_FragColor.rgb = vec3(f,f,f);\n");
+                str += sprintf(str, "lowp vec3 col0 = arg0.rgb - vec3(0.5);\n");
+                str += sprintf(str, "lowp vec3 col1 = arg1.rgb - vec3(0.5);\n");
+                str += sprintf(str, "gl_FragColor.rgb = vec3(4 * dot(col0, col1));\n");
                 break;
-        }
 
+            /*ATI Extensions */
+            case WES_FUNC_MODULATE_SUBTRACT:
+                str += sprintf(str, "gl_FragColor.rgb = arg0.rgb * arg2.rgb - arg1.rgb;\n");
+                break;
+
+            case WES_FUNC_MODULATE_ADD:
+                str += sprintf(str, "gl_FragColor.rgb = arg0.rgb * arg2.rgb + arg1.rgb;\n");
+                break;
+
+            case WES_FUNC_MODULATE_SIGNED_ADD:
+                str += sprintf(str, "gl_FragColor.rgb = arg0.rgb * arg2.rgb + arg1.rgb - vec3(0.5);\n");
+                break;
+
+            default:    PRINT_ERROR("ERROR: No valid FUNC for TEX%i.rgb", tex); break;
+        }
 
         switch(s->uTexture[tex].AlphaCombine)
         {
@@ -328,14 +446,117 @@ wes_frag_combine(char *buff, progstate_t *s, int tex)
                 break;
 
             case WES_FUNC_INTERPOLATE:
-                str += sprintf(str, "gl_FragColor.a = arg0.a * arg2.a + arg1.a * (1.0 - arg2.a);\n");
+                str += sprintf(str, "gl_FragColor.a = mix(arg1.a, arg0.a, arg2.a);\n");
+                //arg0.a * arg2.a + arg1.a * (1.0 - arg2.a);\n");
                 break;
 
             case WES_FUNC_SUBTRACT:
                 str += sprintf(str, "gl_FragColor.a = arg0.a - arg1.a;\n");
                 break;
+
+            /*ATI Extensions */
+            case WES_FUNC_MODULATE_SUBTRACT:
+                str += sprintf(str, "gl_FragColor.a = arg0.a * arg2.a - arg1.a;\n");
+                break;
+
+            case WES_FUNC_MODULATE_ADD:
+                str += sprintf(str, "gl_FragColor.a = arg0.a * arg2.a + arg1.a;\n");
+                break;
+
+            case WES_FUNC_MODULATE_SIGNED_ADD:
+                str += sprintf(str, "gl_FragColor.a = arg0.a * arg2.a + arg1.a - 0.5;\n");
+                break;
+
+            default:    PRINT_ERROR("ERROR: No valid FUNC for TEX%i.a", tex); break;
         }
 
+    }
+
+    return (GLint)(str - buff);
+}
+
+GLint
+wes_frag_tex_obtain(char* buff, progstate_t *s){
+    char *str = buff;
+    GLint i, j, n;
+    GLint needtex[WES_MULTITEX_NUM];
+    for(i = 0; i < WES_MULTITEX_NUM; i++){
+        needtex[i] = 0;
+    }
+
+    //Add needed textures
+    for(i = 0; i < WES_MULTITEX_NUM; i++){
+        if (s->uTexture[i].Enable){
+            if (s->uTexture[i].Mode != WES_FUNC_COMBINE){
+                    needtex[i] = 1;
+            } else {
+
+                //number of arguments:
+                if (s->uTexture[i].RGBCombine == WES_FUNC_REPLACE){
+                    n = 1;
+                } else if ( s->uTexture[i].RGBCombine == WES_FUNC_INTERPOLATE ||
+                            s->uTexture[i].RGBCombine == WES_FUNC_MODULATE_SUBTRACT ||
+                            s->uTexture[i].RGBCombine == WES_FUNC_MODULATE_ADD ||
+                            s->uTexture[i].RGBCombine == WES_FUNC_MODULATE_SIGNED_ADD) {
+                    n = 3;
+                } else {
+                    n = 2;
+                }
+
+                for(j = 0; j < n; j++){
+                    if (s->uTexture[i].Arg[j].RGBSrc == WES_SRC_TEXTURE){
+                        needtex[i] = 1;
+                    }
+                    if (s->uTexture[i].Arg[j].RGBSrc == WES_SRC_TEXTURE0){
+                        needtex[0] = 1;
+                    }
+                    if (s->uTexture[i].Arg[j].RGBSrc == WES_SRC_TEXTURE1){
+                        needtex[1] = 1;
+                    }
+                    if (s->uTexture[i].Arg[j].RGBSrc == WES_SRC_TEXTURE2){
+                        needtex[2] = 1;
+                    }
+                    if (s->uTexture[i].Arg[j].RGBSrc == WES_SRC_TEXTURE3){
+                        needtex[3] = 1;
+                    }
+                }
+
+                //number of arguments:
+                if (s->uTexture[i].AlphaCombine == WES_FUNC_REPLACE){
+                    n = 1;
+                } else if ( s->uTexture[i].AlphaCombine == WES_FUNC_INTERPOLATE ||
+                            s->uTexture[i].AlphaCombine == WES_FUNC_MODULATE_SUBTRACT ||
+                            s->uTexture[i].AlphaCombine == WES_FUNC_MODULATE_ADD ||
+                            s->uTexture[i].AlphaCombine == WES_FUNC_MODULATE_SIGNED_ADD) {
+                    n = 3;
+                } else {
+                    n = 2;
+                }
+
+                for(j = 0; j < n; j++){
+                    if (s->uTexture[i].Arg[j].AlphaSrc == WES_SRC_TEXTURE){
+                        needtex[i] = 1;
+                    }
+                    if (s->uTexture[i].Arg[j].AlphaSrc == WES_SRC_TEXTURE0){
+                        needtex[0] = 1;
+                    }
+                    if (s->uTexture[i].Arg[j].AlphaSrc == WES_SRC_TEXTURE1){
+                        needtex[1] = 1;
+                    }
+                    if (s->uTexture[i].Arg[j].AlphaSrc == WES_SRC_TEXTURE2){
+                        needtex[2] = 1;
+                    }
+                    if (s->uTexture[i].Arg[j].AlphaSrc == WES_SRC_TEXTURE3){
+                        needtex[3] = 1;
+                    }
+                }
+            }
+        }
+    }
+
+    for(i = 0; i < WES_MULTITEX_NUM; i++){
+        if (needtex[i])
+            str += sprintf(str, "lowp vec4 tex%i = texture2D(uTexture[%i].Unit, vTexCoord[%i].xy);\n", i, i, i);
     }
 
     return (GLint)(str - buff);
@@ -345,41 +566,44 @@ GLint
 wes_frag_tex(char* buff, progstate_t *s)
 {
     char *str = buff;
-    str += sprintf(str, "lowp vec4 arg0, arg1, arg2;\n");
-
     GLint i;
+
+    str += sprintf(str, "lowp vec4 arg0, arg1, arg2;\n");
+    str += wes_frag_tex_obtain(str, s);
+
     for(i = 0; i < WES_MULTITEX_NUM; i++)
     {
-        switch(s->uTexture[i].Mode)
-        {
-            case WES_FUNC_REPLACE:
-                str += sprintf(str, "gl_FragColor = texture2D(uTexture[%i].Unit, vTexCoord[%i].xy);\n", i, i);
-                break;
+        if ((i == 0) || s->uTexture[i].Enable){
+            switch(s->uTexture[i].Mode)
+            {
+                case WES_FUNC_REPLACE:
+                    str += sprintf(str, "gl_FragColor = tex%i;\n", i);
+                    break;
 
-            case WES_FUNC_MODULATE:
-                str += sprintf(str, "gl_FragColor *= texture2D(uTexture[%i].Unit, vTexCoord[%i].xy);\n", i, i);
-                break;
+                case WES_FUNC_MODULATE:
+                    str += sprintf(str, "gl_FragColor *= tex%i;\n", i);
+                    break;
 
-            case WES_FUNC_DECAL:
-                str += sprintf(str, "lowp vec4 col = texture2D(uTexture[%i].Unit, vTexCoord[%i].xy);\n", i, i);
-                str += sprintf(str, "gl_FragColor.rgb = (1.0 - col.a) * gl_FragColor.rgb + col.a * col.rgb;\n");
-                break;
+                case WES_FUNC_DECAL:
+                    str += sprintf(str, "gl_FragColor.rgb = mix(gl_FragColor.rgb, tex%i.rgb, tex%i.a);\n", i, i);
+                    break;
 
-            case WES_FUNC_BLEND:
-                str += sprintf(str, "lowp vec4 col = texture2D(uTexture[%i].Unit, vTexCoord[%i].xy);\n", i, i);
-                str += sprintf(str, "gl_FragColor.rgb = (vec3(1.0,1.0,1.0) - col.rgb) * gl_FragColor.rgb + col.rgb * uTexture[0].EnvColor.rgb;\n");
-                str += sprintf(str, "gl_FragColor.a *= col.a;\n");
-                break;
+                case WES_FUNC_BLEND:
+                    str += sprintf(str, "gl_FragColor.rgb = mix(gl_FragColor.rgb, uTexture[%i].EnvColor.rgb, tex%i.rgb);\n", i, i);
+                    str += sprintf(str, "gl_FragColor.a *= tex%i.a;\n", i);
+                    break;
 
-            case WES_FUNC_ADD:
-                str += sprintf(str, "lowp vec4 col = texture2D(uTexture[%i].Unit, vTexCoord[%i].xy);\n", i, i);
-                str += sprintf(str, "gl_FragColor.rgb += col.rgb;\n");
-                str += sprintf(str, "gl_FragColor.a *= col.a;\n");
-                break;
+                case WES_FUNC_ADD:
+                    str += sprintf(str, "gl_FragColor.rgb += tex%i.rgb;\n", i);
+                    str += sprintf(str, "gl_FragColor.a *= tex%i.a;\n", i);
+                    break;
 
-            case WES_FUNC_COMBINE:
-                str += wes_frag_combine(str, s, i);
-                break;
+                case WES_FUNC_COMBINE:
+                    str += wes_frag_combine(str, s, i);
+                    break;
+
+                default:    PRINT_ERROR("ERROR: No valid MODE for TEX%i", i); break;
+            }
         }
     }
     return (GLint)(str - buff);

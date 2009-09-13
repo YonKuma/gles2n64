@@ -300,7 +300,6 @@ void FrameBuffer_RenderBuffer( u32 address )
 #if 0
             glDrawBuffer( GL_BACK );
 #endif
-
             glEnable( GL_TEXTURE_2D );
             glActiveTextureARB( GL_TEXTURE0_ARB );
             glTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB );
@@ -371,7 +370,6 @@ void FrameBuffer_RestoreBuffer( u32 address, u16 size, u16 width )
 
             u1 = (float)current->texture->width / (float)current->texture->realWidth;
             v1 = (float)current->texture->height / (float)current->texture->realHeight;
-
             glBegin(GL_QUADS);
                 glTexCoord2f( 0.0f, 0.0f );
                 glVertex2f( 0.0f, OGL.height - current->texture->height );
@@ -385,7 +383,6 @@ void FrameBuffer_RestoreBuffer( u32 address, u16 size, u16 width )
                 glTexCoord2f( u1, 0.0f );
                 glVertex2f( current->texture->width, OGL.height - current->texture->height );
             glEnd();
-
             glLoadIdentity();
 #if 0
             glPopAttrib();

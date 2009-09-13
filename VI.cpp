@@ -13,8 +13,6 @@ VIInfo VI;
 
 void VI_UpdateSize()
 {
-    LOG("VI_UpdateSize() \n");
-
     f32 xScale = _FIXED2FLOAT( _SHIFTR( *REG.VI_X_SCALE, 0, 12 ), 10 );
     //f32 xOffset = _FIXED2FLOAT( _SHIFTR( *REG.VI_X_SCALE, 16, 12 ), 10 );
 
@@ -37,9 +35,6 @@ void VI_UpdateSize()
 
 void VI_UpdateScreen()
 {
-
-    LOG("VI_UpdateScreen() \n");
-
     glFinish();
     if (OGL.frameBufferTextures)
     {
@@ -76,6 +71,8 @@ void VI_UpdateScreen()
 #endif
         }
     }
+#if 0
     glFinish();
+#endif
 }
 

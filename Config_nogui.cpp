@@ -98,7 +98,7 @@ void Config_LoadConfig()
     OGL.fullscreenWidth = 640;
     OGL.fullscreenHeight = 480;
 
-    OGL.windowedWidth = 800;
+    OGL.windowedWidth = 640;
     OGL.windowedHeight = 480;
 
     OGL.forceBilinear = 0;
@@ -107,7 +107,6 @@ void Config_LoadConfig()
     OGL.fog = 1;
     OGL.textureBitDepth = 2; // normal (16 & 32 bits)
     OGL.frameBufferTextures = 0;
-    OGL.usePolygonStipple = 0;
     cache.maxBytes = 32 * 1048576;
 
     // read configuration
@@ -187,10 +186,6 @@ void Config_LoadConfig()
         else if (!strcasecmp( line, "enable HardwareFB" ))
         {
             OGL.frameBufferTextures = atoi( val );
-        }
-        else if (!strcasecmp( line, "enable dithered alpha" ))
-        {
-            OGL.usePolygonStipple = atoi( val );
         }
         else if (!strcasecmp( line, "texture depth" ))
         {

@@ -34,11 +34,6 @@ void Combiner_Init()
         case TEXTURE_ENV_COMBINE:
             Init_texture_env_combine();
             break;
-#if 0
-        case NV_REGISTER_COMBINERS:
-            Init_NV_register_combiners();
-            break;
-#endif
     }
     combiner.root = NULL;
 }
@@ -50,11 +45,6 @@ void Combiner_UpdateCombineColors()
         case TEXTURE_ENV_COMBINE:
             Update_texture_env_combine_Colors( (TexEnvCombiner*)combiner.current->compiled );
             break;
-#if 0
-        case NV_REGISTER_COMBINERS:
-            Update_NV_register_combiners_Colors( (RegisterCombiners*)combiner.current->compiled );
-            break;
-#endif
     }
 
     gDP.changed &= ~CHANGED_COMBINE_COLORS;
@@ -284,12 +274,6 @@ CachedCombiner *Combiner_Compile( u64 mux )
         case TEXTURE_ENV_COMBINE:
             cached->compiled = (void*)Compile_texture_env_combine( &color, &alpha );
             break;
-
-#if 0
-        case NV_REGISTER_COMBINERS:
-            cached->compiled = (void*)Compile_NV_register_combiners( &color, &alpha );
-            break;
-#endif
     }
 
     return cached;
@@ -403,11 +387,7 @@ void Combiner_SetCombineStates()
         case TEXTURE_ENV_COMBINE:
             Set_texture_env_combine( (TexEnvCombiner*)combiner.current->compiled );
             break;
-#if 0
-        case NV_REGISTER_COMBINERS:
-            Set_NV_register_combiners( (RegisterCombiners*)combiner.current->compiled );
-            break;
-#endif
+
     }
 }
 

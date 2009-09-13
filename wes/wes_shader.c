@@ -101,7 +101,7 @@ wes_attrib_loc(GLuint prog)
     wes_gl->glBindAttribLocation(prog, WES_ATEXCOORD3, "aTexCoord3");
     wes_gl->glBindAttribLocation(prog, WES_ANORMAL,    "aNormal");
     wes_gl->glBindAttribLocation(prog, WES_AFOGCOORD,  "aFogCoord");
-    wes_gl->glBindAttribLocation(prog, WES_ACOLOR0,     "aColor");
+    wes_gl->glBindAttribLocation(prog, WES_ACOLOR0,    "aColor");
     wes_gl->glBindAttribLocation(prog, WES_ACOLOR1,    "aColor2nd");
 }
 
@@ -111,14 +111,13 @@ GLvoid
 wes_uniform_loc(program_t *p)
 {
 #define LocateUniform(A)                                                \
-    p->uloc.A = wes_gl->glGetUniformLocation(p->prog, #A)
-
+    p->uloc.A = wes_gl->glGetUniformLocation(p->prog, #A);
 #define LocateUniformIndex(A, B, I)                                    \
     sprintf(str, #A "[%i]" #B, I);                                     \
-    p->uloc.A[I]B = wes_gl->glGetUniformLocation(p->prog, str)
+    p->uloc.A[I]B = wes_gl->glGetUniformLocation(p->prog, str);
 
     int i;
-    char str[32];
+    char str[256];
 
     LocateUniform(uEnableRescaleNormal);
     LocateUniform(uEnableNormalize);
@@ -238,7 +237,7 @@ wes_progstate_cmp(progstate_t* s0, progstate_t* s1)
     if (s0->uEnableAlphaTest != s1->uEnableAlphaTest)
         return 1;
 
-    if (s0->uEnableAlphaTest && s0->uAlphaFunc != s1->uAlphaFunc)
+    if (s0->uEnableAlphaTest && (s0->uAlphaFunc != s1->uAlphaFunc))
         return 1;
 
     if (s0->uEnableFog != s1->uEnableFog)
@@ -249,26 +248,31 @@ wes_progstate_cmp(progstate_t* s0, progstate_t* s1)
 
     for(i = 0; i != WES_MULTITEX_NUM; i++)
     {
-        if (s0->uTexture[i].Mode != s1->uTexture[i].Mode)
+        if (s0->uTexture[i].Enable != s1->uTexture[i].Enable)
             return 1;
+        else if (s0->uTexture[i].Enable){
 
-        if (s0->uTexture[i].Mode == WES_FUNC_COMBINE)
-        {
-            if (s0->uTexture[i].RGBCombine != s1->uTexture[i].RGBCombine)
-                return 1;
-            if (s0->uTexture[i].AlphaCombine != s1->uTexture[i].AlphaCombine)
+            if (s0->uTexture[i].Mode != s1->uTexture[i].Mode)
                 return 1;
 
-            for(j = 0; j != 3; j++){
-                if (s0->uTexture[i].Arg[j].RGBSrc != s1->uTexture[i].Arg[j].RGBSrc)
+            if (s0->uTexture[i].Mode == WES_FUNC_COMBINE)
+            {
+                if (s0->uTexture[i].RGBCombine != s1->uTexture[i].RGBCombine)
                     return 1;
-                if (s0->uTexture[i].Arg[j].RGBOp != s1->uTexture[i].Arg[j].RGBOp)
+                if (s0->uTexture[i].AlphaCombine != s1->uTexture[i].AlphaCombine)
                     return 1;
-                if (s0->uTexture[i].Arg[j].AlphaSrc != s1->uTexture[i].Arg[j].AlphaSrc)
-                    return 1;
-                if (s0->uTexture[i].Arg[j].AlphaOp != s1->uTexture[i].Arg[j].AlphaOp)
-                    return 1;
-                }
+
+                for(j = 0; j != 3; j++){
+                    if (s0->uTexture[i].Arg[j].RGBSrc != s1->uTexture[i].Arg[j].RGBSrc)
+                        return 1;
+                    if (s0->uTexture[i].Arg[j].RGBOp != s1->uTexture[i].Arg[j].RGBOp)
+                        return 1;
+                    if (s0->uTexture[i].Arg[j].AlphaSrc != s1->uTexture[i].Arg[j].AlphaSrc)
+                        return 1;
+                    if (s0->uTexture[i].Arg[j].AlphaOp != s1->uTexture[i].Arg[j].AlphaOp)
+                        return 1;
+                    }
+            }
         }
     }
 
@@ -308,6 +312,11 @@ wes_choose_program(progstate_t *s)
     wes_build_program(s, p);
     wes_bind_program(p);
     sh_pbuffer_count++;
+
+    if (sh_pbuffer_count == WES_PBUFFER_SIZE){
+        PRINT_ERROR("Exceeded Maximum Programs!");
+    }
+
 }
 
 GLvoid

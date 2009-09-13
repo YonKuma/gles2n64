@@ -221,6 +221,7 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
         SetAlphaCombinerValues( i, arg0, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
         SetAlphaCombinerValues( i, arg1, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
         SetAlphaCombinerValues( i, arg2, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
+
         envCombiner->alpha[i].constant = COMBINED;
         envCombiner->alpha[i].outputTexture = GL_TEXTURE0_ARB + i;
     }
@@ -318,7 +319,6 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
                             SetAlphaCombinerArg( curUnit, arg0, alpha->stage[i].op[j].param1 );
                             envCombiner->alpha[curUnit].arg0.operand = GL_ONE_MINUS_SRC_ALPHA;
                         }
-#if 0
                         else if ((OGL.ATI_texture_env_combine3) && (curUnit > 0) && (envCombiner->alpha[curUnit - 1].combine == GL_MODULATE))
                         {
                             curUnit--;
@@ -327,7 +327,6 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
                             SetAlphaCombinerArg( curUnit, arg1, alpha->stage[i].op[j].param1 );
                             curUnit++;
                         }
-#endif
                         else
                         {
                             envCombiner->alpha[curUnit].combine = GL_SUBTRACT_ARB;
@@ -349,7 +348,6 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
                         if (!(OGL.ARB_texture_env_crossbar || OGL.NV_texture_env_combine4) &&
                             (alpha->stage[i].op[j].param1 == TEXEL1_ALPHA) && (curUnit == 0))
                             curUnit++;
-#if 0
                         if ((OGL.ATI_texture_env_combine3) && (curUnit > 0) && (envCombiner->alpha[curUnit - 1].combine == GL_MODULATE))
                         {
                             curUnit--;
@@ -358,7 +356,6 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
                             SetAlphaCombinerArg( curUnit, arg1, alpha->stage[i].op[j].param1 );
                         }
                         else
-#endif
                         {
                             envCombiner->alpha[curUnit].combine = GL_ADD;
                             SetAlphaCombinerArg( curUnit, arg1, alpha->stage[i].op[j].param1 );
@@ -461,7 +458,6 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
                             SetColorCombinerArg( curUnit, arg0, color->stage[i].op[j].param1 );
                             envCombiner->color[curUnit].arg0.operand = GL_ONE_MINUS_SRC_COLOR;
                         }
-#if 0
                         else if ((OGL.ATI_texture_env_combine3) && (curUnit > 0) && (envCombiner->color[curUnit - 1].combine == GL_MODULATE))
                         {
                             curUnit--;
@@ -470,7 +466,6 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
                             SetColorCombinerArg( curUnit, arg1, color->stage[i].op[j].param1 );
                             curUnit++;
                         }
-#endif
                         else
                         {
                             envCombiner->color[curUnit].combine = GL_SUBTRACT_ARB;
@@ -494,7 +489,6 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
                             curUnit++;
 
                         // ATI_texture_env_combine3 adds GL_MODULATE_ADD_ATI; saves texture units
-#if 0
                         if ((OGL.ATI_texture_env_combine3) && (curUnit > 0) && (envCombiner->color[curUnit - 1].combine == GL_MODULATE))
                         {
                             curUnit--;
@@ -503,7 +497,6 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
                             SetColorCombinerArg( curUnit, arg1, color->stage[i].op[j].param1 );
                         }
                         else
-#endif
                         {
                             envCombiner->color[curUnit].combine = GL_ADD;
                             SetColorCombinerArg( curUnit, arg1, color->stage[i].op[j].param1 );
@@ -600,30 +593,23 @@ void Set_texture_env_combine( TexEnvCombiner *envCombiner )
         if ((i < envCombiner->usedUnits ) || ((i < 2) && envCombiner->usesT1))
         {
             glEnable( GL_TEXTURE_2D );
-
             glTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB );
 
             glTexEnvi( GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, envCombiner->color[i].combine );
-
             glTexEnvi( GL_TEXTURE_ENV, GL_SOURCE0_RGB_ARB,  envCombiner->color[i].arg0.source );
             glTexEnvi( GL_TEXTURE_ENV, GL_OPERAND0_RGB_ARB, envCombiner->color[i].arg0.operand );
             glTexEnvi( GL_TEXTURE_ENV, GL_SOURCE1_RGB_ARB,  envCombiner->color[i].arg1.source );
             glTexEnvi( GL_TEXTURE_ENV, GL_OPERAND1_RGB_ARB, envCombiner->color[i].arg1.operand );
             glTexEnvi( GL_TEXTURE_ENV, GL_SOURCE2_RGB_ARB,  envCombiner->color[i].arg2.source );
             glTexEnvi( GL_TEXTURE_ENV, GL_OPERAND2_RGB_ARB, envCombiner->color[i].arg2.operand );
-//          if (OGL.ATIX_texture_env_route)
-//              glTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_OUTPUT_RGB_ATIX, envCombiner->color[i].outputTexture );
 
             glTexEnvi( GL_TEXTURE_ENV, GL_COMBINE_ALPHA_ARB, envCombiner->alpha[i].combine );
-
             glTexEnvi( GL_TEXTURE_ENV, GL_SOURCE0_ALPHA_ARB,  envCombiner->alpha[i].arg0.source );
             glTexEnvi( GL_TEXTURE_ENV, GL_OPERAND0_ALPHA_ARB, envCombiner->alpha[i].arg0.operand );
             glTexEnvi( GL_TEXTURE_ENV, GL_SOURCE1_ALPHA_ARB,  envCombiner->alpha[i].arg1.source );
             glTexEnvi( GL_TEXTURE_ENV, GL_OPERAND1_ALPHA_ARB, envCombiner->alpha[i].arg1.operand );
             glTexEnvi( GL_TEXTURE_ENV, GL_SOURCE2_ALPHA_ARB,  envCombiner->alpha[i].arg2.source );
             glTexEnvi( GL_TEXTURE_ENV, GL_OPERAND2_ALPHA_ARB, envCombiner->alpha[i].arg2.operand );
-//          if (OGL.ATIX_texture_env_route)
-//              glTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_OUTPUT_ALPHA_ATIX, envCombiner->alpha[i].outputTexture );
         }
         else
         {

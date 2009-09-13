@@ -40,6 +40,53 @@
 
 GLInfo OGL;
 
+EGLint		VersionMajor;
+EGLint		VersionMinor;
+
+EGLDisplay  Display;
+EGLContext  Context;
+EGLConfig   Config;
+EGLSurface  Surface;
+
+EGLNativeDisplayType    Device;
+EGLNativeWindowType     Handle;
+
+const EGLint ConfigAttribs[] = {
+	EGL_LEVEL,				0,
+	EGL_DEPTH_SIZE,         16,
+	EGL_STENCIL_SIZE,       0,
+	EGL_SURFACE_TYPE,		EGL_WINDOW_BIT,
+	EGL_RENDERABLE_TYPE,	EGL_OPENGL_ES2_BIT,
+	EGL_NATIVE_RENDERABLE,	EGL_FALSE,
+	EGL_NONE
+};
+
+const EGLint ContextAttribs[] = {
+	EGL_CONTEXT_CLIENT_VERSION, 	2,
+	EGL_NONE
+};
+
+const char* EGLErrorString(){
+	EGLint nErr = eglGetError();
+	switch(nErr){
+		case EGL_SUCCESS: 				return "EGL_SUCCESS";
+		case EGL_BAD_DISPLAY:			return "EGL_BAD_DISPLAY";
+		case EGL_NOT_INITIALIZED:		return "EGL_NOT_INITIALIZED";
+		case EGL_BAD_ACCESS:			return "EGL_BAD_ACCESS";
+		case EGL_BAD_ALLOC:				return "EGL_BAD_ALLOC";
+		case EGL_BAD_ATTRIBUTE:			return "EGL_BAD_ATTRIBUTE";
+		case EGL_BAD_CONFIG:			return "EGL_BAD_CONFIG";
+		case EGL_BAD_CONTEXT:			return "EGL_BAD_CONTEXT";
+		case EGL_BAD_CURRENT_SURFACE:	return "EGL_BAD_CURRENT_SURFACE";
+		case EGL_BAD_MATCH:				return "EGL_BAD_MATCH";
+		case EGL_BAD_NATIVE_PIXMAP:		return "EGL_BAD_NATIVE_PIXMAP";
+		case EGL_BAD_NATIVE_WINDOW:		return "EGL_BAD_NATIVE_WINDOW";
+		case EGL_BAD_PARAMETER:			return "EGL_BAD_PARAMETER";
+		case EGL_BAD_SURFACE:			return "EGL_BAD_SURFACE";
+		default:						return "unknown";
+	}
+};
+
 BOOL isExtensionSupported( const char *extension )
 {
     LOG("isExtensionSupported(%d) \n", extension);
@@ -80,15 +127,15 @@ void OGL_InitExtensions()
     OGL.maxGeneralCombiners = 0;
     OGL.ARB_multitexture = 1;
     OGL.maxTextureUnits = 4;
-    OGL.EXT_fog_coord = 0;
+    OGL.EXT_fog_coord = 1;
     OGL.EXT_secondary_color = 1;
 
     OGL.ARB_texture_env_combine = 1;
-    OGL.ARB_texture_env_crossbar = 0;
+    OGL.ARB_texture_env_crossbar = 1;
     OGL.EXT_texture_env_combine = 1;
     OGL.ATI_texture_env_combine3 = 1;
     OGL.ATIX_texture_env_route = 0;
-    OGL.NV_texture_env_combine4 = 0;
+    OGL.NV_texture_env_combine4 = 1;
 }
 
 void OGL_InitStates()
@@ -144,22 +191,6 @@ void OGL_InitStates()
     glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
     glClear( GL_COLOR_BUFFER_BIT );
 
-    srand( timeGetTime() );
-
-    for (int i = 0; i < 32; i++)
-    {
-        for (int j = 0; j < 8; j++)
-            for (int k = 0; k < 128; k++)
-                OGL.stipplePattern[i][j][k] =((i > (rand() >> 10)) << 7) |
-                                            ((i > (rand() >> 10)) << 6) |
-                                            ((i > (rand() >> 10)) << 5) |
-                                            ((i > (rand() >> 10)) << 4) |
-                                            ((i > (rand() >> 10)) << 3) |
-                                            ((i > (rand() >> 10)) << 2) |
-                                            ((i > (rand() >> 10)) << 1) |
-                                            ((i > (rand() >> 10)) << 0);
-    }
-
     OGL_SwapBuffers();
 }
 
@@ -212,53 +243,6 @@ void OGL_ResizeWindow()
 #endif // __LINUX__
 }
 
-EGLint		VersionMajor;
-EGLint		VersionMinor;
-
-EGLDisplay  Display;
-EGLContext  Context;
-EGLConfig   Config;
-EGLSurface  Surface;
-
-EGLNativeDisplayType    Device;
-EGLNativeWindowType     Handle;
-
-const EGLint ConfigAttribs[] = {
-	EGL_LEVEL,				0,
-	EGL_DEPTH_SIZE,         16,
-	EGL_STENCIL_SIZE,       0,
-	EGL_SURFACE_TYPE,		EGL_WINDOW_BIT,
-	EGL_RENDERABLE_TYPE,	EGL_OPENGL_ES2_BIT,
-	EGL_NATIVE_RENDERABLE,	EGL_FALSE,
-	EGL_NONE
-};
-
-const EGLint ContextAttribs[] = {
-	EGL_CONTEXT_CLIENT_VERSION, 	2,
-	EGL_NONE
-};
-
-const char* EGLErrorString(){
-	EGLint nErr = eglGetError();
-	switch(nErr){
-		case EGL_SUCCESS: 				return "EGL_SUCCESS";
-		case EGL_BAD_DISPLAY:			return "EGL_BAD_DISPLAY";
-		case EGL_NOT_INITIALIZED:		return "EGL_NOT_INITIALIZED";
-		case EGL_BAD_ACCESS:			return "EGL_BAD_ACCESS";
-		case EGL_BAD_ALLOC:				return "EGL_BAD_ALLOC";
-		case EGL_BAD_ATTRIBUTE:			return "EGL_BAD_ATTRIBUTE";
-		case EGL_BAD_CONFIG:			return "EGL_BAD_CONFIG";
-		case EGL_BAD_CONTEXT:			return "EGL_BAD_CONTEXT";
-		case EGL_BAD_CURRENT_SURFACE:	return "EGL_BAD_CURRENT_SURFACE";
-		case EGL_BAD_MATCH:				return "EGL_BAD_MATCH";
-		case EGL_BAD_NATIVE_PIXMAP:		return "EGL_BAD_NATIVE_PIXMAP";
-		case EGL_BAD_NATIVE_WINDOW:		return "EGL_BAD_NATIVE_WINDOW";
-		case EGL_BAD_PARAMETER:			return "EGL_BAD_PARAMETER";
-		case EGL_BAD_SURFACE:			return "EGL_BAD_SURFACE";
-		default:						return "unknown";
-	}
-};
-
 bool OGL_Start()
 {
     LOG("OGL_Start() \n");
@@ -276,8 +260,11 @@ bool OGL_Start()
         OGL.width = OGL.windowedWidth;
         OGL.height = OGL.windowedHeight;
     }
+#ifdef WIN32
     OGL.heightOffset = -16;
-
+#else
+    OGL.heightOffset = 0;
+#endif
     /* Initialize SDL */
     printf( "[glN64]: (II) Initializing SDL video subsystem...\n" );
     if (SDL_InitSubSystem( SDL_INIT_VIDEO ) == -1)
@@ -496,13 +483,6 @@ void OGL_UpdateStates()
         }
         else
             glDisable( GL_ALPHA_TEST );
-
-#if 0
-        if (OGL.usePolygonStipple && (gDP.otherMode.alphaCompare == G_AC_DITHER) && !(gDP.otherMode.alphaCvgSel))
-            glEnable( GL_POLYGON_STIPPLE );
-        else
-            glDisable( GL_POLYGON_STIPPLE );
-#endif
     }
 
     if (gDP.changed & CHANGED_SCISSOR)
@@ -697,43 +677,18 @@ void OGL_AddTriangle( SPVertex *vertices, int v0, int v1, int v2 )
         }
         OGL.numVertices++;
     }
-
-#if 0
     OGL.numTriangles++;
 
     if (OGL.numVertices >= 255)
         OGL_DrawTriangles();
-#else
-    OGL.numVertices -= 3;
-    glBegin(GL_TRIANGLES);
-    for(int i = 0; i < 3; i++)
-    {
-        if (combiner.usesT0){
-            glTexCoord2f(OGL.vertices[i].s0, OGL.vertices[i].t0);
-        }
-        if (combiner.usesT1){
-            glMultiTexCoord2f(GL_TEXTURE1, OGL.vertices[i].s1, OGL.vertices[i].t1);
-        }
-        glColor4f(OGL.vertices[i].color.r, OGL.vertices[i].color.g, OGL.vertices[i].color.b, OGL.vertices[i].color.a);
-        glVertex4f(OGL.vertices[i].x, OGL.vertices[i].y, OGL.vertices[i].z, OGL.vertices[i].w);
-    }
-    glEnd();
-#endif
 }
 
 void OGL_DrawTriangles()
 {
     LOG("OGL_DrawTriangles() \n");
 
-#if 0
-    if (OGL.usePolygonStipple && (gDP.otherMode.alphaCompare == G_AC_DITHER) && !(gDP.otherMode.alphaCvgSel))
-    {
-        OGL.lastStipple = (OGL.lastStipple + 1) & 0x7;
-        glPolygonStipple( OGL.stipplePattern[(BYTE)(gDP.envColor.a * 255.0f) >> 3][OGL.lastStipple] );
-    }
     glDrawArrays( GL_TRIANGLES, 0, OGL.numVertices );
     OGL.numTriangles = OGL.numVertices = 0;
-#endif
 }
 
 void OGL_DrawLine( SPVertex *vertices, int v0, int v1, float width )
@@ -1020,62 +975,6 @@ void OGL_SaveScreenshot()
 {
     LOG("OGL_SaveScreenshot() \n");
 
-#if 0
-    BITMAPFILEHEADER fileHeader;
-    BITMAPINFOHEADER infoHeader;
-    HANDLE hBitmapFile;
-
-    char *pixelData = (char*)malloc( OGL.width * OGL.height * 3 );
-#if 0
-    glReadBuffer( GL_FRONT );
-#endif
-    glReadPixels( 0, OGL.heightOffset, OGL.width, OGL.height, GL_BGR_EXT, GL_UNSIGNED_BYTE, pixelData );
-#if 0
-    glReadBuffer( GL_BACK );
-#endif
-    infoHeader.biSize = sizeof( BITMAPINFOHEADER );
-    infoHeader.biWidth = OGL.width;
-    infoHeader.biHeight = OGL.height;
-    infoHeader.biPlanes = 1;
-    infoHeader.biBitCount = 24;
-    infoHeader.biCompression = BI_RGB;
-    infoHeader.biSizeImage = OGL.width * OGL.height * 3;
-    infoHeader.biXPelsPerMeter = 0;
-    infoHeader.biYPelsPerMeter = 0;
-    infoHeader.biClrUsed = 0;
-    infoHeader.biClrImportant = 0;
-
-    fileHeader.bfType = 19778;
-    fileHeader.bfSize = sizeof( BITMAPFILEHEADER ) + sizeof( BITMAPINFOHEADER ) + infoHeader.biSizeImage;
-    fileHeader.bfReserved1 = fileHeader.bfReserved2 = 0;
-    fileHeader.bfOffBits = sizeof( BITMAPFILEHEADER ) + sizeof( BITMAPINFOHEADER );
-
-    char filename[256];
-
-    CreateDirectory( screenDirectory, NULL );
-
-    int i = 0;
-    do
-    {
-        sprintf( filename, "%sscreen%02i.bmp", screenDirectory, i );
-        i++;
-
-        if (i > 99)
-            return;
-
-        hBitmapFile = CreateFile( filename, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL );
-    }
-    while (hBitmapFile == INVALID_HANDLE_VALUE);
-
-    DWORD written;
-
-    WriteFile( hBitmapFile, &fileHeader, sizeof( BITMAPFILEHEADER ), &written, NULL );
-    WriteFile( hBitmapFile, &infoHeader, sizeof( BITMAPINFOHEADER ), &written, NULL );
-    WriteFile( hBitmapFile, pixelData, infoHeader.biSizeImage, &written, NULL );
-
-    CloseHandle( hBitmapFile );
-    free( pixelData );
-#endif
     // start by getting the base file path
     char filepath[2048], filename[2048];
     filepath[0] = 0;
@@ -1127,13 +1026,9 @@ void OGL_SaveScreenshot()
     png_init_io(png_write, savefile);
     // read pixel data from OpenGL
     char *pixels = (char*)malloc( OGL.width * OGL.height * 3 );
-#if 0
-    glReadBuffer( GL_FRONT );
-#endif
+
     glReadPixels( 0, OGL.heightOffset, OGL.width, OGL.height, GL_RGB, GL_UNSIGNED_BYTE, pixels );
-#if 0
-    glReadBuffer( GL_BACK );
-#endif
+
     // set the info
     int width = OGL.width;
     int height = OGL.height;
@@ -1185,10 +1080,7 @@ OGL_SwapBuffers()
     }
 
     // if emulator defined a render callback function, call it before buffer swap
-
-    if(renderCallback)
-        (*renderCallback)();
-
+    if (renderCallback) (*renderCallback)();
 
     eglSwapBuffers(Display, Surface);
 }
@@ -1204,17 +1096,7 @@ void OGL_ReadScreen( void **dest, int *width, int *height )
     if (*dest == 0)
         return;
 
-    GLint oldMode;
-#if 0
-    glGetIntegerv( GL_READ_BUFFER, &oldMode );
-    glReadBuffer( GL_FRONT );
-//  glReadBuffer( GL_BACK );
-#endif
-    glReadPixels( 0, 0, OGL.width, OGL.height,
-                  GL_RGB, GL_UNSIGNED_BYTE, *dest );
-#if 0
-    glReadBuffer( oldMode );
-#endif
+    glReadPixels( 0, 0, OGL.width, OGL.height, GL_RGB, GL_UNSIGNED_BYTE, *dest );
 }
 
 

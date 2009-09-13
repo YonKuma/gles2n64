@@ -76,9 +76,6 @@ struct GLInfo
 #ifndef __LINUX__
     HWND    hFullscreenWnd;
 #endif
-    BOOL    usePolygonStipple;
-    GLubyte stipplePattern[32][8][128];
-    BYTE    lastStipple;
 
     BYTE    combiner;
 };
@@ -89,7 +86,6 @@ struct GLcolor
 {
     float r, g, b, a;
 };
-
 
 bool OGL_Start();
 void OGL_Stop();
