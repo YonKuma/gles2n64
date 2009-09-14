@@ -218,9 +218,16 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
         envCombiner->color[i].constant = COMBINED;
         envCombiner->color[i].outputTexture = GL_TEXTURE0_ARB + i;
 
+        //Alpha source not being set correctly somewhere.
+#if 1
+        SetAlphaCombinerValues( i, arg0, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
+        SetAlphaCombinerValues( i, arg1, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
+        SetAlphaCombinerValues( i, arg2, GL_TEXTURE, GL_SRC_ALPHA );
+#else
         SetAlphaCombinerValues( i, arg0, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
         SetAlphaCombinerValues( i, arg1, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
         SetAlphaCombinerValues( i, arg2, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
+#endif
 
         envCombiner->alpha[i].constant = COMBINED;
         envCombiner->alpha[i].outputTexture = GL_TEXTURE0_ARB + i;
@@ -303,7 +310,6 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
                             curUnit++;
 
                         envCombiner->alpha[curUnit].combine = GL_REPLACE;
-
                         SetAlphaCombinerArg( curUnit, arg0, alpha->stage[i].op[j].param1 );
                         break;
                     case SUB:

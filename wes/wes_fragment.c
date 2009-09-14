@@ -143,24 +143,28 @@ wes_frag_op(char *buff, progstate_t *s, int tex, int arg)
 }
 
 GLint
-wes_frag_arg_obtain(char *buff, int tex, int arg, int src, int type)
+wes_frag_arg_obtain(char *buff, progstate_t *s, int tex, int arg, int type)
 {
     char *str = buff;
 
-    char comp[4];
+    int src = 0;
+    char comp[5];
     switch(type){
-        case 4: strcpy(comp, "rgba");  break;
-        case 3: strcpy(comp, "rgb");   break;
-        case 1: strcpy(comp, "a");     break;
+        case 4: strcpy(comp, "rgba"); src = s->uTexture[tex].Arg[arg].RGBSrc;    break;
+        case 3: strcpy(comp, "rgb");  src = s->uTexture[tex].Arg[arg].RGBSrc;    break;
+        case 1: strcpy(comp, "a");    src = s->uTexture[tex].Arg[arg].AlphaSrc;  break;
+        default: PRINT_ERROR("Unknown Argument Type: %i", type); break;
     }
 
+    /*  do we really need this argument   */
     switch(src)
     {
         case WES_SRC_PREVIOUS:
-            if (tex == 0)
+            if (tex == 0){
                 str += sprintf(str, "arg%i.%s = vColor.%s;\n", arg, comp, comp);
-            else
+            } else {
                 str += sprintf(str, "arg%i.%s = gl_FragColor.%s;\n", arg, comp, comp);
+            }
             break;
         case WES_SRC_CONSTANT:
             str += sprintf(str, "arg%i.%s = uTexture[%i].EnvColor.%s;\n", arg, comp, tex, comp);
@@ -238,20 +242,14 @@ wes_frag_arg(char *buff, progstate_t *s, int tex, int arg)
 
     /* obtain non duplicate components */
     if ((!dupalpha) && (!duprgb) && (rgbsrc == alphasrc)){
-        str += wes_frag_arg_obtain(str, tex, arg, rgbsrc, 4);
+        str += wes_frag_arg_obtain(str, s, tex, arg, 4);
     } else {
 
         if (!duprgb){
-            str += wes_frag_arg_obtain(str, tex, arg, rgbsrc, 3);
+            str += wes_frag_arg_obtain(str, s, tex, arg, 3);
         }
         if (!dupalpha){
-        // Alpha Source it not being set to texture when it should be!
-#if 1
-            if (alphasrc == WES_SRC_PREVIOUS)
-                str += sprintf(str, "arg%i.a = tex%i.a;\n", arg, tex);
-            else
-#endif
-            str += wes_frag_arg_obtain(str, tex, arg, alphasrc, 1);
+            str += wes_frag_arg_obtain(str, s, tex, arg, 1);
         }
     }
 
@@ -305,7 +303,6 @@ wes_frag_combine(char *buff, progstate_t *s, int tex)
                 str += wes_frag_op(str, s, tex, 1);
                 str += wes_frag_op(str, s, tex, 0);
                 str += sprintf(str, "gl_FragColor = mix(arg1, arg0, arg2);\n");
-                //arg0 * arg2 + arg1 * (vec4(1.0) - arg2);\n");
                 break;
 
             case WES_FUNC_SUBTRACT:
@@ -362,7 +359,10 @@ wes_frag_combine(char *buff, progstate_t *s, int tex)
     } else {
 
         str += wes_frag_arg(str, s, tex, 0);
-        str += wes_frag_arg(str, s, tex, 1);
+        if (s->uTexture[tex].RGBCombine != WES_FUNC_REPLACE ||
+            s->uTexture[tex].AlphaCombine != WES_FUNC_REPLACE){
+            str += wes_frag_arg(str, s, tex, 1);
+        }
         if (s->uTexture[tex].RGBCombine == WES_FUNC_INTERPOLATE ||
             s->uTexture[tex].AlphaCombine == WES_FUNC_INTERPOLATE ||
             s->uTexture[tex].RGBCombine == WES_FUNC_MODULATE_SUBTRACT ||
@@ -398,7 +398,6 @@ wes_frag_combine(char *buff, progstate_t *s, int tex)
 
             case WES_FUNC_INTERPOLATE:
                 str += sprintf(str, "gl_FragColor.rgb = mix(arg1.rgb, arg0.rgb, arg2.rgb);\n");
-                //arg0.rgb * arg2.rgb + arg1.rgb * (vec3(1.0) - arg2.rgb);\n");
                 break;
 
             case WES_FUNC_SUBTRACT:
@@ -447,7 +446,6 @@ wes_frag_combine(char *buff, progstate_t *s, int tex)
 
             case WES_FUNC_INTERPOLATE:
                 str += sprintf(str, "gl_FragColor.a = mix(arg1.a, arg0.a, arg2.a);\n");
-                //arg0.a * arg2.a + arg1.a * (1.0 - arg2.a);\n");
                 break;
 
             case WES_FUNC_SUBTRACT:
@@ -480,6 +478,7 @@ wes_frag_tex_obtain(char* buff, progstate_t *s){
     char *str = buff;
     GLint i, j, n;
     GLint needtex[WES_MULTITEX_NUM];
+
     for(i = 0; i < WES_MULTITEX_NUM; i++){
         needtex[i] = 0;
     }
@@ -491,7 +490,8 @@ wes_frag_tex_obtain(char* buff, progstate_t *s){
                     needtex[i] = 1;
             } else {
 
-                //number of arguments:
+                // This does not work in general
+#if 0
                 if (s->uTexture[i].RGBCombine == WES_FUNC_REPLACE){
                     n = 1;
                 } else if ( s->uTexture[i].RGBCombine == WES_FUNC_INTERPOLATE ||
@@ -502,7 +502,9 @@ wes_frag_tex_obtain(char* buff, progstate_t *s){
                 } else {
                     n = 2;
                 }
-
+#else
+                n = 3;
+#endif
                 for(j = 0; j < n; j++){
                     if (s->uTexture[i].Arg[j].RGBSrc == WES_SRC_TEXTURE){
                         needtex[i] = 1;
@@ -519,9 +521,28 @@ wes_frag_tex_obtain(char* buff, progstate_t *s){
                     if (s->uTexture[i].Arg[j].RGBSrc == WES_SRC_TEXTURE3){
                         needtex[3] = 1;
                     }
+                    if (s->uTexture[i].Arg[j].RGBOp == WES_OP_ALPHA ||
+                        s->uTexture[i].Arg[j].RGBOp == WES_OP_ONE_MINUS_ALPHA){
+                        if (s->uTexture[i].Arg[j].AlphaSrc == WES_SRC_TEXTURE){
+                            needtex[i] = 1;
+                        }
+                        if (s->uTexture[i].Arg[j].AlphaSrc == WES_SRC_TEXTURE0){
+                            needtex[0] = 1;
+                        }
+                        if (s->uTexture[i].Arg[j].AlphaSrc == WES_SRC_TEXTURE1){
+                            needtex[1] = 1;
+                        }
+                        if (s->uTexture[i].Arg[j].AlphaSrc == WES_SRC_TEXTURE2){
+                            needtex[2] = 1;
+                        }
+                        if (s->uTexture[i].Arg[j].AlphaSrc == WES_SRC_TEXTURE3){
+                            needtex[3] = 1;
+                        }
+                    }
                 }
 
-                //number of arguments:
+                //This does not work in general
+#if 0
                 if (s->uTexture[i].AlphaCombine == WES_FUNC_REPLACE){
                     n = 1;
                 } else if ( s->uTexture[i].AlphaCombine == WES_FUNC_INTERPOLATE ||
@@ -532,7 +553,9 @@ wes_frag_tex_obtain(char* buff, progstate_t *s){
                 } else {
                     n = 2;
                 }
-
+#else
+                n = 3;
+#endif
                 for(j = 0; j < n; j++){
                     if (s->uTexture[i].Arg[j].AlphaSrc == WES_SRC_TEXTURE){
                         needtex[i] = 1;

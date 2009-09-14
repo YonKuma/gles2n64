@@ -135,7 +135,7 @@ void OGL_InitExtensions()
     OGL.EXT_texture_env_combine = 1;
     OGL.ATI_texture_env_combine3 = 1;
     OGL.ATIX_texture_env_route = 0;
-    OGL.NV_texture_env_combine4 = 1;
+    OGL.NV_texture_env_combine4 = 0;
 }
 
 void OGL_InitStates()

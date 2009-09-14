@@ -61,18 +61,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #define GL_OPERAND0_RGB_ARB                         GL_OPERAND0_RGB
 #define GL_OPERAND1_RGB_ARB                         GL_OPERAND1_RGB
 #define GL_OPERAND2_RGB_ARB                         GL_OPERAND2_RGB
-#define GL_OPERAND0_ALPHA_ARB                       0x8598
-#define GL_OPERAND1_ALPHA_ARB                       0x8599
-#define GL_OPERAND2_ALPHA_ARB                       0x859A
-#define GL_RGB_SCALE_ARB                            0x8573
-#define GL_ADD_SIGNED_ARB                           0x8574
-#define GL_INTERPOLATE_ARB                          0x8575
-#define GL_SUBTRACT_ARB                             0x84E7
-#define GL_CONSTANT_ARB                             0x8576
-#define GL_PRIMARY_COLOR_ARB                        0x8577
-#define GL_PREVIOUS_ARB                             0x8578
-#define GL_DOT3_RGB_ARB                             0x86AE
-#define GL_DOT3_RGBA_ARB                            0x86AF
+#define GL_OPERAND0_ALPHA_ARB                       GL_OPERAND0_ALPHA
+#define GL_OPERAND1_ALPHA_ARB                       GL_OPERAND1_ALPHA
+#define GL_OPERAND2_ALPHA_ARB                       GL_OPERAND2_ALPHA
+#define GL_ADD_SIGNED_ARB                           GL_ADD_SIGNED
+#define GL_INTERPOLATE_ARB                          GL_INTERPOLATE
+#define GL_SUBTRACT_ARB                             GL_SUBTRACT
+#define GL_CONSTANT_ARB                             GL_CONSTANT
+#define GL_PRIMARY_COLOR_ARB                        GL_PRIMARY_COLOR
+#define GL_PREVIOUS_ARB                             GL_PREVIOUS
+#define GL_DOT3_RGB_ARB                             GL_DOT3_RGB
+#define GL_DOT3_RGBA_ARB                            GL_DOT3_RGBA
 
 
 /* ATI Extensions */
@@ -81,14 +80,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #define GL_MODULATE_SUBTRACT_ATI                    0x8746
 
 /*  Textures    */
-#define GL_UNSIGNED_SHORT_4_4_4_4_EXT                   0x8033
-#define GL_UNSIGNED_SHORT_5_5_5_1_EXT                   0x8034
-#define GL_UNSIGNED_SHORT_5_6_5_EXT                     0x8363
+#define GL_UNSIGNED_SHORT_4_4_4_4_EXT               GL_UNSIGNED_SHORT_4_4_4_4
+#define GL_UNSIGNED_SHORT_5_5_5_1_EXT               GL_UNSIGNED_SHORT_5_5_5_1
+#define GL_UNSIGNED_SHORT_5_6_5_EXT                 GL_UNSIGNED_SHORT_5_6_5
 
 /* Shaders */
 #define GL_FRAGMENT_SHADER_ARB                  	GL_FRAGMENT_SHADER
 #define GL_VERTEX_SHADER_ARB                     	GL_VERTEX_SHADER
-#define GL_OBJECT_LINK_STATUS_ARB	GL_OBJECT_LINK_STATUS
+#define GL_OBJECT_LINK_STATUS_ARB	                GL_OBJECT_LINK_STATUS
 
 
 //ARB / EXT Wrappers:
