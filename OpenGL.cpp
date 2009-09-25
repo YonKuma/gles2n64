@@ -292,15 +292,15 @@ bool OGL_Start()
     }
     SDL_WM_SetCaption( pluginName, pluginName );
 
+#ifdef _WIN32
 	SDL_SysWMinfo info;
 	SDL_VERSION(&info.version);
 	SDL_GetWMInfo(&info);
 	Handle = (EGLNativeWindowType) info.window;
-
-#ifdef _WIN32
 	Device = GetDC(Handle);
 #else
-    Device = EGL_DEFAULT_DEVICE;
+	Handle = NULL;
+    Device = 0;
 #endif
 
     Display = eglGetDisplay((EGLNativeDisplayType) Device);

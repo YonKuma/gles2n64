@@ -1,4 +1,5 @@
-#ifndef __LINUX__ //Change me...
+
+#ifdef WIN32 //Change me...
 #include <windows.h>
 #include <commctrl.h>
 #include <process.h>

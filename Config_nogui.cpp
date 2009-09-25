@@ -105,7 +105,7 @@ void Config_LoadConfig()
     OGL.enable2xSaI = 0;
     OGL.enableAnisotropicFiltering = 0;
     OGL.fog = 1;
-    OGL.textureBitDepth = 1; // normal (16 & 32 bits)
+    OGL.textureBitDepth = 0; // normal (16 & 32 bits)
     OGL.frameBufferTextures = 0;
     cache.maxBytes = 32 * 1048576;
 

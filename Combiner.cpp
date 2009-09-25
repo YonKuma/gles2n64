@@ -7,7 +7,6 @@
 
 #include "OpenGL.h"
 #include "Combiner.h"
-#include "NV_register_combiners.h"
 #include "texture_env_combine.h"
 #include "texture_env.h"
 #include "Debug.h"

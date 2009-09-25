@@ -31,7 +31,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
     #define dlopen(A, B)    LoadLibrary(A)
     #define dlsym(A, B)     GetProcAddress((HINSTANCE__*) A, B)
     #define dlclose(A)      FreeLibrary((HINSTANCE__*) A)
-#elif defined(POSIX)
+#else
     #include <dlfcn.h>
 #endif
 

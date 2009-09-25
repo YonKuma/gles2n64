@@ -20,14 +20,29 @@
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 # Makefile for glN64 in Mupen64plus.
 
-SO_EXTENSION = dll
-CXX = 	C:/MinGW/bin/g++
-LD = 	C:/MinGW/bin/g++
-STRIP = C:/MinGW/bin/strip
+#SO_EXTENSION = dll
+#CXX = 	C:/MinGW/bin/g++
+#LD = 	C:/MinGW/bin/g++
+#STRIP = C:/MinGW/bin/strip
+SO_EXTENSION = so
+CXX = 	C:/CS2009q1/bin/arm-none-linux-gnueabi-g++
+LD = 	C:/CS2009q1/bin/arm-none-linux-gnueabi-g++
+STRIP = C:/CS2009q1/bin/arm-none-linux-gnueabi-strip
 
-CFLAGS += -O2 -I.  -IC:/MinGW/include/SDL -IC:/MinGW/include/PVR -I./wes
-CFLAGS += -Wall
-LDFLAGS += -LC:/MinGW/lib/PVR -lmingw32 -lSDLmain -lSDL -lGLESv2 -lpng
+CFLAGS = -I./
+CFLAGS += -I./wes/
+CFLAGS += -IC:/CS2009q1/arm-none-linux-gnueabi/include/c++/4.3.3
+CFLAGS += -IC:/CS2009q1/arm-none-linux-gnueabi/include/c++/4.3.3/arm-none-linux-gnueabi/ 
+CFLAGS += -IC:/CS2009q1/lib/gcc/arm-none-linux-gnueabi/4.3.3/include
+CFLAGS += -IC:/CS2009q1/arm-none-linux-gnueabi/libc/lib
+CFLAGS += -IC:/CS2009q1/include
+CFLAGS += -IC:/CS2009q1/include/SDL
+CFLAGS += -IC:/CS2009q1/include/libpng12
+
+
+CFLAGS += -Wall -D__LINUX__
+LDFLAGS += -LC:/CS2009q1/lib -lsrv_um -lGLESv2 -lIMGegl -lEGL -lSDL -lts -lpng12
+
 
 OBJECTS = Config_nogui.o
 OBJECTS += ./wes/wes_matrix.o ./wes/wes_begin.o ./wes/wes_fragment.o ./wes/wes_shader.o ./wes/wes_state.o ./wes/wes_texture.o ./wes/wes.o

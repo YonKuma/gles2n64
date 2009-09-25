@@ -512,7 +512,6 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
                     case INTER:
                         envCombiner->usesT0 |= (color->stage[i].op[j].param2 == TEXEL0) || (color->stage[i].op[j].param3 == TEXEL0) || (color->stage[i].op[j].param3 == TEXEL0_ALPHA);
                         envCombiner->usesT1 |= (color->stage[i].op[j].param2 == TEXEL1) || (color->stage[i].op[j].param3 == TEXEL1) || (color->stage[i].op[j].param3 == TEXEL1_ALPHA);
-
                         if (!(OGL.ARB_texture_env_crossbar || OGL.NV_texture_env_combine4) &&
                             ((color->stage[i].op[j].param1 == TEXEL1) || (color->stage[i].op[j].param2 == TEXEL1) || (color->stage[i].op[j].param3 == TEXEL1) || (color->stage[i].op[j].param3 == TEXEL1_ALPHA)) && (curUnit == 0))
                         {
@@ -544,13 +543,15 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
 
                             curUnit++;
                         }
-
+#if 1
                         envCombiner->color[curUnit].combine = GL_INTERPOLATE_ARB;
-
                         SetColorCombinerArg( curUnit, arg0, color->stage[i].op[j].param1 );
                         SetColorCombinerArg( curUnit, arg1, color->stage[i].op[j].param2 );
                         SetColorCombinerArg( curUnit, arg2, color->stage[i].op[j].param3 );
-
+#else
+                        envCombiner->color[curUnit].combine = GL_REPLACE;
+                        SetColorCombinerArg( curUnit, arg0, color->stage[i].op[j].param1 );
+#endif
                         curUnit++;
                         break;
                 }

@@ -202,8 +202,8 @@ wes_state_update()
     }
     for(i = 0; i < WES_MULTITEX_NUM; i++){
         UpdateUniform4i(uEnableTextureGen[i]);
-        UpdateUniform1i(uTexture[i].Unit);
-        UpdateUniform4f(uTexture[i].EnvColor);
+        UpdateUniform1i(uTexUnit[i]);
+        UpdateUniform4f(uTexEnvColor[i]);
     }
     UpdateUniform1f(uRescaleFactor);
 
@@ -295,8 +295,8 @@ GLvoid wes_state_init()
     SetUniform4f(uFogColor, 0.0, 0.0, 0.0, 0.0);
 
     for(i = 0; i < WES_MULTITEX_NUM; i++){
-        SetUniform1i(uTexture[i].Unit, i);
-        SetUniform4f(uTexture[i].EnvColor, 0.0f, 0.0f, 0.0f, 0.0f);
+        SetUniform1i(uTexUnit[i], i);
+        SetUniform4f(uTexEnvColor[i], 0.0f, 0.0f, 0.0f, 0.0f);
     }
     SetUniform1f(uAlphaRef, 0.0);
 
@@ -323,7 +323,8 @@ GLvoid wes_state_init()
         u_progstate.uTexture[i].Arg[2].AlphaOp = WES_OP_ALPHA;
     }
     u_progstate.uTexture[0].Enable = 1;
-    wes_state_update();
+
+    //wes_state_update();
 }
 
 const char*
@@ -921,7 +922,7 @@ glTexEnvfv(GLenum target, GLenum pname, GLfloat *param)
         switch(pname)
         {
             case GL_TEXTURE_ENV_COLOR:
-                SetUniform4fv(uTexture[u_activetex].EnvColor, param);
+                SetUniform4fv(uTexEnvColor[u_activetex], param);
                 break;
         }
     }

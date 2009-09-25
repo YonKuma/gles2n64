@@ -1,4 +1,4 @@
-#ifndef __LINUX__
+#ifdef WIN32
 # include <windows.h>
 #else
 # include "winlnxdefs.h"

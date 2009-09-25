@@ -124,32 +124,28 @@ struct uniformloc_s
         GLint  ColorControl;
     } uLightModel;
 
-    struct {
-        GLint  Func;		// {Tex function, RGB function, Alpha function}
-        GLint  Arg0;		// {RGB Src, RGB Op, Alpha Src, Alpha Op}
-        GLint  Arg1;		// {RGB Src, RGB Op, Alpha Src, Alpha Op}
-        GLint  Arg2;		// {RGB Src, RGB Op, Alpha Src, Alpha Op}
-        GLint  EnvColor;
-        GLint  Unit;
-    } uTexture[WES_MULTITEX_NUM];
 
-    GLint  uRescaleFactor;
+    GLint   uTexEnvColor[WES_MULTITEX_NUM];
+    GLint   uTexUnit[WES_MULTITEX_NUM];
 
-    GLint      uFogMode;
-    GLint    uFogStart, uFogEnd, uFogDensity;
-    GLint     uFogColor;
+
+    GLint   uRescaleFactor;
+
+    GLint   uFogMode;
+    GLint   uFogStart, uFogEnd, uFogDensity;
+    GLint   uFogColor;
 
     GLint	uTexGenMode[WES_MULTITEX_NUM];
-    GLint		uTexGenMat[WES_MULTITEX_NUM];
+    GLint   uTexGenMat[WES_MULTITEX_NUM];
 
-    GLint     uClipPlane[WES_CLIPPLANE_NUM];
+    GLint   uClipPlane[WES_CLIPPLANE_NUM];
 
-    GLint     uMVP;
-    GLint     uMV;
-    GLint     uMVIT;
+    GLint   uMVP;
+    GLint   uMV;
+    GLint   uMVIT;
 
-    GLint      uAlphaFunc;
-    GLint      uAlphaRef;
+    GLint   uAlphaFunc;
+    GLint   uAlphaRef;
 };
 
 struct progstate_s

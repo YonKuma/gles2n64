@@ -173,8 +173,8 @@ wes_uniform_loc(program_t *p)
     LocateUniform(uAlphaRef);
 
     for(i = 0; i != WES_MULTITEX_NUM; i++){
-        LocateUniformIndex(uTexture, .Unit, i);
-        LocateUniformIndex(uTexture, .EnvColor, i);
+        LocateUniformIndex(uTexUnit, , i);
+        LocateUniformIndex(uTexEnvColor, , i);
     }
 
 #undef LocateUniform
