@@ -20,17 +20,28 @@
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 # Makefile for glN64 in Mupen64plus.
 
-#SO_EXTENSION = dll
-#CXX = 	C:/MinGW/bin/g++
-#LD = 	C:/MinGW/bin/g++
-#STRIP = C:/MinGW/bin/strip
-SO_EXTENSION = so
-CXX = 	C:/CS2009q1/bin/arm-none-linux-gnueabi-g++
-LD = 	C:/CS2009q1/bin/arm-none-linux-gnueabi-g++
-STRIP = C:/CS2009q1/bin/arm-none-linux-gnueabi-strip
+ARCH = X86
+OS = WIN32
+SO_EXTENSION = dll
+CXX = 	C:/MinGW/bin/g++
+LD = 	C:/MinGW/bin/g++
+STRIP = C:/MinGW/bin/strip
+
+#SO_EXTENSION = so
+#CXX = 	C:/CS2009q1/bin/arm-none-linux-gnueabi-g++
+#LD = 	C:/CS2009q1/bin/arm-none-linux-gnueabi-g++
+#STRIP = C:/CS2009q1/bin/arm-none-linux-gnueabi-strip
 
 CFLAGS = -I./
-CFLAGS += -I./wes/
+CFLAGS += -I./wes
+
+ifeq ($(ARCH), X86)
+CFLAGS += -IC:/MinGW/include
+CFLAGS += -IC:/MinGW/include/SDL
+CFLAGS += -IC:/MinGW/include/PVR
+CFLAGS += -IC:/MinGW/include/libpng12
+
+else
 CFLAGS += -IC:/CS2009q1/arm-none-linux-gnueabi/include/c++/4.3.3
 CFLAGS += -IC:/CS2009q1/arm-none-linux-gnueabi/include/c++/4.3.3/arm-none-linux-gnueabi/ 
 CFLAGS += -IC:/CS2009q1/lib/gcc/arm-none-linux-gnueabi/4.3.3/include
@@ -38,11 +49,15 @@ CFLAGS += -IC:/CS2009q1/arm-none-linux-gnueabi/libc/lib
 CFLAGS += -IC:/CS2009q1/include
 CFLAGS += -IC:/CS2009q1/include/SDL
 CFLAGS += -IC:/CS2009q1/include/libpng12
+endif
 
-
+ifeq ($(OS), LINUX)
 CFLAGS += -Wall -D__LINUX__
-LDFLAGS += -LC:/CS2009q1/lib -lsrv_um -lGLESv2 -lIMGegl -lEGL -lSDL -lts -lpng12
-
+LDFLAGS += -LC:/CS2009q1/lib -lsrv_um -lGLESv2 -lIMGegl -lEGL C:/CS2009q1/lib/libSDL.a C:/CS2009q1/lib/libts.a C:/CS2009q1/lib/libpng12.a
+else
+CFLAGS += -Wall
+LDFLAGS +=  -LC:/MinGW/lib/PVR -lSDLmain -lSDL -lpng -lGLESv2
+endif
 
 OBJECTS = Config_nogui.o
 OBJECTS += ./wes/wes_matrix.o ./wes/wes_begin.o ./wes/wes_fragment.o ./wes/wes_shader.o ./wes/wes_state.o ./wes/wes_texture.o ./wes/wes.o
