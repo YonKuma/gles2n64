@@ -5,7 +5,11 @@
 #include "stdio.h"
 
 #ifndef PATH_MAX
-# define PATH_MAX 1024
+#define PATH_MAX 4096
+#endif
+
+#ifndef min
+#define min(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
 //#define DEBUG

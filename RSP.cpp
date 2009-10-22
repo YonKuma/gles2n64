@@ -2,10 +2,6 @@
 # include <windows.h>
 #else
 # include "winlnxdefs.h"
-
-# ifndef min
-#  define min(a,b) ((a) < (b) ? (a) : (b))
-# endif
 #endif
 #include <math.h>
 #include "glN64.h"
@@ -23,6 +19,7 @@
 #include "FrameBuffer.h"
 #include "DepthBuffer.h"
 #include "GBI.h"
+
 
 RSPInfo     RSP;
 
@@ -43,6 +40,55 @@ void RSP_LoadMatrix( f32 mtx[4][4], u32 address )
 }
 
 #ifdef RSPTHREAD
+#ifndef WIN32
+int RSP_ThreadProc(void *param)
+{
+    RSP_Init();
+    while(true)
+    {
+        int num = 0;
+
+        RSP.threadIdle = RSP.threadEvents.empty();
+
+        //process all events
+        while(!RSP.threadEvents.empty())
+        {
+            switch (RSP.threadEvents.front())
+            {
+                case (RSPMSG_PROCESSDLIST):
+                    RSP_ProcessDList();
+                    break;
+                case (RSPMSG_UPDATESCREEN):
+                    VI_UpdateScreen();
+                    break;
+                case (RSPMSG_CLOSE):
+                    OGL_Stop();
+                    return 0;
+                    break;
+                case (RSPMSG_DESTROYTEXTURES):
+                    Combiner_Destroy();
+                    FrameBuffer_Destroy();
+                    TextureCache_Destroy();
+                    break;
+                case (RSPMSG_INITTEXTURES):
+                    FrameBuffer_Init();
+                    TextureCache_Init();
+                    Combiner_Init();
+                    gSP.changed = gDP.changed = 0xFFFFFFFF;
+                    break;
+                case (RSPMSG_CAPTURESCREEN):
+                    OGL_SaveScreenshot();
+                    break;
+            }
+            RSP.threadEvents.pop();
+            num++;
+        }
+    }
+
+    return 0;
+}
+
+#else
 DWORD WINAPI RSP_ThreadProc( LPVOID lpParameter )
 {
     RSP_Init();
@@ -99,6 +145,7 @@ DWORD WINAPI RSP_ThreadProc( LPVOID lpParameter )
     RSP.thread = NULL;
     return 0;
 }
+#endif //Win32
 #endif // RSPTHREAD
 
 void RSP_ProcessDList()

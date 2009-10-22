@@ -111,7 +111,7 @@ normalize3(GLfloat *v)
     GLfloat r;
     r = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
     if (r == 0.0) return;
-    r = sqrt(r);
+    r = sqrtf(r);
     v[0] /= r;
     v[1] /= r;
     v[2] /= r;

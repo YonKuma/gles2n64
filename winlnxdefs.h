@@ -22,6 +22,10 @@
 #ifndef WINLNXDEFS_H
 #define WINLNXDEFS_H
 
+#ifndef min
+#define min(a,b) ((a) < (b) ? (a) : (b))
+#endif
+
 #ifdef __WIN32__
 # define WIN32_LEAN_AND_MEAN
 # include <windows.h>

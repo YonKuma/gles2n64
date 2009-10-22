@@ -3,32 +3,6 @@
 
 #include <string.h>
 
-//ADVENTUS: NEON-ize these commands.
-#ifdef NEON
-inline void MultMatrix( float m0[4][4], float m1[4][4] )
-{
-    int i;
-    float dst[4][4];
-    dst[0][0] = m0[0][0]*m1[0][0] + m0[1][0]*m1[0][1] + m0[2][0]*m1[0][2] + m0[3][0]*m1[0][3];
-    dst[1][0] = m0[0][0]*m1[1][0] + m0[1][0]*m1[1][1] + m0[2][0]*m1[1][2] + m0[3][0]*m1[1][3];
-    dst[2][0] = m0[0][0]*m1[2][0] + m0[1][0]*m1[2][1] + m0[2][0]*m1[2][2] + m0[3][0]*m1[2][3];
-    dst[3][0] = m0[3][0]*m1[3][3] + m0[2][0]*m1[3][2] + m0[1][0]*m1[3][1] + m0[0][0]*m1[3][0];
-    dst[0][1] = m0[0][1]*m1[0][0] + m0[1][1]*m1[0][1] + m0[2][1]*m1[0][2] + m0[3][1]*m1[0][3];
-    dst[1][1] = m0[0][1]*m1[1][0] + m0[1][1]*m1[1][1] + m0[2][1]*m1[1][2] + m0[3][1]*m1[1][3];
-    dst[2][1] = m0[0][1]*m1[2][0] + m0[1][1]*m1[2][1] + m0[2][1]*m1[2][2] + m0[3][1]*m1[2][3];
-    dst[3][1] = m0[3][1]*m1[3][3] + m0[2][1]*m1[3][2] + m0[1][1]*m1[3][1] + m0[0][1]*m1[3][0];
-    dst[0][2] = m0[0][2]*m1[0][0] + m0[1][2]*m1[0][1] + m0[2][2]*m1[0][2] + m0[3][2]*m1[0][3];
-    dst[1][2] = m0[0][2]*m1[1][0] + m0[1][2]*m1[1][1] + m0[2][2]*m1[1][2] + m0[3][2]*m1[1][3];
-    dst[2][2] = m0[0][2]*m1[2][0] + m0[1][2]*m1[2][1] + m0[2][2]*m1[2][2] + m0[3][2]*m1[2][3];
-    dst[3][2] = m0[3][2]*m1[3][3] + m0[2][2]*m1[3][2] + m0[1][2]*m1[3][1] + m0[0][2]*m1[3][0];
-    dst[0][3] = m0[0][3]*m1[0][0] + m0[1][3]*m1[0][1] + m0[2][3]*m1[0][2] + m0[3][3]*m1[0][3];
-    dst[1][3] = m0[0][3]*m1[1][0] + m0[1][3]*m1[1][1] + m0[2][3]*m1[1][2] + m0[3][3]*m1[1][3];
-    dst[2][3] = m0[0][3]*m1[2][0] + m0[1][3]*m1[2][1] + m0[2][3]*m1[2][2] + m0[3][3]*m1[2][3];
-    dst[3][3] = m0[3][3]*m1[3][3] + m0[2][3]*m1[3][2] + m0[1][3]*m1[3][1] + m0[0][3]*m1[3][0];
-    memcpy( m0, dst, sizeof(float) * 16 );
-}
-
-#else
 inline void CopyMatrix( float m0[4][4], float m1[4][4] )
 {
     memcpy( m0, m1, 16 * sizeof( float ) );
@@ -36,9 +10,45 @@ inline void CopyMatrix( float m0[4][4], float m1[4][4] )
 
 inline void MultMatrix( float m0[4][4], float m1[4][4] )
 {
+#ifdef __NEON_OPT
+    asm volatile (
+	"vld1.32 		{d0, d1}, [%1]!			\n\t"	//q0 = m1
+	"vld1.32 		{d2, d3}, [%1]!			\n\t"	//q1 = m1+4
+	"vld1.32 		{d4, d5}, [%1]!			\n\t"	//q2 = m1+8
+	"vld1.32 		{d6, d7}, [%1]			\n\t"	//q3 = m1+12
+	"vld1.32 		{d16, d17}, [%0]		\n\t"	//q8 = m0
+	"vld1.32 		{d18, d19}, [%0, #16]	\n\t"	//q9 = m0+4
+	"vld1.32 		{d20, d21}, [%0, #32]	\n\t"	//q10 = m0+8
+	"vld1.32 		{d22, d23}, [%0, #48]	\n\t"	//q11 = m0+12
+
+	"vmul.f32 		q12, q8, d0[0] 			\n\t"	//q12 = q8 * d0[0]
+	"vmul.f32 		q13, q8, d2[0] 			\n\t"	//q13 = q8 * d2[0]
+	"vmul.f32 		q14, q8, d4[0] 			\n\t"	//q14 = q8 * d4[0]
+	"vmul.f32 		q15, q8, d6[0]	 		\n\t"	//q15 = q8 * d6[0]
+	"vmla.f32 		q12, q9, d0[1] 			\n\t"	//q12 = q9 * d0[1]
+	"vmla.f32 		q13, q9, d2[1] 			\n\t"	//q13 = q9 * d2[1]
+	"vmla.f32 		q14, q9, d4[1] 			\n\t"	//q14 = q9 * d4[1]
+	"vmla.f32 		q15, q9, d6[1] 			\n\t"	//q15 = q9 * d6[1]
+	"vmla.f32 		q12, q10, d1[0] 		\n\t"	//q12 = q10 * d0[0]
+	"vmla.f32 		q13, q10, d3[0] 		\n\t"	//q13 = q10 * d2[0]
+	"vmla.f32 		q14, q10, d5[0] 		\n\t"	//q14 = q10 * d4[0]
+	"vmla.f32 		q15, q10, d7[0] 		\n\t"	//q15 = q10 * d6[0]
+	"vmla.f32 		q12, q11, d1[1] 		\n\t"	//q12 = q11 * d0[1]
+	"vmla.f32 		q13, q11, d3[1] 		\n\t"	//q13 = q11 * d2[1]
+	"vmla.f32 		q14, q11, d5[1] 		\n\t"	//q14 = q11 * d4[1]
+	"vmla.f32 		q15, q11, d7[1]	 		\n\t"	//q15 = q11 * d6[1]
+
+	"vst1.32 		{d24, d25}, [%0]! 		\n\t"	//d = q12
+	"vst1.32 		{d26, d27}, [%0]! 		\n\t"	//d+4 = q13
+	"vst1.32 		{d28, d29}, [%0]! 		\n\t"	//d+8 = q14
+	"vst1.32 		{d30, d31}, [%0] 		\n\t"	//d+12 = q15
+
+	: "=r"(m0), "=r"(m1):
+    : "q0", "q1", "q2", "q3", "q8", "q9", "q10", "q11", "q12", "q13", "q14", "q15"
+	);
+#else
     int i;
     float dst[4][4];
-
     for (i = 0; i < 4; i++)
     {
         dst[0][i] = m0[0][i]*m1[0][0] + m0[1][i]*m1[0][1] + m0[2][i]*m1[0][2] + m0[3][i]*m1[0][3];
@@ -47,6 +57,7 @@ inline void MultMatrix( float m0[4][4], float m1[4][4] )
         dst[3][i] = m0[3][i]*m1[3][3] + m0[2][i]*m1[3][2] + m0[1][i]*m1[3][1] + m0[0][i]*m1[3][0];
     }
     memcpy( m0, dst, sizeof(float) * 16 );
+#endif
 }
 
 inline void Transpose3x3Matrix( float mtx[4][4] )
@@ -68,6 +79,24 @@ inline void Transpose3x3Matrix( float mtx[4][4] )
 
 inline void TransformVertex(float vtx[4], float mtx[4][4])
 {
+#ifdef __NEON_OPT
+	asm volatile (
+	"vld1.32 		{d0, d1}, [%1]			\n\t"	//Q0 = v
+	"vld1.32 		{d18, d19}, [%0]!		\n\t"	//Q1 = m
+	"vld1.32 		{d20, d21}, [%0]!		\n\t"	//Q2 = m+4
+	"vld1.32 		{d22, d23}, [%0]!		\n\t"	//Q3 = m+8
+	"vld1.32 		{d24, d25}, [%0]		\n\t"	//Q4 = m+12
+
+	"vmul.f32 		q13, q9, d0[0]			\n\t"	//Q5 = Q1*Q0[0]
+	"vmla.f32 		q13, q10, d0[1]			\n\t"	//Q5 += Q1*Q0[1]
+	"vmla.f32 		q13, q11, d1[0]			\n\t"	//Q5 += Q2*Q0[2]
+	"vmla.f32 		q13, q12, d1[1]			\n\t"	//Q5 += Q3*Q0[3]
+
+	"vst1.32 		{d26, d27}, [%1] 		\n\t"	//Q4 = m+12
+	: "=r"(mtx): "r"(vtx)
+    : "q0", "q9", "q10","q11", "q12", "q13"
+	);
+#else
     float x, y, z, w;
     x = vtx[0];
     y = vtx[1];
@@ -93,10 +122,30 @@ inline void TransformVertex(float vtx[4], float mtx[4][4])
              y * mtx[1][3] +
              z * mtx[2][3] +
                  mtx[3][3];
+#endif
 }
 
 inline void TransformVector( float vec[3], float mtx[4][4] )
 {
+#ifdef __NEON_OPT
+	asm volatile (
+	"vld1.32 		{d0}, [%1]  			\n\t"	//Q0 = v
+	"flds    		s2, [%1, #8]  			\n\t"	//Q0 = v
+	"vld1.32 		{d18, d19}, [%0]!		\n\t"	//Q1 = m
+	"vld1.32 		{d20, d21}, [%0]!		\n\t"	//Q2 = m+4
+	"vld1.32 		{d22, d23}, [%0]!		\n\t"	//Q3 = m+8
+	"vld1.32 		{d24, d25}, [%0]		\n\t"	//Q4 = m+12
+
+	"vmul.f32 		q1, q9, d0[0]			\n\t"	//Q5 = Q1*Q0[0]
+	"vmla.f32 		q1, q10, d0[1]			\n\t"	//Q5 += Q1*Q0[1]
+	"vmla.f32 		q1, q11, d1[0]			\n\t"	//Q5 += Q2*Q0[2]
+
+	"vst1.32 		{d2}, [%1] 	    	    \n\t"	//Q4 = m+12
+	"fsts   		s7, [%1, #8] 	    	\n\t"	//Q4 = m+12
+	:"=r"(mtx) : "r"(vec)
+    : "q0", "q9", "q10","q11", "q12", "q1"
+	);
+#else
     vec[0] = mtx[0][0] * vec[0]
            + mtx[1][0] * vec[1]
            + mtx[2][0] * vec[2];
@@ -106,10 +155,36 @@ inline void TransformVector( float vec[3], float mtx[4][4] )
     vec[2] = mtx[0][2] * vec[0]
            + mtx[1][2] * vec[1]
            + mtx[2][2] * vec[2];
+#endif
 }
 
 inline void Normalize(float v[3])
 {
+#ifdef __NEON_OPT
+	asm volatile (
+	"vld1.32 		{d4}, [%0]	    		\n\t"	//d2={x0,y0}, d3={z0, w0}
+	"flds    		s10, [%0, #8]	    	\n\t"	//d2={x0,y0}, d3={z0, w0}
+	"vmul.f32 		d0, d4, d4				\n\t"	//d0= d4*d4
+	"vpadd.f32 		d0, d0					\n\t"	//d0 = d[0] + d[1]
+    "vmla.f32 		d0, d5, d5				\n\t"	//d0 = d0 + d5*d5
+
+	"vmov.f32 		d1, d0					\n\t"	//d1 = d0
+	"vrsqrte.f32 	d0, d0					\n\t"	//d0 = ~ 1.0 / sqrt(d0)
+	"vmul.f32 		d2, d0, d1				\n\t"	//d2 = d0 * d1
+	"vrsqrts.f32 	d3, d2, d0				\n\t"	//d3 = (3 - d0 * d2) / 2
+	"vmul.f32 		d0, d0, d3				\n\t"	//d0 = d0 * d3
+	"vmul.f32 		d2, d0, d1				\n\t"	//d2 = d0 * d1
+	"vrsqrts.f32 	d3, d2, d0				\n\t"	//d4 = (3 - d0 * d3) / 2
+	"vmul.f32 		d0, d0, d3				\n\t"	//d0 = d0 * d4
+
+	"vmul.f32 		q2, q2, d0[0]			\n\t"	//d0= d2*d4
+	"vst1.32 		{d4}, [%0]  			\n\t"	//d2={x0,y0}, d3={z0, w0}
+	"fsts    		s10, [%0, #8]  			\n\t"	//d2={x0,y0}, d3={z0, w0}
+
+	:: "r"(v)
+    : "d0", "d1", "d2", "d3", "d4", "d5"
+	);
+#else
     float len;
 
     len = (float)(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
@@ -120,24 +195,62 @@ inline void Normalize(float v[3])
         v[1] /= (float)len;
         v[2] /= (float)len;
     }
-
+#endif
 }
 
 inline void Normalize2D( float v[2] )
 {
-    float len;
+#ifdef __NEON_OPT
+	asm volatile (
+	"vld1.32 		{d4}, [%0]	    		\n\t"	//d2={x0,y0}
+	"vmul.f32 		d0, d4, d4				\n\t"	//d0= d4*d4
+	"vpadd.f32 		d0, d0					\n\t"	//d0 = d[0] + d[1]
 
+	"vmov.f32 		d1, d0					\n\t"	//d1 = d0
+	"vrsqrte.f32 	d0, d0					\n\t"	//d0 = ~ 1.0 / sqrt(d0)
+	"vmul.f32 		d2, d0, d1				\n\t"	//d2 = d0 * d1
+	"vrsqrts.f32 	d3, d2, d0				\n\t"	//d3 = (3 - d0 * d2) / 2
+	"vmul.f32 		d0, d0, d3				\n\t"	//d0 = d0 * d3
+	"vmul.f32 		d2, d0, d1				\n\t"	//d2 = d0 * d1
+	"vrsqrts.f32 	d3, d2, d0				\n\t"	//d4 = (3 - d0 * d3) / 2
+	"vmul.f32 		d0, d0, d3				\n\t"	//d0 = d0 * d4
+
+	"vmul.f32 		d4, d4, d0[0]			\n\t"	//d0= d2*d4
+	"vst1.32 		{d4}, [%0]	    		\n\t"	//d2={x0,y0}, d3={z0, w0}
+
+	:: "r"(v)
+    : "d0", "d1", "d2", "d3", "d4", "d5"
+	);
+#else
+    float len;
     len = (float)sqrt( v[0]*v[0] + v[1]*v[1] );
     v[0] /= len;
     v[1] /= len;
+#endif
 }
 
 inline float DotProduct( float v0[3], float v1[3] )
 {
     float dot;
+#ifdef __NEON_OPT
+	asm volatile (
+	"vld1.32 		{d2}, [%1]			\n\t"	//d2={x0,y0}
+	"flds 			s6, [%1, #8]		\n\t"	//d3[0]={z0}
+	"vld1.32 		{d4}, [%2]			\n\t"	//d4={x1,y1}
+	"flds 			s10, [%2, #8]		\n\t"	//d5[0]={z1}
+
+	"vmul.f32 		d0, d2, d4			\n\t"	//d0= d2*d4
+	"vpadd.f32 		d0, d0, d0			\n\t"	//d0 = d[0] + d[1]
+	"vmla.f32 		d0, d3, d5			\n\t"	//d0 = d0 + d3*d5
+	"vmov.f32 		%0, s0	    		\n\t"	//r0 = s0
+	:"=r"(dot): "r"(v0), "r"(v1)
+    :
+	);
+#else
     dot = v0[0]*v1[0] + v0[1]*v1[1] + v0[2]*v1[2];
+#endif
     return dot;
 }
 #endif
-#endif
+
 

@@ -51,6 +51,92 @@ f32 identityMatrix[4][4] =
 };
 
 
+#ifdef __NEON_OPT2
+
+const float __acosf_pi_2 = M_PI_2;
+
+const float __acosf_lut[8] = {
+	0.105312459675071, 	//p7
+	0.105312459675071, 	//p7
+	0.051599985887214, 	//p5
+	0.051599985887214, 	//p5
+	0.169303418571894,	//p3
+	0.169303418571894,	//p3
+	0.999954835104825,	//p1
+	0.999954835104825	//p1
+};
+
+//computes 2 acosf in parallel
+void acosf_neon(float x[2], float r[2])
+{
+	asm volatile (
+
+	"vld1.f32	 	{d0}, %0				\n\t"	//d0 = {x0, x1};
+	"vdup.f32	 	d17, %3					\n\t"	//d17 = {pi/2, pi/2};
+	"vmov.f32	 	d6, d0					\n\t"	//d6 = d0;
+	"vabs.f32	 	d0, d0					\n\t"	//d0 = fabs(d0) ;
+
+	"vmov.f32	 	d5, #0.5				\n\t"	//d5 = 0.5;
+	"vmls.f32	 	d5, d0, d5				\n\t"	//d5 = d5 - d0*d5;
+
+	//fast invsqrt approx
+	"vmov.f32 		d1, d5					\n\t"	//d1 = d5
+	"vrsqrte.f32 	d5, d5					\n\t"	//d5 = ~ 1.0 / sqrt(d5)
+	"vmul.f32 		d2, d5, d1				\n\t"	//d2 = d5 * d1
+	"vrsqrts.f32 	d3, d2, d5				\n\t"	//d3 = (3 - d5 * d2) / 2
+	"vmul.f32 		d5, d5, d3				\n\t"	//d5 = d5 * d3
+	"vmul.f32 		d2, d5, d1				\n\t"	//d2 = d5 * d1
+	"vrsqrts.f32 	d3, d2, d5				\n\t"	//d3 = (3 - d5 * d3) / 2
+	"vmul.f32 		d5, d5, d3				\n\t"	//d5 = d5 * d3
+
+	//fast reciporical approximation
+	"vrecpe.f32		d1, d5					\n\t"	//d1 = ~ 1 / d5;
+	"vrecps.f32		d2, d1, d5				\n\t"	//d2 = 2.0 - d1 * d5;
+	"vmul.f32		d1, d1, d2				\n\t"	//d1 = d1 * d2;
+	"vrecps.f32		d2, d1, d5				\n\t"	//d2 = 2.0 - d1 * d5;
+	"vmul.f32		d5, d1, d2				\n\t"	//d5 = d1 * d2;
+
+	//if |x| > 0.5 -> ax = sqrt((1-ax)/2), r = pi/2
+	"vsub.f32		d5, d0, d5				\n\t"	//d5 = d0 - d5;
+	"vmov.f32	 	d2, #0.5				\n\t"	//d2 = 0.5;
+	"vcgt.f32	 	d3, d0, d2				\n\t"	//d3 = (d0 > d2);
+	"vmov.f32		d1, #3.0 				\n\t"	//d1 = 3.0;
+	"vshr.u32	 	d3, #31					\n\t"	//d3 = d3 >> 31;
+	"vmov.f32		d16, #1.0 				\n\t"	//d16 = 1.0;
+	"vcvt.f32.u32	d3, d3					\n\t"	//d3 = (float) d3;
+	"vmls.f32		d0, d5, d3  			\n\t"	//d0 = d0 - d5 * d3;
+	"vmul.f32		d7, d17, d3  			\n\t"	//d7 = d17 * d3;
+	"vmls.f32		d16, d1, d3 			\n\t"	//d16 = d16 - d1 * d3;
+
+	//polynomial:
+	"vld1.32 		{d2, d3}, [%2]	 		\n\t"	//d2 = {p7, p7}, d3 = {p5, p5}
+	"vmul.f32 		d1, d0, d0				\n\t"	//d1 = d0 * d0 = {x0^2, x1^2}
+	"vld1.32 		{d4}, [%2, #16]			\n\t"	//d4 = {p3, p3}
+	"vmla.f32 		d3, d2, d1				\n\t"	//d3 = d3 + d2 * d1;
+	"vld1.32	 	{d5}, [%2, #24]			\n\t"	//d5 = {p1, p1}
+	"vmla.f32 		d4, d3, d1				\n\t"	//d4 = d4 + d3 * d1;
+	"vmla.f32 		d5, d4, d1				\n\t"	//d5 = d5 + d4 * d1;
+	"vmul.f32 		d5, d5, d0				\n\t"	//d5 = d5 * d0;
+
+	"vmla.f32 		d7, d5, d16				\n\t"	//d7 = d7 + d5*d16
+
+	"vadd.f32 		d2, d7, d7				\n\t"	//d2 = d7 + d7
+	"vclt.f32	 	d3, d6, #0				\n\t"	//d3 = (d6 < 0)
+	"vshr.u32	 	d3, #31					\n\t"	//d3 = d3 >> 31;
+	"vcvt.f32.u32	d3, d3					\n\t"	//d3 = (float) d3
+	"vmls.f32 		d7, d2, d3		    	\n\t"	//d7 = d7 - d2 * d3;
+
+	"vsub.f32 		d0, d17, d7		    	\n\t"	//d0 = d17 - d7
+
+	"vst1.f32 		{d0}, [%1]				\n\t"	//s0 = s3
+
+	::"r"(x), "r"(r), "r"(__acosf_lut),  "r"(__acosf_pi_2)
+    : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d16", "d17"
+	);
+
+}
+#endif
+
 void gSPLoadUcodeEx( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 {
     RSP.PCi = 0;
@@ -69,15 +155,20 @@ void gSPLoadUcodeEx( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 
     MicrocodeInfo *ucode = GBI_DetectMicrocode( uc_start, uc_dstart, uc_dsize );
     if (ucode->type != (u32)-1) last_good_ucode = ucode->type;
-    if (ucode->type != NONE)
+    if (ucode->type != NONE){
         GBI_MakeCurrent( ucode );
-    else
+    } else {
 #ifdef RSPTHREAD
+#ifdef WIN32
         SetEvent( RSP.threadMsg[RSPMSG_CLOSE] );
+#else
+        RSP.threadIdle = 0;
+        RSP.threadEvents.push(RSPMSG_CLOSE);
+#endif
 #else
         puts( "Warning: Unknown UCODE!!!" );
 #endif
-
+    }
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_ERROR, "// Unknown microcode: 0x%08X, 0x%08X, %s\n", uc_crc, uc_dcrc, uc_str );
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gSPLoadUcodeEx( 0x%08X, 0x%08X, %i );\n", uc_start, uc_dstart, uc_dsize );
@@ -104,10 +195,21 @@ void gSPProcessVertex( u32 v )
 
     if (gSP.matrix.billboard)
     {
+#ifdef __NEON_OPT2
+        asm volatile (
+        "vld1.32 		{d2, d3}, [%0]			\n\t"	//d2={x0,y0}
+        "vld1.32 		{d4, d5}, [%1]			\n\t"	//d4={x1,y1}
+        "vadd.f32 		q1, q1, q2 			    \n\t"	//d4={x1,y1}
+        "vst1.32 		{d2, d3}, [%0] 		    \n\t"	//d4={x1,y1}
+        :: "r"(&gSP.vertices[v].x), "r"(&gSP.vertices[0].x)
+        :
+        );
+#else
         gSP.vertices[v].x += gSP.vertices[0].x;
         gSP.vertices[v].y += gSP.vertices[0].y;
         gSP.vertices[v].z += gSP.vertices[0].z;
         gSP.vertices[v].w += gSP.vertices[0].w;
+#endif
     }
 
     if (!(gSP.geometryMode & G_ZBUFFER))
@@ -119,7 +221,35 @@ void gSPProcessVertex( u32 v )
     {
         TransformVector( &gSP.vertices[v].nx, gSP.matrix.modelView[gSP.matrix.modelViewi] );
         Normalize( &gSP.vertices[v].nx );
-
+#ifdef __NEON_OPT2
+        //forces compiler to resolve absolute location
+        int *ptr = (int*) &gSP.lights[0].r;
+        asm volatile (
+        "vld1.32 		{d0}, [%3]	    		\n\t"	//d0={r, g}
+        "flds    		s2, [%3, #8]	   		\n\t"	//d1[0]={b}
+        "vld1.32 		{d2}, [%2]	    		\n\t"	//d2={nx,ny}
+        "flds    		s6, [%2, #8]	   		\n\t"	//d3[0]={nz}
+        "vmov.f32 		d16, #0.0   		    \n\t"	//d16={0,0}
+        "1:                                     \n\t"
+        "vld1.32 		{d4}, [%1, #12]	    	\n\t"	//d4={x,y}
+        "flds    		s10, [%1, #20]	   		\n\t"	//d5[0]={z}
+        "vmul.f32 		d4, d2, d4	    		\n\t"	//d4=d2*d4
+        "vpadd.f32 		d4, d4, d4		    	\n\t"	//d4=d4[0]+d4[1]
+        "vmla.f32 		d4, d3, d5		    	\n\t"	//d4=d0+d3*d5
+        "vmax.f32 		d4, d16, d4		    	\n\t"	//d4=max(d4, d16)
+        "vld1.32 		{d6}, [%1]	           	\n\t"	//d6={r,b}
+        "flds    		s14, [%1, #8]	   		\n\t"	//d7[0]={z}
+        "vmla.f32 		q0, q3, d4[0]	    	\n\t"	//q0=q0+q3*d4[0]
+        "add 		    %1, %1, #24	    		\n\t"	//r1=r1+24
+        "subs 		    %0, %0, #1	    		\n\t"	//r0=r0-1
+        "bne 		    1b	            		\n\t"	//(r0!=0)?(goto 1)
+        "vst1.32 		{d0}, [%2, #12]	   		\n\t"	//
+        "fsts 	    	s2, [%2, #16]	   		\n\t"	//
+        : "+r"(gSP.numLights), "+r"(ptr)
+        : "r"(&gSP.vertices[v].nx), "r"(&gSP.lights[gSP.numLights].r)
+        :
+        );
+#else
         r = gSP.lights[gSP.numLights].r;
         g = gSP.lights[gSP.numLights].g;
         b = gSP.lights[gSP.numLights].b;
@@ -133,12 +263,13 @@ void gSPProcessVertex( u32 v )
             r += gSP.lights[i].r * intensity;
             g += gSP.lights[i].g * intensity;
             b += gSP.lights[i].b * intensity;
+
         }
 
         gSP.vertices[v].r = r;
         gSP.vertices[v].g = g;
         gSP.vertices[v].b = b;
-
+#endif
         if (gSP.geometryMode & G_TEXTURE_GEN)
         {
             TransformVector( &gSP.vertices[v].nx, gSP.matrix.projection );
@@ -147,8 +278,14 @@ void gSPProcessVertex( u32 v )
 
             if (gSP.geometryMode & G_TEXTURE_GEN_LINEAR)
             {
+#ifdef __NEON_OPT2
+                acosf_neon(&gSP.vertices[v].nx, &gSP.vertices[v].s);
+                gSP.vertices[v].s *= 325.94931f;
+                gSP.vertices[v].t *= 325.94931f;
+#else
                 gSP.vertices[v].s = acosf(gSP.vertices[v].nx) * 325.94931f;
                 gSP.vertices[v].t = acosf(gSP.vertices[v].ny) * 325.94931f;
+#endif
             }
             else // G_TEXTURE_GEN
             {
@@ -157,7 +294,41 @@ void gSPProcessVertex( u32 v )
             }
         }
     }
+#ifdef __NEON_OPT2
+    float tmp;
+    float tmp2 = 0.1f;
+    asm volatile (
+    "vld1.32 		{d0, d1}, [%1]	    		\n\t"	//q0={x, y, z, w}
+    "vdup.f32 		q8, d1[1]	        		\n\t"	//q8={w,w,w,w}
+    "vneg.f32 		q9, q8	              	    \n\t"	//q9={-w,-w,-w,-w}
+    "vcgt.f32 		q1, q0, q8	    		    \n\t"	//q1={x>w, y>w, z>w, w>w}
+    "vclt.f32 		q2, q0, q9	    		    \n\t"	//q2={x<-w, y<-w, z<-w, w<-w}
+    "vshr.u32 		q1, q1, #31	    		    \n\t"	//q1=q1>>31
+    "vshr.u32 		q2, q2, #31	    		    \n\t"	//q2=q2>>31
+    "vsub.i32 		d6, d2, d4	    		    \n\t"	//d6=d2-d4
+    "vcvt.f32.s32 	d6, d6	    		        \n\t"	//d6=(float)d6
+    "vst1.32 		{d6}, [%1, #52]	    		\n\t"	//
 
+    "ldr 		    %0, [%1, #12]	        	\n\t"	//r1=w
+    "cmp 		    %0, #0	                	\n\t"	//w<0
+    "bmi 		    1f	                	    \n\t"	//
+    "vcvt.f32.u32 	d3, d3	    		        \n\t"	//d3=(float)d3
+    "vcvt.f32.u32 	d5, d5	    		        \n\t"	//d5=(float)d5
+    "vmov.f32 	    d0, #0.0	   		        \n\t"	//d0=0.0
+    "vdup.f32 	    d1, %2  	   		        \n\t"	//d0=0.0
+    "vadd.f32 	    d0, d0, d3	   		        \n\t"	//d0=0.0
+    "vmls.f32 	    d0, d1, d5	   		        \n\t"	//d0=0.0
+    "fsts 	        s0, [%1, #60]	   	        \n\t"	//d0=0.0
+    "b 		        2f	                	    \n\t"	//
+    "1: 		      	                	    \n\t"	//
+    "mov 		    %0, #0x0000 	        	\n\t"	//r1=w
+    "movt 		    %0, #0x8000 	        	\n\t"	//r1=w
+    "str 		    %0, [%1, #60]	        	\n\t"	//r1=w
+    "2: 		      	                	    \n\t"	//
+    :"=r"(tmp) : "r"(&gSP.vertices[v].x), "r"(tmp2)
+    :
+    );
+#else
     if (gSP.vertices[v].x < -gSP.vertices[v].w)
         gSP.vertices[v].xClip = -1.0f;
     else if (gSP.vertices[v].x > gSP.vertices[v].w)
@@ -180,6 +351,7 @@ void gSPProcessVertex( u32 v )
         gSP.vertices[v].zClip = 1.0f;
     else
         gSP.vertices[v].zClip = 0.0f;
+#endif
 }
 
 void gSPNoOp()

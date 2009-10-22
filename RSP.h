@@ -1,6 +1,7 @@
 #ifndef RSP_H
 #define RSP_H
 
+#include <queue>
 #include "winlnxdefs.h"
 #include "SDL.h"
 #include "SDL_thread.h"
@@ -8,6 +9,10 @@
 #include "GBI.h"
 #include "gSP.h"
 #include "Types.h"
+
+#ifndef min
+#define min(a,b) ((a) < (b) ? (a) : (b))
+#endif
 
 #define RSPMSG_CLOSE            0
 #define RSPMSG_UPDATESCREEN     1
@@ -19,16 +24,17 @@
 typedef struct
 {
 #ifdef RSPTHREAD
-# ifndef __LINUX__
+#ifdef WIN32
     HANDLE thread;
     // Events for thread messages, see defines at the top, or RSP_Thread
     HANDLE          threadMsg[6];
     // Event to notify main process that the RSP is finished with what it was doing
     HANDLE          threadFinished;
-# else
-    SDL_Thread *thread;
-    int        threadMsg[6];
-# endif // !__LINUX__
+#else
+    SDL_Thread      *thread;
+    std::queue<int>  threadEvents;
+    int              threadIdle;
+#endif // !__LINUX__
 #endif // RSPTHREAD
 
     u32 PC[18], PCi, busy, halt, close, DList, uc_start, uc_dstart, cmd, nextCmd, count;
@@ -41,7 +47,11 @@ extern RSPInfo RSP;
 void RSP_Init();
 void RSP_ProcessDList();
 #ifdef RSPTHREAD
+#ifndef WIN32
+int RSP_ThreadProc(void *param);
+#else
 DWORD WINAPI RSP_ThreadProc( LPVOID lpParameter );
+#endif
 #endif
 void RSP_LoadMatrix( f32 mtx[4][4], u32 address );
 

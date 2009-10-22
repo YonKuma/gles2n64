@@ -34,7 +34,7 @@ HWND        hToolBar;
 HINSTANCE   hInstance;
 #endif // !__LINUX__
 
-char        pluginName[] = "gles2N64 v0.0.1";
+char        pluginName[] = "gles2N64 v0.0.2";
 char        *screenDirectory;
 u32 last_good_ucode = (u32) -1;
 void        (*CheckInterrupts)( void );
@@ -81,8 +81,14 @@ EXPORT void CALL CaptureScreen ( char * Directory )
 #ifdef RSPTHREAD
     if (RSP.thread)
     {
+#ifdef WIN32
         SetEvent( RSP.threadMsg[RSPMSG_CAPTURESCREEN] );
         WaitForSingleObject( RSP.threadFinished, INFINITE );
+#else
+        RSP.threadIdle = 0;
+        RSP.threadEvents.push(RSPMSG_CAPTURESCREEN);
+        while(!RSP.threadIdle){SDL_Delay(1);};
+#endif
     }
 #else
     OGL_SaveScreenshot();
@@ -91,6 +97,9 @@ EXPORT void CALL CaptureScreen ( char * Directory )
 
 EXPORT void CALL ChangeWindow (void)
 {
+#ifdef __LINUX__
+    SDL_WM_ToggleFullScreen( OGL.hScreen );
+#else
 #ifdef RSPTHREAD
     // Textures seem to get corrupted when changing video modes (at least on my Radeon), so destroy them
     SetEvent( RSP.threadMsg[RSPMSG_DESTROYTEXTURES] );
@@ -156,11 +165,8 @@ EXPORT void CALL ChangeWindow (void)
 
     SetEvent( RSP.threadMsg[RSPMSG_INITTEXTURES] );
     WaitForSingleObject( RSP.threadFinished, INFINITE );
-#else // RSPTHREAD
-# ifdef __LINUX__
-    SDL_WM_ToggleFullScreen( OGL.hScreen );
-# endif // __LINUX__
 #endif // !RSPTHREAD
+#endif // __LINUX__
 }
 
 EXPORT void CALL CloseDLL (void)
@@ -283,8 +289,14 @@ EXPORT void CALL ProcessDList(void)
 #ifdef RSPTHREAD
     if (RSP.thread)
     {
+#ifdef WIN32
         SetEvent( RSP.threadMsg[RSPMSG_PROCESSDLIST] );
         WaitForSingleObject( RSP.threadFinished, INFINITE );
+#else
+        RSP.threadIdle = 0;
+        RSP.threadEvents.push(RSPMSG_PROCESSDLIST);
+        //while(!RSP.threadIdle){SDL_Delay(1);};
+#endif
     }
 #else
     RSP_ProcessDList();
@@ -331,9 +343,15 @@ EXPORT void CALL RomClosed (void)
         if (RSP.busy)
         {
             RSP.halt = TRUE;
+#ifdef WIN32
             WaitForSingleObject( RSP.threadFinished, INFINITE );
+#else
+            RSP.threadIdle = 0;
+            while(!RSP.threadIdle){SDL_Delay(1);};
+#endif
         }
 
+#ifdef WIN32
         SetEvent( RSP.threadMsg[RSPMSG_CLOSE] );
         WaitForSingleObject( RSP.threadFinished, INFINITE );
         for (i = 0; i < 4; i++)
@@ -341,6 +359,12 @@ EXPORT void CALL RomClosed (void)
                 CloseHandle( RSP.threadMsg[i] );
         CloseHandle( RSP.threadFinished );
         CloseHandle( RSP.thread );
+#else
+        RSP.threadIdle = 0;
+        RSP.threadEvents.push(RSPMSG_CLOSE);
+        while(!RSP.threadIdle){SDL_Delay(1);};
+        SDL_KillThread(RSP.thread);
+#endif
     }
 
     RSP.thread = NULL;
@@ -356,7 +380,7 @@ EXPORT void CALL RomClosed (void)
 EXPORT void CALL RomOpen (void)
 {
 #ifdef RSPTHREAD
-# ifndef __LINUX__
+# ifdef WIN32
     DWORD threadID;
     int i;
 
@@ -381,8 +405,11 @@ EXPORT void CALL RomOpen (void)
 
     RSP.thread = CreateThread( NULL, 4096, RSP_ThreadProc, NULL, NULL, &threadID );
     WaitForSingleObject( RSP.threadFinished, INFINITE );
-# else // !__LINUX__
-# endif // __LINUX__
+# else //
+    RSP.threadIdle = 1;
+    while(!RSP.threadEvents.empty()){RSP.threadEvents.pop();}
+    RSP.thread = SDL_CreateThread(RSP_ThreadProc, NULL);
+# endif //WIN32
 #else
 
 
@@ -405,8 +432,14 @@ EXPORT void CALL UpdateScreen (void)
 #ifdef RSPTHREAD
     if (RSP.thread)
     {
+#ifdef WIN32
         SetEvent( RSP.threadMsg[RSPMSG_UPDATESCREEN] );
         WaitForSingleObject( RSP.threadFinished, INFINITE );
+#else
+        RSP.threadIdle = 0;
+        RSP.threadEvents.push(RSPMSG_UPDATESCREEN);
+//        while(!RSP.threadIdle){SDL_Delay(1);};
+#endif
     }
 #else
     VI_UpdateScreen();

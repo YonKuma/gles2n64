@@ -1057,8 +1057,6 @@ void OGL_SaveScreenshot()
 void
 OGL_SwapBuffers()
 {
-    LOG("OGL_SwapBuffers() \n");
-
     static int frames[5] = { 0, 0, 0, 0, 0 };
     static int framesIndex = 0;
     static Uint32 lastTicks = 0;
@@ -1067,13 +1065,14 @@ OGL_SwapBuffers()
     frames[framesIndex]++;
     if (ticks >= (lastTicks + 1000))
     {
-        char caption[500];
+        //char caption[500];
         float fps = 0.0;
         for (int i = 0; i < 5; i++)
             fps += frames[i];
         fps /= 5.0;
-        snprintf( caption, 500, "%s - %.2f fps", pluginName, fps );
-        SDL_WM_SetCaption( caption, pluginName );
+        printf("fps = %f \n", fps);
+        //snprintf( caption, 500, "%s - %.2f fps", pluginName, fps );
+        //SDL_WM_SetCaption( caption, pluginName );
         framesIndex = (framesIndex + 1) % 5;
         frames[framesIndex] = 0;
         lastTicks = ticks;

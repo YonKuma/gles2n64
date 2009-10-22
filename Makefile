@@ -55,12 +55,15 @@ CFLAGS 	+= -IC:/CS2007q3/arm-none-linux-gnueabi/libc/lib
 endif
 
 ifeq ($(OS), LINUX)
-CFLAGS += -Wall -D__LINUX__
-#LDFLAGS += -LC:/CS2009q1/lib -lsrv_um -lGLESv2 -lIMGegl -lEGL C:/CS2009q1/lib/libSDL.a C:/CS2009q1/lib/libts.a C:/CS2009q1/lib/libpng12.a
+CFLAGS += -Wall -D__LINUX__ -D__NEON_OPT -D__NEON_OPT2
 else
 CFLAGS += -Wall
 LDFLAGS +=  -LC:/MinGW/lib/PVR -lSDLmain -lSDL -lpng -lGLESv2
 endif
+
+CFLAGS  += -O3 -mabi=aapcs-linux -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp -ffast-math \
+		  -fsingle-precision-constant -save-temps -fomit-frame-pointer
+
 
 OBJECTS = Config_nogui.o
 OBJECTS += ./wes/wes_matrix.o ./wes/wes_begin.o ./wes/wes_fragment.o ./wes/wes_shader.o ./wes/wes_state.o ./wes/wes_texture.o ./wes/wes.o
