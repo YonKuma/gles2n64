@@ -56,10 +56,6 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD dwReason, LPVOID lpvReserved)
         Config_LoadConfig();
         OGL.hRC = NULL;
         OGL.hDC = NULL;
-/*      OGL.hPbufferRC = NULL;
-        OGL.hPbufferDC = NULL;
-        OGL.hPbuffer = NULL;*/
-//      hFullscreen = NULL;
     }
     return TRUE;
 }
@@ -284,50 +280,37 @@ EXPORT void CALL MoveScreen (int xpos, int ypos)
 {
 }
 
+int Frame = 0;
 EXPORT void CALL ProcessDList(void)
 {
-#ifdef RSPTHREAD
-    if (RSP.thread)
+    Frame++;
+    if ((Frame % OGL.frameSkip) == 0 || OGL.frameSkip == 0)
     {
-#ifdef WIN32
-        SetEvent( RSP.threadMsg[RSPMSG_PROCESSDLIST] );
-        WaitForSingleObject( RSP.threadFinished, INFINITE );
-#else
-        RSP.threadIdle = 0;
-        RSP.threadEvents.push(RSPMSG_PROCESSDLIST);
-        //while(!RSP.threadIdle){SDL_Delay(1);};
-#endif
+
+    #ifdef RSPTHREAD
+        if (RSP.thread)
+        {
+    #ifdef WIN32
+            SetEvent( RSP.threadMsg[RSPMSG_PROCESSDLIST] );
+            WaitForSingleObject( RSP.threadFinished, INFINITE );
+    #else
+            RSP.threadIdle = 0;
+            RSP.threadEvents.push(RSPMSG_PROCESSDLIST);
+            //while(!RSP.threadIdle){SDL_Delay(1);};
+    #endif
+        }
+    #else
+        RSP_ProcessDList();
+    #endif
+    } else {
+        RSP.busy = FALSE;
+        RSP.DList++;
     }
-#else
-    RSP_ProcessDList();
-#endif
 }
 
 EXPORT void CALL ProcessRDPList(void)
 {
-    //*REG.DPC_CURRENT = *REG.DPC_START;
-/*  RSP.PCi = 0;
-    RSP.PC[RSP.PCi] = *REG.DPC_CURRENT;
 
-    RSP.halt = FALSE;
-
-    while (RSP.PC[RSP.PCi] < *REG.DPC_END)
-    {
-        RSP.cmd0 = *(DWORD*)&RDRAM[RSP.PC[RSP.PCi]];
-        RSP.cmd1 = *(DWORD*)&RDRAM[RSP.PC[RSP.PCi] + 4];
-        RSP.PC[RSP.PCi] += 8;
-*/
-/*      if ((RSP.cmd0 >> 24) == 0xE9)
-        {
-            *REG.MI_INTR |= MI_INTR_DP;
-            CheckInterrupts();
-        }
-        if ((RSP.cmd0 >> 24) == 0xCD)
-            RSP.cmd0 = RSP.cmd0;
-
-        GFXOp[RSP.cmd0 >> 24]();*/
-        //*REG.DPC_CURRENT += 8;
-//  }
 }
 
 EXPORT void CALL RomClosed (void)

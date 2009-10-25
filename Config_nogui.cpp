@@ -40,7 +40,7 @@ static const char *pluginDir = 0;
 
 static inline const char *GetPluginDir()
 {
-        static char path[PATH_MAX];
+    static char path[PATH_MAX];
 
     if(strlen(configdir) > 0)
     {
@@ -95,23 +95,26 @@ void Config_LoadConfig()
         pluginDir = GetPluginDir();
 
     // default configuration
-    OGL.fullscreenWidth = 640;
+    OGL.fullscreenWidth = 800;
     OGL.fullscreenHeight = 480;
-
-    OGL.windowedWidth = 640;
+    OGL.windowedWidth = 800;
     OGL.windowedHeight = 480;
+
+    OGL.frameSkip = 1;
+    OGL.vSync = 0;
+    OGL.logFPS = 1;
 
     OGL.forceBilinear = 0;
     OGL.enable2xSaI = 0;
     OGL.enableAnisotropicFiltering = 0;
     OGL.fog = 1;
-    OGL.textureBitDepth = 0; // normal (16 & 32 bits)
+    OGL.textureBitDepth = 1; // normal (16 & 32 bits)
     OGL.frameBufferTextures = 0;
     cache.maxBytes = 32 * 1048576;
 
     // read configuration
     char filename[PATH_MAX];
-    snprintf( filename, PATH_MAX, "%s/glN64.conf", pluginDir );
+    snprintf( filename, PATH_MAX, "%s/gles2n64.conf", pluginDir );
     f = fopen( filename, "r" );
     if (!f)
     {
@@ -129,34 +132,10 @@ void Config_LoadConfig()
             continue;
         *val++ = '\0';
 
-/*      if (!strcasecmp( line, "fullscreen width" ))
-        {
-            OGL.fullscreenWidth = atoi( val );
-        }
-        else if (!strcasecmp( line, "fullscreen height" ))
-        {
-            OGL.fullscreenHeight = atoi( val );
-        }
-        else if (!strcasecmp( line, "fullscreen depth" ))
-        {
-            OGL.fullscreenBits = atoi( val );
-        }
-        else if (!strcasecmp( line, "windowed width" ))
-        {
-            OGL.windowedWidth = atoi( val );
-        }
-        else if (!strcasecmp( line, "windowed height" ))
-        {
-            OGL.windowedHeight = atoi( val );
-        }
-        else if (!strcasecmp( line, "windowed depth" ))
-        {
-            OGL.windowedBits = atoi( val );
-        }*/
         if (!strcasecmp( line, "width" ))
         {
             int w = atoi( val );
-            OGL.fullscreenWidth = OGL.windowedWidth = (w == 0) ? (640) : (w);
+            OGL.fullscreenWidth = OGL.windowedWidth = (w == 0) ? (800) : (w);
         }
         else if (!strcasecmp( line, "height" ))
         {
@@ -190,6 +169,18 @@ void Config_LoadConfig()
         else if (!strcasecmp( line, "texture depth" ))
         {
             OGL.textureBitDepth = atoi( val );
+        }
+        else if (!strcasecmp( line, "frame skip" ))
+        {
+            OGL.frameSkip = atoi( val );
+        }
+        else if (!strcasecmp( line, "vertical sync" ))
+        {
+            OGL.vSync = atoi( val );
+        }
+        else if (!strcasecmp( line, "log fps" ))
+        {
+            OGL.logFPS = atoi( val );
         }
         else
         {

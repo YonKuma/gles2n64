@@ -50,7 +50,6 @@ f32 identityMatrix[4][4] =
     { 0.0f, 0.0f, 0.0f, 1.0f }
 };
 
-
 #ifdef __NEON_OPT2
 
 const float __acosf_pi_2 = M_PI_2;
@@ -195,14 +194,14 @@ void gSPProcessVertex( u32 v )
 
     if (gSP.matrix.billboard)
     {
-#ifdef __NEON_OPT2
+#if __NEON_OPT
         asm volatile (
-        "vld1.32 		{d2, d3}, [%0]			\n\t"	//d2={x0,y0}
-        "vld1.32 		{d4, d5}, [%1]			\n\t"	//d4={x1,y1}
-        "vadd.f32 		q1, q1, q2 			    \n\t"	//d4={x1,y1}
-        "vst1.32 		{d2, d3}, [%0] 		    \n\t"	//d4={x1,y1}
+        "vld1.32 		{d2, d3}, [%0]			\n\t"	//q1={x0,y0, z0, w0}
+        "vld1.32 		{d4, d5}, [%1]			\n\t"	//q2={x1,y1, z1, w1}
+        "vadd.f32 		q1, q1, q2 			    \n\t"	//q1=q1+q1
+        "vst1.32 		{d2, d3}, [%0] 		    \n\t"	//
         :: "r"(&gSP.vertices[v].x), "r"(&gSP.vertices[0].x)
-        :
+        : "d2", "d3", "d4", "d5", "memory"
         );
 #else
         gSP.vertices[v].x += gSP.vertices[0].x;
@@ -221,33 +220,39 @@ void gSPProcessVertex( u32 v )
     {
         TransformVector( &gSP.vertices[v].nx, gSP.matrix.modelView[gSP.matrix.modelViewi] );
         Normalize( &gSP.vertices[v].nx );
-#ifdef __NEON_OPT2
-        //forces compiler to resolve absolute location
-        int *ptr = (int*) &gSP.lights[0].r;
+
+//not sure if this is 100% correct. Fairly close though.
+#ifdef __NEON_OPT
         asm volatile (
-        "vld1.32 		{d0}, [%3]	    		\n\t"	//d0={r, g}
-        "flds    		s2, [%3, #8]	   		\n\t"	//d1[0]={b}
-        "vld1.32 		{d2}, [%2]	    		\n\t"	//d2={nx,ny}
-        "flds    		s6, [%2, #8]	   		\n\t"	//d3[0]={nz}
-        "vmov.f32 		d16, #0.0   		    \n\t"	//d16={0,0}
-        "1:                                     \n\t"
-        "vld1.32 		{d4}, [%1, #12]	    	\n\t"	//d4={x,y}
-        "flds    		s10, [%1, #20]	   		\n\t"	//d5[0]={z}
-        "vmul.f32 		d4, d2, d4	    		\n\t"	//d4=d2*d4
-        "vpadd.f32 		d4, d4, d4		    	\n\t"	//d4=d4[0]+d4[1]
-        "vmla.f32 		d4, d3, d5		    	\n\t"	//d4=d0+d3*d5
-        "vmax.f32 		d4, d16, d4		    	\n\t"	//d4=max(d4, d16)
-        "vld1.32 		{d6}, [%1]	           	\n\t"	//d6={r,b}
-        "flds    		s14, [%1, #8]	   		\n\t"	//d7[0]={z}
-        "vmla.f32 		q0, q3, d4[0]	    	\n\t"	//q0=q0+q3*d4[0]
-        "add 		    %1, %1, #24	    		\n\t"	//r1=r1+24
-        "subs 		    %0, %0, #1	    		\n\t"	//r0=r0-1
-        "bne 		    1b	            		\n\t"	//(r0!=0)?(goto 1)
-        "vst1.32 		{d0}, [%2, #12]	   		\n\t"	//
-        "fsts 	    	s2, [%2, #16]	   		\n\t"	//
-        : "+r"(gSP.numLights), "+r"(ptr)
-        : "r"(&gSP.vertices[v].nx), "r"(&gSP.lights[gSP.numLights].r)
-        :
+        "vld1.32 		{d0}, [%0]	    		\n\t"	//d0={r,g}
+        "flds   		s2, [%0, #8]	    	\n\t"	//d1[0]={b}
+        "vld1.32 		{d2}, [%1]			    \n\t"	//d2={nx,ny}
+        "flds   		s6, [%1, #8]			\n\t"	//d3[0]={nz}
+        "vmov.f32 		d16, #0.0     			\n\t"	//q16=0
+        ::"r"(&gSP.lights[gSP.numLights].r), "r"(&gSP.vertices[v].nx)
+        : "d0", "d1", "d2", "d3", "d16"
+        );
+        for (int i = 0; i < gSP.numLights; i++)
+        {
+            asm volatile (
+            "vld1.32 		{d6}, [%0]	        	\n\t"	//d6={r,g}
+            "flds    		s14, [%0, #8]	    	\n\t"	//q7[0]={b}
+            "vld1.32 		{d4}, [%0, #12]			\n\t"	//d4={x,y}
+            "flds    		s10, [%0, #20]	    	\n\t"	//d5[0]={z}
+            "vmul.f32 		d4, d2, d4 			    \n\t"	//d4=d2*d4
+            "vpadd.f32 		d4, d4, d4 			    \n\t"	//d4=d4[0]+d4[1]
+            "vmla.f32 		d4, d3, d5 			    \n\t"	//d4=d4+d3*d5
+            "vmax.f32 		d4, d4, d16 		    \n\t"	//d4=max(d4, 0)
+            "vmla.f32 		q0, q3, d4[0] 		    \n\t"	//q0=q0+q3*d4[0]
+            :: "r"(&gSP.lights[i].r)
+            : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7"
+            );
+        }
+        asm volatile (
+        "vst1.32        {d0}, [%0]	    		\n\t"	//d0={r,g}
+        "fsts           s2, [%0, #8]	    	\n\t"	//d0={r,g}
+        ::"r"(&gSP.vertices[v].r)
+        : "d0", "d1", "memory"
         );
 #else
         r = gSP.lights[gSP.numLights].r;
@@ -294,64 +299,8 @@ void gSPProcessVertex( u32 v )
             }
         }
     }
-#ifdef __NEON_OPT2
-    float tmp;
-    float tmp2 = 0.1f;
-    asm volatile (
-    "vld1.32 		{d0, d1}, [%1]	    		\n\t"	//q0={x, y, z, w}
-    "vdup.f32 		q8, d1[1]	        		\n\t"	//q8={w,w,w,w}
-    "vneg.f32 		q9, q8	              	    \n\t"	//q9={-w,-w,-w,-w}
-    "vcgt.f32 		q1, q0, q8	    		    \n\t"	//q1={x>w, y>w, z>w, w>w}
-    "vclt.f32 		q2, q0, q9	    		    \n\t"	//q2={x<-w, y<-w, z<-w, w<-w}
-    "vshr.u32 		q1, q1, #31	    		    \n\t"	//q1=q1>>31
-    "vshr.u32 		q2, q2, #31	    		    \n\t"	//q2=q2>>31
-    "vsub.i32 		d6, d2, d4	    		    \n\t"	//d6=d2-d4
-    "vcvt.f32.s32 	d6, d6	    		        \n\t"	//d6=(float)d6
-    "vst1.32 		{d6}, [%1, #52]	    		\n\t"	//
 
-    "ldr 		    %0, [%1, #12]	        	\n\t"	//r1=w
-    "cmp 		    %0, #0	                	\n\t"	//w<0
-    "bmi 		    1f	                	    \n\t"	//
-    "vcvt.f32.u32 	d3, d3	    		        \n\t"	//d3=(float)d3
-    "vcvt.f32.u32 	d5, d5	    		        \n\t"	//d5=(float)d5
-    "vmov.f32 	    d0, #0.0	   		        \n\t"	//d0=0.0
-    "vdup.f32 	    d1, %2  	   		        \n\t"	//d0=0.0
-    "vadd.f32 	    d0, d0, d3	   		        \n\t"	//d0=0.0
-    "vmls.f32 	    d0, d1, d5	   		        \n\t"	//d0=0.0
-    "fsts 	        s0, [%1, #60]	   	        \n\t"	//d0=0.0
-    "b 		        2f	                	    \n\t"	//
-    "1: 		      	                	    \n\t"	//
-    "mov 		    %0, #0x0000 	        	\n\t"	//r1=w
-    "movt 		    %0, #0x8000 	        	\n\t"	//r1=w
-    "str 		    %0, [%1, #60]	        	\n\t"	//r1=w
-    "2: 		      	                	    \n\t"	//
-    :"=r"(tmp) : "r"(&gSP.vertices[v].x), "r"(tmp2)
-    :
-    );
-#else
-    if (gSP.vertices[v].x < -gSP.vertices[v].w)
-        gSP.vertices[v].xClip = -1.0f;
-    else if (gSP.vertices[v].x > gSP.vertices[v].w)
-        gSP.vertices[v].xClip = 1.0f;
-    else
-        gSP.vertices[v].xClip = 0.0f;
-
-    if (gSP.vertices[v].y < -gSP.vertices[v].w)
-        gSP.vertices[v].yClip = -1.0f;
-    else if (gSP.vertices[v].y > gSP.vertices[v].w)
-        gSP.vertices[v].yClip = 1.0f;
-    else
-        gSP.vertices[v].yClip = 0.0f;
-
-    if (gSP.vertices[v].w <= 0.0f)
-        gSP.vertices[v].zClip = -1.0f;
-    else if (gSP.vertices[v].z < -gSP.vertices[v].w)
-        gSP.vertices[v].zClip = -0.1f;
-    else if (gSP.vertices[v].z > gSP.vertices[v].w)
-        gSP.vertices[v].zClip = 1.0f;
-    else
-        gSP.vertices[v].zClip = 0.0f;
-#endif
+    ClipVertex(&gSP.vertices[v].x, &gSP.vertices[v].xClip);
 }
 
 void gSPNoOp()

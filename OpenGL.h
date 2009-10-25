@@ -37,6 +37,8 @@ struct GLInfo
     DWORD   fullscreenWidth, fullscreenHeight, fullscreenBits, fullscreenRefresh;
     DWORD   width, height, windowedWidth, windowedHeight;
     int     heightOffset;
+    int     frameSkip, vSync;
+    int     logFPS;
 
     BOOL    fullscreen, forceBilinear, fog;
 

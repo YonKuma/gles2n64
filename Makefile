@@ -23,15 +23,9 @@
 ARCH = ARM
 OS = LINUX
 
-#SO_EXTENSION = dll
-#CXX = 	C:/MinGW/bin/g++
-#LD = 	C:/MinGW/bin/g++
-#STRIP = C:/MinGW/bin/strip
-
 SO_EXTENSION = so
 CXX = 	C:/CS2007q3/bin/arm-none-linux-gnueabi-g++
 LD = 	C:/CS2007q3/bin/arm-none-linux-gnueabi-g++
-STRIP = C:/CS2007q3/bin/arm-none-linux-gnueabi-strip
 
 CFLAGS = -I./
 CFLAGS += -I./wes
@@ -43,26 +37,28 @@ CFLAGS += -IC:/MinGW/include/PVR
 CFLAGS += -IC:/MinGW/include/libpng12
 
 else
+
 DRIVE 	= G
 INCLUDE	= $(DRIVE):/Pandora/pnd_libs_081117/include
-
 CFLAGS	+= -IC:/CS2007q3/include/PVR
 CFLAGS 	+= -I$(INCLUDE)/libpng12
 CFLAGS 	+= -I$(INCLUDE)/SDL
 CFLAGS	+= -I$(INCLUDE)
 CFLAGS 	+= -IC:/CS2007q3/arm-none-linux-gnueabi/libc/lib
-
+#LDFLAGS += -LG:/Pandora/lib_rev2
+#LDFLAGS += -LG:/Pandora/lib
 endif
 
 ifeq ($(OS), LINUX)
-CFLAGS += -Wall -D__LINUX__ -D__NEON_OPT -D__NEON_OPT2
+CFLAGS += -Wall -D__LINUX__ -fPIC -D__NEON_OPT 
+LDFLAGS += G:/Pandora/lib_rev2/libEGL.so 
 else
 CFLAGS += -Wall
 LDFLAGS +=  -LC:/MinGW/lib/PVR -lSDLmain -lSDL -lpng -lGLESv2
 endif
 
-CFLAGS  += -O3 -mabi=aapcs-linux -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp -ffast-math \
-		  -fsingle-precision-constant -save-temps -fomit-frame-pointer
+CFLAGS  += -O3 -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp -ffast-math \
+		  -fsingle-precision-constant -save-temps -fomit-frame-pointer -fno-tree-vectorize
 
 
 OBJECTS = Config_nogui.o

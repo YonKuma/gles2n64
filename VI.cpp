@@ -35,7 +35,7 @@ void VI_UpdateSize()
 
 void VI_UpdateScreen()
 {
-    glFinish();
+    //glFinish();
     if (OGL.frameBufferTextures)
     {
         FrameBuffer *current = FrameBuffer_FindBuffer( *REG.VI_ORIGIN );
@@ -71,8 +71,5 @@ void VI_UpdateScreen()
 #endif
         }
     }
-#if 0
-    glFinish();
-#endif
 }
 

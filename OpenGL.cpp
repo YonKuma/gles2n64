@@ -66,6 +66,24 @@ const EGLint ContextAttribs[] = {
 	EGL_NONE
 };
 
+void
+enable_runfast()
+{
+#ifdef __arm__
+	static const unsigned int x = 0x04086060;
+	static const unsigned int y = 0x03000000;
+	int r;
+	asm volatile (
+		"fmrx	%0, fpscr			\n\t"	//r0 = FPSCR
+		"and	%0, %0, %1			\n\t"	//r0 = r0 & 0x04086060
+		"orr	%0, %0, %2			\n\t"	//r0 = r0 | 0x03000000
+		"fmxr	fpscr, %0			\n\t"	//FPSCR = r0
+		: "=r"(r)
+		: "r"(x), "r"(y)
+	);
+#endif
+}
+
 const char* EGLErrorString(){
 	EGLint nErr = eglGetError();
 	switch(nErr){
@@ -260,11 +278,12 @@ bool OGL_Start()
         OGL.width = OGL.windowedWidth;
         OGL.height = OGL.windowedHeight;
     }
-#ifdef WIN32
+#if 0
     OGL.heightOffset = -16;
 #else
     OGL.heightOffset = 0;
 #endif
+
     /* Initialize SDL */
     printf( "[glN64]: (II) Initializing SDL video subsystem...\n" );
     if (SDL_InitSubSystem( SDL_INIT_VIDEO ) == -1)
@@ -283,13 +302,13 @@ bool OGL_Start()
     }
 
     /* Set the video mode */
-    printf( "[glN64]: (II) Setting video mode %dx%d...\n", (int)OGL.width, (int)OGL.height );
-    if (!(OGL.hScreen = SDL_SetVideoMode( OGL.width, OGL.height - 32, 0, SDL_SWSURFACE )))
-    {
-        printf( "[glN64]: (EE) Error setting videomode %dx%d: %s\n", (int)OGL.width, (int)OGL.height, SDL_GetError() );
-        SDL_QuitSubSystem( SDL_INIT_VIDEO );
-        return FALSE;
-    }
+    //printf( "[glN64]: (II) Setting video mode %dx%d...\n", (int)OGL.width, (int)OGL.height );
+    //if (!(OGL.hScreen = SDL_SetVideoMode( OGL.width, OGL.height - 32, 0, SDL_SWSURFACE )))
+    //{
+    //    printf( "[glN64]: (EE) Error setting videomode %dx%d: %s\n", (int)OGL.width, (int)OGL.height, SDL_GetError() );
+    //    SDL_QuitSubSystem( SDL_INIT_VIDEO );
+    //    return FALSE;
+    //}
     SDL_WM_SetCaption( pluginName, pluginName );
 
 #ifdef _WIN32
@@ -337,7 +356,7 @@ bool OGL_Start()
         LOG( "\nMake Current failed: %s", EGLErrorString()); fflush(stdout);
     };
 
-    eglSwapInterval(Display, 0);
+    eglSwapInterval(Display, OGL.vSync);
 
     switch(eglGetError())
     {
@@ -356,7 +375,14 @@ bool OGL_Start()
     LOG( "Color Buffer Size: %i \n", attrib);
 
     printf( "[glN64]: (II) Initialize WES...\n");
+#ifndef __LINUX__
     wes_init("libGLESv2.dll");
+#else
+    wes_init("libGLESv2.so");
+#endif
+
+    printf( "[glN64]: (III) Enable Runfast...\n");
+    enable_runfast();
 
     OGL_InitExtensions();
     OGL_InitStates();
@@ -381,13 +407,13 @@ void OGL_Stop()
 
     SDL_QuitSubSystem( SDL_INIT_VIDEO );
     OGL.hScreen = NULL;
-/*
+
     wes_destroy();
-    eglSwapBuffers(Display, Surface);
+
 	eglMakeCurrent(Display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
- 	eglDestroyContext(Display, Context);
 	eglDestroySurface(Display, Surface);
-   	eglTerminate(Display);*/
+ 	eglDestroyContext(Display, Context);
+   	eglTerminate(Display);
 }
 
 void OGL_UpdateCullFace()
@@ -1057,25 +1083,22 @@ void OGL_SaveScreenshot()
 void
 OGL_SwapBuffers()
 {
-    static int frames[5] = { 0, 0, 0, 0, 0 };
-    static int framesIndex = 0;
-    static Uint32 lastTicks = 0;
-    Uint32 ticks = SDL_GetTicks();
-
-    frames[framesIndex]++;
-    if (ticks >= (lastTicks + 1000))
-    {
-        //char caption[500];
-        float fps = 0.0;
-        for (int i = 0; i < 5; i++)
-            fps += frames[i];
-        fps /= 5.0;
-        printf("fps = %f \n", fps);
-        //snprintf( caption, 500, "%s - %.2f fps", pluginName, fps );
-        //SDL_WM_SetCaption( caption, pluginName );
-        framesIndex = (framesIndex + 1) % 5;
-        frames[framesIndex] = 0;
-        lastTicks = ticks;
+    if (OGL.logFPS){
+        static int frames[5] = { 0, 0, 0, 0, 0 };
+        static int framesIndex = 0;
+        static Uint32 lastTicks = 0;
+        Uint32 ticks = SDL_GetTicks();
+        frames[framesIndex]++;
+        if (ticks >= (lastTicks + 1000))
+        {
+            float fps = 0.0f;
+            for (int i = 0; i < 5; i++) fps += frames[i];
+            fps /= 5.0f;
+            printf("fps = %f \n", fps);
+            framesIndex = (framesIndex + 1) % 5;
+            frames[framesIndex] = 0;
+            lastTicks = ticks;
+        }
     }
 
     // if emulator defined a render callback function, call it before buffer swap
