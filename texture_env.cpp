@@ -173,9 +173,7 @@ void Set_texture_env( TexEnv *texEnv )
     combiner.vertex.alpha = texEnv->fragment.alpha;
 
     // Shouldn't ever happen, but who knows?
-    if (OGL.ARB_multitexture)
-        glActiveTextureARB( GL_TEXTURE0_ARB );
-
+    glActiveTextureARB( GL_TEXTURE0);
     if (texEnv->usesT0 || texEnv->usesT1)
         glEnable( GL_TEXTURE_2D );
     else

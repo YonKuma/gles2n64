@@ -102,14 +102,18 @@ void Config_LoadConfig()
 
     OGL.frameSkip = 1;
     OGL.vSync = 0;
-    OGL.logFPS = 1;
+    OGL.logFrameRate = 1;
+    OGL.textureHack = 0;
+    OGL.alphaHack = 1;
+    OGL.enableLighting = 1;
+    OGL.enableAlphaTest = 1;
 
+    OGL.combinerCompiler = 1;
     OGL.forceBilinear = 0;
     OGL.enable2xSaI = 0;
     OGL.enableAnisotropicFiltering = 0;
     OGL.fog = 1;
     OGL.textureBitDepth = 1; // normal (16 & 32 bits)
-    OGL.frameBufferTextures = 0;
     cache.maxBytes = 32 * 1048576;
 
     // read configuration
@@ -162,10 +166,6 @@ void Config_LoadConfig()
         {
             cache.maxBytes = atoi( val ) * 1048576;
         }
-        else if (!strcasecmp( line, "enable HardwareFB" ))
-        {
-            OGL.frameBufferTextures = atoi( val );
-        }
         else if (!strcasecmp( line, "texture depth" ))
         {
             OGL.textureBitDepth = atoi( val );
@@ -180,13 +180,39 @@ void Config_LoadConfig()
         }
         else if (!strcasecmp( line, "log fps" ))
         {
-            OGL.logFPS = atoi( val );
+            OGL.logFrameRate = atoi( val );
+        }
+        else if (!strcasecmp( line, "texture hack" ))
+        {
+            OGL.textureHack = atoi( val );
+        }
+        else if (!strcasecmp( line, "alpha hack" ))
+        {
+            OGL.alphaHack = atoi( val );
+        }
+        else if (!strcasecmp( line, "highp intermediates" ))
+        {
+            OGL.highpIntermediates = atoi( val );
+        }
+        else if (!strcasecmp( line, "enable lighting" ))
+        {
+            OGL.enableLighting = atoi( val );
+        }
+        else if (!strcasecmp( line, "enable alpha test" ))
+        {
+            OGL.enableAlphaTest = atoi( val );
+        }
+        else if (!strcasecmp( line, "combiner compiler" ))
+        {
+            OGL.combinerCompiler = atoi( val );
         }
         else
         {
-            printf( "Unknown config option: %s\n", line );
+            printf( "Unsupported config option: %s\n", line );
         }
     }
+    OGL.xpos = (800 - OGL.fullscreenWidth) / 2;
+    OGL.ypos = (480 - OGL.fullscreenHeight) / 2;
 
     fclose( f );
 }

@@ -126,4 +126,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #define glUniform1fARB				glUniform1f
 #define GLhandleARB					GLint
 
+
+/* N64 Extensions               */
+#define GL_TEXSCALE_N64             0xFF00
+#define GL_TEXOFFSET_N64            0xFF01
+#define GL_CACHESCALE_N64           0xFF02
+#define GL_CACHESHIFTSCALE_N64      0xFF03
+#define GL_CACHEOFFSET_N64          0xFF04
+
+#define GL_TEXGEN_N64               0xFF05
+#define GL_ZPRIM_N64                0xFF06
+#define GL_FOG_N64                  0xFF07
+
+#define GL_COLORALPHA_ARRAY_N64     0xFF08
+
+#define GL_FOG_MULTIPLIER_N64       0xFF09
+#define GL_FOG_OFFSET_N64           0xFF0A
+
 #endif

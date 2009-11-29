@@ -66,5 +66,4 @@ extern GLvoid wes_begin_init();
 extern GLvoid wes_begin_destroy();
 extern GLvoid wes_vertbuffer_flush();
 
-
 #endif

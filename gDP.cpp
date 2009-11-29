@@ -9,7 +9,6 @@
 #include "convert.h"
 #include "OpenGL.h"
 #include "CRC.h"
-#include "FrameBuffer.h"
 #include "DepthBuffer.h"
 #include "VI.h"
 #include <stdlib.h>
@@ -63,6 +62,8 @@ void gDPSetPrimDepth( u16 z, u16 dz )
 {
     gDP.primDepth.z = min( 1.0f, max( 0.0f, (_FIXED2FLOAT( z, 15 ) - gSP.viewport.vtrans[2]) / gSP.viewport.vscale[2] ) );
     gDP.primDepth.deltaZ = dz;
+
+    glPrimitiveZ(gDP.primDepth.z);
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gDPSetPrimDepth( %f, %f );\n",
@@ -198,6 +199,10 @@ void gDPSetAlphaCompare( u32 mode )
 void gDPSetDepthSource( u32 source )
 {
     gDP.otherMode.depthSource = source;
+    if (gDP.otherMode.depthSource == G_ZS_PRIM)
+        glEnable(GL_ZPRIM_N64);
+    else
+        glDisable(GL_ZPRIM_N64);
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gDPSetDepthSource( %s );\n",
@@ -295,10 +300,8 @@ void gDPUpdateColorImage()
         u32 frameX, frameY;
         u32 i = 0;
 
-#if  0
-        glReadBuffer( GL_BACK );
-#endif
-        glReadPixels( 0, (int)(OGL.height - gDP.colorImage.height * OGL.scaleY + OGL.heightOffset), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1_EXT, frameBuffer );
+        printf("READ PIXELS \n");
+        glReadPixels( OGL.xpos, (int)(OGL.height - gDP.colorImage.height * OGL.scaleY + OGL.ypos), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1_EXT, frameBuffer );
 
         for (u32 y = 0; y < gDP.colorImage.height; y++)
         {
@@ -321,7 +324,8 @@ void gDPUpdateColorImage()
         u32 frameX, frameY;
         u32 i = 0;
 
-        glReadPixels( 0, (int)(OGL.height - gDP.colorImage.height * OGL.scaleY + OGL.heightOffset), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_LUMINANCE, GL_UNSIGNED_BYTE, frameBuffer );
+        printf("READ PIXELS \n");
+        glReadPixels( 0, (int)(OGL.height - gDP.colorImage.height * OGL.scaleY), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_LUMINANCE, GL_UNSIGNED_BYTE, frameBuffer );
 
         for (u32 y = 0; y < gDP.colorImage.height; y++)
         {
@@ -359,17 +363,6 @@ void gDPSetColorImage( u32 format, u32 size, u32 width, u32 address )
 
     if (gDP.colorImage.address != address)
     {
-        if (OGL.frameBufferTextures)
-        {
-            if (gDP.colorImage.changed)
-                FrameBuffer_SaveBuffer( gDP.colorImage.address, gDP.colorImage.size, gDP.colorImage.width, gDP.colorImage.height );
-
-            if (address != gDP.depthImageAddress)
-                FrameBuffer_RestoreBuffer( address, size, width );
-
-            //OGL_ClearDepthBuffer();
-        }
-
         gDP.colorImage.changed = FALSE;
 
         if (width == VI.width)
@@ -596,20 +589,6 @@ void gDPLoadTile( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt )
         return;
     }
 
-    if (OGL.frameBufferTextures)
-    {
-        FrameBuffer *buffer;
-        if (((buffer = FrameBuffer_FindBuffer( address )) != NULL) &&
-            ((*(u32*)&RDRAM[buffer->startAddress] & 0xFFFEFFFE) == (buffer->startAddress & 0xFFFEFFFE)))
-        {
-            gDP.loadTile->frameBuffer = buffer;
-            gDP.textureMode = TEXTUREMODE_FRAMEBUFFER;
-            gDP.loadType = LOADTYPE_TILE;
-            gDP.changed |= CHANGED_TMEM;
-            return;
-        }
-    }
-
     // Line given for 32-bit is half what it seems it should since they split the
     // high and low words. I'm cheating by putting them together.
     if (gDP.loadTile->size == G_IM_SIZ_32b)
@@ -661,20 +640,6 @@ void gDPLoadBlock( u32 tile, u32 uls, u32 ult, u32 lrs, u32 dxt )
 #endif
 //      bytes = min( bytes, min( RDRAMSize - gDP.textureImage.address, 4096 - (gDP.loadTile->tmem << 3) ) );
         return;
-    }
-
-    if (OGL.frameBufferTextures)
-    {
-        FrameBuffer *buffer;
-        if (((buffer = FrameBuffer_FindBuffer( address )) != NULL) &&
-            ((*(u32*)&RDRAM[buffer->startAddress] & 0xFFFEFFFE) == (buffer->startAddress & 0xFFFEFFFE)))
-        {
-            gDP.loadTile->frameBuffer = buffer;
-            gDP.textureMode = TEXTUREMODE_FRAMEBUFFER;
-            gDP.loadType = LOADTYPE_BLOCK;
-            gDP.changed |= CHANGED_TMEM;
-            return;
-        }
     }
 
     u64* src = (u64*)&RDRAM[address];
@@ -764,7 +729,11 @@ void gDPSetScissor( u32 mode, f32 ulx, f32 uly, f32 lrx, f32 lry )
     gDP.scissor.lrx = lrx;
     gDP.scissor.lry = lry;
 
+#ifdef __STATE_OPT
+    OGL_UpdateScissor();
+#else
     gDP.changed |= CHANGED_SCISSOR;
+#endif
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_IGNORED, "gDPSetScissor( %s, %.2f, %.2f, %.2f, %.2f );\n",
@@ -791,9 +760,6 @@ void gDPFillRectangle( s32 ulx, s32 uly, s32 lrx, s32 lry )
 
     if (gDP.otherMode.cycleType == G_CYC_FILL)
     {
-        //if (gDP.fillColor.a == 0.0f)
-        //  return;
-
         lrx++;
         lry++;
 
@@ -853,7 +819,7 @@ void gDPTextureRectangle( f32 ulx, f32 uly, f32 lrx, f32 lry, s32 tile, f32 s, f
     }
 
     gSP.textureTile[0] = &gDP.tiles[tile];
-    gSP.textureTile[1] = &gDP.tiles[tile < 7 ? tile + 1 : tile];
+    gSP.textureTile[1] = &gDP.tiles[tile < 7 ? (tile + 1) : tile];
 
     f32 lrs = s + (lrx - ulx - 1) * dsdx;
     f32 lrt = t + (lry - uly - 1) * dtdy;

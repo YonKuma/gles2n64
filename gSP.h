@@ -15,11 +15,12 @@
 struct SPVertex
 {
     f32     x, y, z, w;
-    f32     nx, ny, nz;
+    f32     nx, ny, nz, __pad0;
     f32     r, g, b, a;
     f32     s, t;
-    f32     xClip, yClip, zClip;
+    s32     xClip, yClip, zClip;
     s16     flag;
+    s16     __pad1;
 };
 
 typedef SPVertex SPTriangle[3];
@@ -112,7 +113,7 @@ void gSPBranchList( u32 dl );
 void gSPBranchLessZ( u32 branchdl, u32 vtx, f32 zval );
 void gSPSprite2DBase( u32 base );
 void gSP1Triangle( s32 v0, s32 v1, s32 v2, s32 flag );
-void gSP2Triangles( s32 v00, s32 v01, s32 v02, s32 flag0, 
+void gSP2Triangles( s32 v00, s32 v01, s32 v02, s32 flag0,
                     s32 v10, s32 v11, s32 v12, s32 flag1 );
 void gSP4Triangles( s32 v00, s32 v01, s32 v02,
                     s32 v10, s32 v11, s32 v12,

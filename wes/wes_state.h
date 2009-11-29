@@ -174,6 +174,17 @@ struct uniforms_s {
 
     //uint_t      uAlphaFunc;
     ufloat_t    uAlphaRef;
+
+    /* N64 Specific Stuff */
+    ubool_t     uEnablePrimitiveZ;
+    ubool_t     uEnableTexGen;
+    ufloat_t    uPrimitiveZ;
+    ufloat_t    uFogMultiplier, uFogOffset;
+    uvec2_t 	uTexScale[WES_MULTITEX_NUM];
+    uvec2_t 	uTexOffset[WES_MULTITEX_NUM];
+    uvec2_t 	uCacheShiftScale[WES_MULTITEX_NUM];
+    uvec2_t 	uCacheScale[WES_MULTITEX_NUM];
+    uvec2_t 	uCacheOffset[WES_MULTITEX_NUM];
 };
 
 //variables

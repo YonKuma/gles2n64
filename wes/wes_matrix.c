@@ -614,7 +614,6 @@ glUniformMatrix4fv(GLint location, GLsizei count, GLboolean transpose, GLfloat* 
 GLvoid
 glMatrixMode(GLenum mode)
 {
-    wes_vertbuffer_flush();
     m_mode = mode;
     switch(m_mode)
     {
@@ -837,6 +836,27 @@ glOrthof(float l, float r, float b, float t, float n, float f)
 {
     wes_vertbuffer_flush();
 
+    GLfloat m[16];
+    m[0] = 2.0f / (r - l);
+    m[1] = 0;
+    m[2] = 0;
+    m[3] = 0;
+    m[4] = 0;
+    m[5] = 2.0f / (t - b);
+    m[6] = 0;
+    m[7] = 0;
+    m[8] = 0;
+    m[9] = 0;
+    m[10] = -2.0f / (f - n);
+    m[11] = 0;
+    m[12] = -(r + l)/(r - l);
+    m[13] = -(t + b)/(t - b);
+    m[14] = -(f + n)/(f - n);
+    m[15] = 1.0f;
+
+    glMultMatrixf(m);
+
+#if 0
     GLfloat m0  = 2 / (r - l);
     GLfloat m5  = 2 / (t - b);
     GLfloat m10 = - 2 / (f - n);
@@ -844,8 +864,10 @@ glOrthof(float l, float r, float b, float t, float n, float f)
     GLfloat m13 = - (t + b) / (t - b);
     GLfloat m14 = - (f + n) / (f - n);
 
-    m_modelview_mod |= (m_mode == GL_MODELVIEW);
-    m_projection_mod |= (m_mode == GL_PROJECTION);
+    //m_modelview_mod |= (m_mode == GL_MODELVIEW);
+    //m_projection_mod |= (m_mode == GL_PROJECTION);
+    m_modelview_mod |= 1;
+    m_projection_mod |= 1;
     m_current->flags = WES_M_DIRTY;
 
     /* Reordered to minimize temporary variables */
@@ -865,14 +887,12 @@ glOrthof(float l, float r, float b, float t, float n, float f)
 	m_current->data[9]  *= m10;
 	m_current->data[10] *= m10;
 	m_current->data[11] *= m10;
-
+#endif
 }
 
 GLvoid
 glPushMatrix()
 {
-    wes_vertbuffer_flush();
-
     unsigned int i;
     m_modelview_mod |= (m_mode == GL_MODELVIEW);
     m_projection_mod |= (m_mode == GL_PROJECTION);

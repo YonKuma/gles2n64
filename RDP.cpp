@@ -15,7 +15,7 @@ void RDP_Unknown( u32 w0, u32 w1 )
 
 void RDP_NoOp( u32 w0, u32 w1 )
 {
-    gDPNoOp();
+//    gDPNoOp();
 }
 
 void RDP_SetCImg( u32 w0, u32 w1 )
@@ -200,17 +200,17 @@ void RDP_FullSync( u32 w0, u32 w1 )
 
 void RDP_TileSync( u32 w0, u32 w1 )
 {
-    gDPTileSync();
+//    gDPTileSync();
 }
 
 void RDP_PipeSync( u32 w0, u32 w1 )
 {
-    gDPPipeSync();
+//    gDPPipeSync();
 }
 
 void RDP_LoadSync( u32 w0, u32 w1 )
 {
-    gDPLoadSync();
+//    gDPLoadSync();
 }
 
 void RDP_TexRectFlip( u32 w0, u32 w1 )

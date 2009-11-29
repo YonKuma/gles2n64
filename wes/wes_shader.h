@@ -135,6 +135,15 @@ struct uniformloc_s
     GLint   uFogStart, uFogEnd, uFogDensity;
     GLint   uFogColor;
 
+    GLint   uFogMultiplier, uFogOffset;
+    GLint   uEnablePrimitiveZ;
+    GLint   uPrimitiveZ;
+    GLint   uEnableTexGen;
+    GLint   uTexScale[2], uTexOffset[2];
+    GLint   uCacheShiftScale[2];
+    GLint   uCacheScale[2], uCacheOffset[2];
+
+
     GLint	uTexGenMode[WES_MULTITEX_NUM];
     GLint   uTexGenMat[WES_MULTITEX_NUM];
 
@@ -169,7 +178,6 @@ struct progstate_s
 struct program_s
 {
     GLuint          prog, frag, vert;
-    GLboolean       isbound;
     uniformloc_t    uloc;
     progstate_t     pstate;
 };

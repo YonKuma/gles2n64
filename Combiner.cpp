@@ -17,9 +17,7 @@ CombinerInfo combiner;
 void Combiner_Init()
 {
 
-    if (OGL.NV_register_combiners)
-        combiner.compiler = NV_REGISTER_COMBINERS;
-    else if (OGL.EXT_texture_env_combine || OGL.ARB_texture_env_combine)
+    if (OGL.combinerCompiler)
         combiner.compiler = TEXTURE_ENV_COMBINE;
     else
         combiner.compiler = TEXTURE_ENV;
@@ -337,7 +335,7 @@ DWORD64 Combiner_EncodeCombineMode( WORD saRGB0, WORD sbRGB0, WORD mRGB0, WORD a
 void Combiner_SelectCombine( u64 mux )
 {
     // Hack for the Banjo-Tooie shadow (framebuffer textures must be enabled too)
-    if ((gDP.otherMode.cycleType == G_CYC_1CYCLE) && (mux == 0x00ffe7ffffcf9fcfLL) && (cache.current[0]->frameBufferTexture))
+    if ((gDP.otherMode.cycleType == G_CYC_1CYCLE) && (mux == 0x00ffe7ffffcf9fcfLL))
     {
         mux = EncodeCombineMode( 0, 0, 0, 0, TEXEL0, 0, PRIMITIVE, 0,
                                  0, 0, 0, 0, TEXEL0, 0, PRIMITIVE, 0 );

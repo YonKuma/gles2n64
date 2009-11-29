@@ -5,6 +5,7 @@
 struct VIInfo
 {
     u32 width, height;
+    f32 rwidth, rheight;
     u32 lastOrigin;
 };
 

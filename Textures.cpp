@@ -273,7 +273,6 @@ void TextureCache_Init()
     cache.dummy->crc = 0;
     cache.dummy->format = 0;
     cache.dummy->size = 0;
-    cache.dummy->frameBufferTexture = FALSE;
     cache.dummy->width = 2;
     cache.dummy->height = 2;
     cache.dummy->realWidth = 0;
@@ -288,7 +287,8 @@ void TextureCache_Init()
     cache.dummy->tMem = 0;
 
     glBindTexture( GL_TEXTURE_2D, cache.dummy->glName );
-    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, dummyTexture );
+    //glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, dummyTexture );
+    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
     cache.cachedBytes = cache.dummy->textureBytes;
 
@@ -326,13 +326,12 @@ BOOL TextureCache_Verify()
 
 void TextureCache_RemoveBottom()
 {
+//    printf("REMOVE TEXTURE \n");
+
     CachedTexture *newBottom = cache.bottom->higher;
 
     glDeleteTextures( 1, &cache.bottom->glName );
     cache.cachedBytes -= cache.bottom->textureBytes;
-
-    if (cache.bottom->frameBufferTexture)
-        FrameBuffer_RemoveBuffer( cache.bottom->address );
 
     if (cache.bottom == cache.top)
         cache.top = NULL;
@@ -349,6 +348,8 @@ void TextureCache_RemoveBottom()
 
 void TextureCache_Remove( CachedTexture *texture )
 {
+//    printf("REMOVE TEXTURE \n");
+
     if ((texture == cache.bottom) &&
         (texture == cache.top))
     {
@@ -447,6 +448,8 @@ void TextureCache_Destroy()
 
 void TextureCache_LoadBackground( CachedTexture *texInfo )
 {
+//    printf("LOAD TEXTURE \n");
+
     u32 *dest, *scaledDest;
 
     u8 *swapped, *src;
@@ -556,6 +559,8 @@ void TextureCache_Load( CachedTexture *texInfo )
 {
     u32 *dest, *scaledDest;
 
+//    printf("LOAD TEXTURE \n");
+
     u64 *src;
     u16 x, y, i, j, tx, ty, line;
     u16 mirrorSBit, maskSMask, clampSClamp;
@@ -565,7 +570,8 @@ void TextureCache_Load( CachedTexture *texInfo )
     GLenum          glType;
 
     if (((imageFormat[texInfo->size][texInfo->format].autoFormat == GL_RGBA8) ||
-        ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16)) || (cache.bitDepth == 2)) && (cache.bitDepth != 0))
+        ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16)) ||
+        (cache.bitDepth == 2)) && (cache.bitDepth != 0))
     {
         texInfo->textureBytes = (texInfo->realWidth * texInfo->realHeight) << 2;
         if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
@@ -648,6 +654,7 @@ void TextureCache_Load( CachedTexture *texInfo )
         clampTClamp = 0;
     if (clampSClamp & 0x8000)
         clampSClamp = 0;
+
 
     j = 0;
     for (y = 0; y < texInfo->realHeight; y++)
@@ -732,8 +739,7 @@ u32 TextureCache_CalculateCRC( u32 t, u32 width, u32 height )
 void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
 {
     // If multitexturing, set the appropriate texture
-    if (OGL.ARB_multitexture)
-        glActiveTexture( GL_TEXTURE0_ARB + t );
+    glActiveTexture( GL_TEXTURE0_ARB + t );
 
     // Bind the cached texture
     glBindTexture( GL_TEXTURE_2D, texture->glName );
@@ -754,24 +760,21 @@ void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texture->clampS ? GL_CLAMP_TO_EDGE : GL_REPEAT );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texture->clampT ? GL_CLAMP_TO_EDGE : GL_REPEAT );
 
-    // Anisotropic filtering
-#if 0
-    if (OGL.enableAnisotropicFiltering)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 4.0f);
-#endif
-
     texture->lastDList = RSP.DList;
 
     TextureCache_MoveToTop( texture );
 
     cache.current[t] = texture;
+
+    glTexGen2fN64(GL_CACHESHIFTSCALE_N64, cache.current[t]->shiftScaleS, cache.current[t]->shiftScaleT);
+    glTexGen2fN64(GL_CACHESCALE_N64, cache.current[t]->scaleS, cache.current[t]->scaleT);
+    glTexGen2fN64(GL_CACHEOFFSET_N64, cache.current[t]->offsetS, cache.current[t]->offsetT);
 }
 
 void TextureCache_ActivateDummy( u32 t )
 {
 //TextureCache_ActivateTexture( t, cache.dummy );
-    if (OGL.ARB_multitexture)
-        glActiveTexture( GL_TEXTURE0_ARB + t );
+    glActiveTexture( GL_TEXTURE0 + t );
 
     glBindTexture( GL_TEXTURE_2D, cache.dummy->glName );
 
@@ -816,8 +819,7 @@ void TextureCache_UpdateBackground()
     cache.misses++;
 
     // If multitexturing, set the appropriate texture
-    if (OGL.ARB_multitexture)
-        glActiveTexture( GL_TEXTURE0_ARB );
+    glActiveTexture(GL_TEXTURE0);
 
     cache.current[0] = TextureCache_AddTop();
 
@@ -844,7 +846,6 @@ void TextureCache_UpdateBackground()
     cache.current[0]->line = 0;
     cache.current[0]->tMem = 0;
     cache.current[0]->lastDList = RSP.DList;
-    cache.current[0]->frameBufferTexture = FALSE;
 
     cache.current[0]->realWidth = pow2( gSP.bgImage.width );
     cache.current[0]->realHeight = pow2( gSP.bgImage.height );
@@ -884,11 +885,6 @@ void TextureCache_Update( u32 t )
     if (gDP.textureMode == TEXTUREMODE_BGIMAGE)
     {
         TextureCache_UpdateBackground();
-        return;
-    }
-    else if (gDP.textureMode == TEXTUREMODE_FRAMEBUFFER)
-    {
-        FrameBuffer_ActivateBufferTexture( t, gDP.loadTile->frameBuffer );
         return;
     }
 
@@ -976,12 +972,6 @@ void TextureCache_Update( u32 t )
             height = lineHeight;
     }
 
-/*  if (gDP.loadTile->frameBuffer)
-    {
-        FrameBuffer_ActivateBufferTexture( t, gDP.loadTile->frameBuffer );
-        return;
-    }*/
-
     clampWidth = gSP.textureTile[t]->clamps ? tileWidth : width;
     clampHeight = gSP.textureTile[t]->clampt ? tileHeight : height;
 
@@ -1044,8 +1034,7 @@ void TextureCache_Update( u32 t )
     cache.misses++;
 
     // If multitexturing, set the appropriate texture
-    if (OGL.ARB_multitexture)
-        glActiveTexture( GL_TEXTURE0_ARB + t );
+    glActiveTexture( GL_TEXTURE0 + t);
 
     cache.current[t] = TextureCache_AddTop();
 
@@ -1079,7 +1068,6 @@ void TextureCache_Update( u32 t )
     cache.current[t]->line = gSP.textureTile[t]->line;
     cache.current[t]->tMem = gSP.textureTile[t]->tmem;
     cache.current[t]->lastDList = RSP.DList;
-    cache.current[t]->frameBufferTexture = FALSE;
 
 /*  if (cache.current[t]->clampS)
         cache.current[t]->realWidth = pow2( clampWidth );
@@ -1136,9 +1124,7 @@ void TextureCache_Update( u32 t )
 
 void TextureCache_ActivateNoise( u32 t )
 {
-    if (OGL.ARB_multitexture)
-        glActiveTexture( GL_TEXTURE0_ARB + t );
-
+    glActiveTexture( GL_TEXTURE0 + t );
     glBindTexture( GL_TEXTURE_2D, cache.glNoiseNames[RSP.DList & 0x1F] );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );

@@ -38,9 +38,8 @@ CFLAGS += -IC:/MinGW/include/libpng12
 
 else
 
-DRIVE 	= G
-INCLUDE	= $(DRIVE):/Pandora/pnd_libs_081117/include
-CFLAGS	+= -IC:/CS2007q3/include/PVR
+INCLUDE	= C:/Users/jim/Desktop/Lachlan/Pandora/pnd_libs_081117/include
+#CFLAGS	+= -IC:/CS2007q3/include/PVR
 CFLAGS 	+= -I$(INCLUDE)/libpng12
 CFLAGS 	+= -I$(INCLUDE)/SDL
 CFLAGS	+= -I$(INCLUDE)
@@ -50,16 +49,17 @@ CFLAGS 	+= -IC:/CS2007q3/arm-none-linux-gnueabi/libc/lib
 endif
 
 ifeq ($(OS), LINUX)
-CFLAGS += -Wall -D__LINUX__ -fPIC -D__NEON_OPT 
-LDFLAGS += G:/Pandora/lib_rev2/libEGL.so 
+CFLAGS += -Wall -D__LINUX__ -fPIC -D__NEON_OPT -D__VEC4_OPT -D__VSH_OPT
+LDFLAGS += C:/Users/jim/Desktop/Lachlan/Pandora/lib_rev2/libEGL.so 
 else
 CFLAGS += -Wall
 LDFLAGS +=  -LC:/MinGW/lib/PVR -lSDLmain -lSDL -lpng -lGLESv2
 endif
 
-CFLAGS  += -O3 -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp -ffast-math \
+CFLAGS  += -O2 -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp -ffast-math \
 		  -fsingle-precision-constant -save-temps -fomit-frame-pointer -fno-tree-vectorize
 
+#CFLAGS += -DPROFILE_GBI
 
 OBJECTS = Config_nogui.o
 OBJECTS += ./wes/wes_matrix.o ./wes/wes_begin.o ./wes/wes_fragment.o ./wes/wes_shader.o ./wes/wes_state.o ./wes/wes_texture.o ./wes/wes.o
@@ -71,7 +71,6 @@ OBJECTS += glN64.o \
 	RSP.o \
 	VI.o \
 	Textures.o \
-	FrameBuffer.o \
 	Combiner.o \
 	gDP.o \
 	gSP.o \

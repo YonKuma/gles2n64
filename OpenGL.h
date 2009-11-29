@@ -4,7 +4,6 @@
 # include "winlnxdefs.h"
 # include "SDL.h"
 
-//#include "glATI.h"
 #include "gSP.h"
 
 #if 0
@@ -12,6 +11,12 @@
 #else
 #define LOG(...)
 #endif
+
+#define RS_NONE         0
+#define RS_TRIANGLE     1
+#define RS_RECT         2
+#define RS_TEXTUREDRECT 3
+#define RS_LINE         4
 
 struct GLVertex
 {
@@ -21,24 +26,27 @@ struct GLVertex
         float r, g, b, a;
     } color, secondaryColor;
     float s0, t0, s1, t1;
-    float fog;
+    //float fog;
 };
 
 struct GLInfo
 {
-#ifndef __LINUX__
-    HGLRC   hRC, hPbufferRC;
-    HDC     hDC, hPbufferDC;
-    HWND    hWnd;
-#endif // __LINUX__
-
+#ifdef WIN32
     SDL_Surface *hScreen;
+#endif
 
     DWORD   fullscreenWidth, fullscreenHeight, fullscreenBits, fullscreenRefresh;
     DWORD   width, height, windowedWidth, windowedHeight;
-    int     heightOffset;
-    int     frameSkip, vSync;
-    int     logFPS;
+    int     xpos, ypos;
+
+    int     frameSkip, vSync, frame;
+    int     logFrameRate;
+    int     highpIntermediates;
+    int     textureHack;        //makes texture show for banjo kazooie / RR64.
+    int     alphaHack;          //makes alpha set properly in most games.
+    int     enableLighting;
+    int     enableAlphaTest;
+    int     combinerCompiler;
 
     BOOL    fullscreen, forceBilinear, fog;
 
@@ -67,14 +75,14 @@ struct GLInfo
 
     BOOL    enable2xSaI;
     BOOL    enableAnisotropicFiltering;
-    BOOL    frameBufferTextures;
     int     textureBitDepth;
-    float   originAdjust;
 
-    GLVertex vertices[256];
-    BYTE    triangles[80][3];
-    BYTE    numTriangles;
-    BYTE    numVertices;
+    GLubyte elements[255];
+    int     numElements;
+    uint32_t    renderState;
+
+    GLVertex rect[4];
+
 #ifndef __LINUX__
     HWND    hFullscreenWnd;
 #endif
@@ -91,18 +99,30 @@ struct GLcolor
 
 bool OGL_Start();
 void OGL_Stop();
-void OGL_AddTriangle( SPVertex *vertices, int v0, int v1, int v2 );
+
+void OGL_AddTriangle(int v0, int v1, int v2);
 void OGL_DrawTriangles();
-void OGL_DrawLine( SPVertex *vertices, int v0, int v1, float width );
-void OGL_DrawRect( int ulx, int uly, int lrx, int lry, float *color );
-void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls, float ult, float lrs, float lrt, bool flip );
+void OGL_DrawTriangle(SPVertex *vertices, int v0, int v1, int v2);
+void OGL_DrawLine(SPVertex *vertices, int v0, int v1, float width);
+void OGL_DrawRect(int ulx, int uly, int lrx, int lry, float *color);
+void OGL_DrawTexturedRect(float ulx, float uly, float lrx, float lry, float uls, float ult, float lrs, float lrt, bool flip );
+
 void OGL_UpdateScale();
+void OGL_UpdateStates();
+void OGL_UpdateViewport();
+void OGL_UpdateScissor();
+void OGL_UpdateCullFace();
+
 void OGL_ClearDepthBuffer();
-void OGL_ClearColorBuffer( float *color );
+void OGL_ClearColorBuffer(float *color);
 void OGL_ResizeWindow();
 void OGL_SaveScreenshot();
 void OGL_SwapBuffers();
 void OGL_ReadScreen( void **dest, int *width, int *height );
 
+int  OGL_CheckError();
+void OGL_SetArrays();
+void OGL_SetColors();
+void OGL_SetTextureArrays();
 #endif
 

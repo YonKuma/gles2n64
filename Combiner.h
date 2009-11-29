@@ -174,25 +174,25 @@ struct CombineCycle
 };
 
 #ifdef MAINDEF
-int saRGBExpanded[] = 
+int saRGBExpanded[] =
 {
-    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,      
+    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,
     SHADE,              ENVIRONMENT,        ONE,                NOISE,
     ZERO,               ZERO,               ZERO,               ZERO,
     ZERO,               ZERO,               ZERO,               ZERO
 };
 
-int sbRGBExpanded[] = 
+int sbRGBExpanded[] =
 {
-    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,      
+    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,
     SHADE,              ENVIRONMENT,        CENTER,             K4,
     ZERO,               ZERO,               ZERO,               ZERO,
     ZERO,               ZERO,               ZERO,               ZERO
 };
 
-int mRGBExpanded[] = 
+int mRGBExpanded[] =
 {
-    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,      
+    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,
     SHADE,              ENVIRONMENT,        SCALE,              COMBINED_ALPHA,
     TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,    SHADE_ALPHA,
     ENV_ALPHA,          LOD_FRACTION,       PRIM_LOD_FRAC,      K5,
@@ -202,33 +202,33 @@ int mRGBExpanded[] =
     ZERO,               ZERO,               ZERO,               ZERO
 };
 
-int aRGBExpanded[] = 
+int aRGBExpanded[] =
 {
-    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,      
+    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,
     SHADE,              ENVIRONMENT,        ONE,                ZERO
 };
 
-int saAExpanded[] = 
+int saAExpanded[] =
 {
-    COMBINED,           TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,        
+    COMBINED,           TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,
     SHADE_ALPHA,        ENV_ALPHA,          ONE,                ZERO
 };
 
-int sbAExpanded[] = 
+int sbAExpanded[] =
 {
-    COMBINED,           TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,        
+    COMBINED,           TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,
     SHADE_ALPHA,        ENV_ALPHA,          ONE,                ZERO
 };
 
-int mAExpanded[] = 
+int mAExpanded[] =
 {
-    LOD_FRACTION,       TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,        
+    LOD_FRACTION,       TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,
     SHADE_ALPHA,        ENV_ALPHA,          PRIM_LOD_FRAC,      ZERO,
 };
 
-int aAExpanded[] = 
+int aAExpanded[] =
 {
-    COMBINED,           TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,        
+    COMBINED,           TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,
     SHADE_ALPHA,        ENV_ALPHA,          ONE,                ZERO
 };
 
@@ -369,7 +369,7 @@ extern struct CombinerInfo
         case ZERO: \
             constant.a = 0.0f; \
             break; \
-    } 
+    }
 
 void Combiner_Init();
 void Combiner_UpdateCombineColors();

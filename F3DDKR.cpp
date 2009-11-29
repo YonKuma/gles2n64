@@ -3,7 +3,7 @@
 #include "F3D.h"
 #include "F3DDKR.h"
 #include "N64.h"
-#include "RSP.h"    
+#include "RSP.h"
 #include "RDP.h"
 #include "gSP.h"
 #include "gDP.h"
@@ -78,7 +78,12 @@ void F3DDKR_MoveWord( u32 w0, u32 w1 )
             break;
         case 0x0A:
             gSP.matrix.modelViewi = _SHIFTR( w1, 6, 2 );
+#ifdef  _STATE_OPT
+            gSPCombineMatrices();
+#else
             gSP.changed |= CHANGED_MATRIX;
+#endif
+
             break;
         default:
             F3D_MoveWord( w0, w1 );

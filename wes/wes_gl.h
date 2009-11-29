@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #include "wes.h"
 #include "wes_gl_defines.h"
+#include "wes_egl_defines.h"
 #include "wes_gl_arb.h"
 
 /* pass throughs */
@@ -70,7 +71,7 @@ extern GLvoid wes_vertbuffer_flush();
 #define glDepthRangef		       	wes_gl->glDepthRangef
 //#define glDisable			        wes_gl->glDisable
 #define glDisableVertexAttribArray	wes_gl->glDisableVertexAttribArray
-#define glDrawElements			    wes_gl->glDrawElements
+//#define glDrawElements			    wes_gl->glDrawElements
 //#define glEnable			        wes_gl->glEnable
 #define glEnableVertexAttribArray	wes_gl->glEnableVertexAttribArray
 #define glFinish			        wes_gl->glFinish
@@ -174,10 +175,46 @@ extern GLvoid wes_vertbuffer_flush();
 
 #define glShadeModel(A)
 
+#define eglGetError                 wes_egl->eglGetError
+#define eglGetDisplay               wes_egl->eglGetDisplay
+#define eglInitialize               wes_egl->eglInitialize
+#define eglTerminate                wes_egl->eglTerminate
+#define eglQueryString              wes_egl->eglQueryString
+#define eglGetConfigs               wes_egl->eglGetConfigs
+#define eglChooseConfig             wes_egl->eglChooseConfig
+#define eglGetConfigAttrib          wes_egl->eglGetConfigAttrib
+#define eglCreateWindowSurface      wes_egl->eglCreateWindowSurface
+#define eglCreatePbufferSurface     wes_egl->eglCreatePbufferSurface
+#define eglCreatePixmapSurface      wes_egl->eglCreatePixmapSurface
+#define eglDestroySurface           wes_egl->eglDestroySurface
+#define eglQuerySurface             wes_egl->eglQuerySurface
+#define eglBindAPI                  wes_egl->eglBindAPI
+#define eglQueryAPI                 wes_egl->eglQueryAPI
+#define eglWaitClient               wes_egl->eglWaitClient
+#define eglReleaseThread            wes_egl->eglReleaseThread
+#define eglCreatePbufferFromClientBuffer    wes_egl->eglCreatePbufferFromClientBuffer
+#define eglSurfaceAttrib            wes_egl->eglSurfaceAttrib
+#define eglBindTexImage             wes_egl->eglBindTexImage
+#define eglReleaseTexImage          wes_egl->eglReleaseTexImage
+#define eglSwapInterval             wes_egl->eglSwapInterval
+#define eglCreateContext            wes_egl->eglCreateContext
+#define eglDestroyContext           wes_egl->eglDestroyContext
+#define eglMakeCurrent              wes_egl->eglMakeCurrent
+#define eglGetCurrentContext        wes_egl->eglGetCurrentContext
+#define eglGetCurrentSurface        wes_egl->eglGetCurrentSurface
+#define eglGetCurrentDisplay        wes_egl->eglGetCurrentDisplay
+#define eglQueryContext             wes_egl->eglQueryContext
+#define eglWaitGL                   wes_egl->eglWaitGL
+#define eglWaitNative               wes_egl->eglWaitNative
+#define eglSwapBuffers              wes_egl->eglSwapBuffers
+#define eglCopyBuffers              wes_egl->eglCopyBuffers
+#define eglGetProcAddress           wes_egl->eglGetProcAddress
+
 extern GLvoid   glEnable(GLenum e);
 extern GLvoid   glDisable(GLenum e);
 
 extern GLvoid   glDrawArrays(GLenum mode, GLint off, GLint num);
+extern GLvoid   glDrawElements(GLenum mode, GLsizei size, GLenum type, void *indices);
 
 
 /*  Begin / End Paradigm
@@ -289,5 +326,12 @@ extern GLvoid   glAlphaFunc(GLenum func, GLclampf ref);
 /*  Texture     */
 extern GLvoid   glTexImage2D(GLenum target, GLint level, GLenum internalFormat, GLsizei width, GLsizei height,
            GLint border, GLenum format, GLenum type, const GLvoid *pixels);
+
+
+/*  N64 Specific    */
+extern GLvoid   glPrimitiveZ(GLfloat z);
+extern GLvoid   glTexGen2fN64(GLenum pname, GLfloat s, GLfloat t);
+extern GLvoid   glColorAlphaPointerN64(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr);
+
 
 #endif

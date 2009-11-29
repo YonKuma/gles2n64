@@ -213,7 +213,6 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
     current->texture->address = current->startAddress;
     current->texture->clampWidth = current->width;
     current->texture->clampHeight = current->height;
-    current->texture->frameBufferTexture = TRUE;
     current->texture->maskS = 0;
     current->texture->maskT = 0;
     current->texture->mirrorS = 0;
@@ -243,9 +242,7 @@ void FrameBuffer_RenderBuffer( u32 address )
         if ((current->startAddress <= address) &&
             (current->endAddress >= address))
         {
-#if 0
-            glPushAttrib( GL_ENABLE_BIT | GL_VIEWPORT_BIT );
-#endif
+
             Combiner_BeginTextureUpdate();
             TextureCache_ActivateTexture( 0, current->texture );
             Combiner_SetCombine( EncodeCombineMode( 0, 0, 0, TEXEL0, 0, 0, 0, 1, 0, 0, 0, TEXEL0, 0, 0, 0, 1 ) );
@@ -274,16 +271,14 @@ void FrameBuffer_RenderBuffer( u32 address )
             glMatrixMode( GL_PROJECTION );
             glLoadIdentity();
             glOrtho( 0, OGL.width, 0, OGL.height, -1.0f, 1.0f );
-            glViewport( 0, OGL.heightOffset, OGL.width, OGL.height );
+            glViewport( OGL.xpos, OGL.ypos + OGL.heightOffset, OGL.width, OGL.height );
             glDisable( GL_SCISSOR_TEST );
 
             float u1, v1;
 
             u1 = (float)current->texture->width / (float)current->texture->realWidth;
             v1 = (float)current->texture->height / (float)current->texture->realHeight;
-#if 0
-            glDrawBuffer( GL_FRONT );
-#endif
+
             glBegin(GL_QUADS);
                 glTexCoord2f( 0.0f, 0.0f );
                 glVertex2f( 0.0f, OGL.height - current->texture->height );
@@ -297,22 +292,30 @@ void FrameBuffer_RenderBuffer( u32 address )
                 glTexCoord2f( u1, 0.0f );
                 glVertex2f( current->texture->width, OGL.height - current->texture->height );
             glEnd();
-#if 0
-            glDrawBuffer( GL_BACK );
-#endif
+
             glEnable( GL_TEXTURE_2D );
             glActiveTextureARB( GL_TEXTURE0_ARB );
             glTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB );
-#if 0
-            glPopAttrib();
-#endif
-
             current->changed = FALSE;
 
             FrameBuffer_MoveToTop( current );
-
             gSP.changed |= CHANGED_TEXTURE | CHANGED_VIEWPORT;
             gDP.changed |= CHANGED_COMBINE;
+
+            //reset state
+            glLoadIdentity();
+            glEnable(GL_BLEND);
+            glEnable(GL_SCISSOR_TEST);
+            OGL_UpdateCullFace();
+            OGL_UpdateStates();
+            OGL_UpdateViewport();
+            OGL_UpdateScale();
+            for (int i = 0; i < OGL.maxTextureUnits; i++)
+            {
+                glActiveTextureARB( GL_TEXTURE0_ARB + i );
+                glEnable( GL_TEXTURE_2D );
+            }
+
             return;
         }
         current = current->lower;
@@ -331,9 +334,6 @@ void FrameBuffer_RestoreBuffer( u32 address, u16 size, u16 width )
             (current->width == width) &&
             (current->size == size))
         {
-#if 0
-            glPushAttrib( GL_ENABLE_BIT | GL_VIEWPORT_BIT );
-#endif
 
           if (OGL.ARB_multitexture)
             {
@@ -363,7 +363,7 @@ void FrameBuffer_RestoreBuffer( u32 address, u16 size, u16 width )
 
             glMatrixMode( GL_PROJECTION );
             glLoadIdentity();
-            glOrtho( 0, OGL.width, 0, OGL.height, -1.0f, 1.0f );
+            glOrtho( OGL.xpos, OGL.ypos + OGL.width, 0, OGL.height, -1.0f, 1.0f );
             glViewport( 0, OGL.heightOffset, OGL.width, OGL.height );
 
             float u1, v1;
@@ -373,24 +373,32 @@ void FrameBuffer_RestoreBuffer( u32 address, u16 size, u16 width )
             glBegin(GL_QUADS);
                 glTexCoord2f( 0.0f, 0.0f );
                 glVertex2f( 0.0f, OGL.height - current->texture->height );
-
                 glTexCoord2f( 0.0f, v1 );
                 glVertex2f( 0.0f, OGL.height );
-
                 glTexCoord2f( u1,  v1 );
                 glVertex2f( current->texture->width, OGL.height );
-
                 glTexCoord2f( u1, 0.0f );
                 glVertex2f( current->texture->width, OGL.height - current->texture->height );
             glEnd();
-            glLoadIdentity();
-#if 0
-            glPopAttrib();
-#endif
-            FrameBuffer_MoveToTop( current );
 
+            FrameBuffer_MoveToTop( current );
             gSP.changed |= CHANGED_TEXTURE | CHANGED_VIEWPORT;
             gDP.changed |= CHANGED_COMBINE;
+
+            //reset state
+            glLoadIdentity();
+            glEnable(GL_BLEND);
+            glEnable(GL_SCISSOR_TEST);
+            OGL_UpdateCullFace();
+            OGL_UpdateStates();
+            OGL_UpdateViewport();
+            OGL_UpdateScale();
+            for (int i = 0; i < OGL.maxTextureUnits; i++)
+            {
+                glActiveTextureARB( GL_TEXTURE0_ARB + i );
+                glEnable( GL_TEXTURE_2D );
+            }
+
             return;
         }
         current = current->lower;

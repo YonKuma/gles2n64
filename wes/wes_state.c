@@ -31,95 +31,140 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #ifdef LOGSTATE
 #define UpdateUniform1i(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         PRINT_ERROR(#A" = %i \n", u_uniform.A.i);                       \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform1i(sh_program->uloc.A, u_uniform.A.i);            \
     };
 
 #define UpdateUniform2i(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         PRINT_ERROR(#A" = %i, %i \n", u_uniform.A.v[0], u_uniform.A.v[1]);  \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform2iv(sh_program->uloc.A, 1, u_uniform.A.v);        \
     };
 #define UpdateUniform3i(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         PRINT_ERROR(#A"  = %i, %i, %i \n", u_uniform.A.v[0], u_uniform.A.v[1], u_uniform.A.v[2]);  \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform3iv(sh_program->uloc.A, 1, u_uniform.A.v);        \
     };
 #define UpdateUniform4i(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         PRINT_ERROR(#A" = %i, %i, %i, %i \n", u_uniform.A.v[0], u_uniform.A.v[1], u_uniform.A.v[2], u_uniform.A.v[3]);  \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform4iv(sh_program->uloc.A, 1, u_uniform.A.v);        \
     };
 #define UpdateUniform1f(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         PRINT_ERROR(#A" = %f \n", u_uniform.A.f);                       \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform1f(sh_program->uloc.A, u_uniform.A.f);            \
     };
 #define UpdateUniform2f(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         PRINT_ERROR(#A" = %f, %f \n", u_uniform.A.v[0],  u_uniform.A.v[1]);                       \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform2fv(sh_program->uloc.A, 1, u_uniform.A.v);        \
     };
 #define UpdateUniform3f(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                          \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                          \
         PRINT_ERROR(#A"= %f, %f, %f \n", u_uniform.A.v[0],  u_uniform.A.v[1], u_uniform.A.v[2]);                       \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform3fv(sh_program->uloc.A, 1, u_uniform.A.v);   \
     };
 #define UpdateUniform4f(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                          \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                          \
         PRINT_ERROR(#A" = %f, %f, %f, %f \n", u_uniform.A.v[0],  u_uniform.A.v[1], u_uniform.A.v[2], u_uniform.A.v[3]);                       \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform4fv(sh_program->uloc.A, 1, u_uniform.A.v);   \
     };
 #else
+
+#if 1
 #define UpdateUniform1i(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform1i(sh_program->uloc.A, u_uniform.A.i);            \
     };
 #define UpdateUniform2i(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform2iv(sh_program->uloc.A, 1, u_uniform.A.v);        \
     };
 #define UpdateUniform3i(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform3iv(sh_program->uloc.A, 1, u_uniform.A.v);        \
     };
 #define UpdateUniform4i(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform4iv(sh_program->uloc.A, 1, u_uniform.A.v);        \
     };
 #define UpdateUniform1f(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform1f(sh_program->uloc.A, u_uniform.A.f);            \
     };
 #define UpdateUniform2f(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                                            \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                                            \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform2fv(sh_program->uloc.A, 1, u_uniform.A.v);        \
     };
 #define UpdateUniform3f(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                          \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                          \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform3fv(sh_program->uloc.A, 1, u_uniform.A.v);   \
     };
 #define UpdateUniform4f(A)                                          \
-    if (u_uniform.A.mod || sh_program_mod) {                          \
+    if ((sh_program->uloc.A != -1) && (u_uniform.A.mod || sh_program_mod)) {                          \
         u_uniform.A.mod = GL_FALSE;                                   \
         wes_gl->glUniform4fv(sh_program->uloc.A, 1, u_uniform.A.v);   \
     };
+#else
+#define UpdateUniform1i(A)                                          \
+    if ((u_uniform.A.mod || sh_program_mod)) {                                            \
+        u_uniform.A.mod = GL_FALSE;                                   \
+        wes_gl->glUniform1i(sh_program->uloc.A, u_uniform.A.i);            \
+    };
+#define UpdateUniform2i(A)                                          \
+    if ((u_uniform.A.mod || sh_program_mod)) {                                            \
+        u_uniform.A.mod = GL_FALSE;                                   \
+        wes_gl->glUniform2iv(sh_program->uloc.A, 1, u_uniform.A.v);        \
+    };
+#define UpdateUniform3i(A)                                          \
+    if ((u_uniform.A.mod || sh_program_mod)) {                                            \
+        u_uniform.A.mod = GL_FALSE;                                   \
+        wes_gl->glUniform3iv(sh_program->uloc.A, 1, u_uniform.A.v);        \
+    };
+#define UpdateUniform4i(A)                                          \
+    if ((u_uniform.A.mod || sh_program_mod)) {                                            \
+        u_uniform.A.mod = GL_FALSE;                                   \
+        wes_gl->glUniform4iv(sh_program->uloc.A, 1, u_uniform.A.v);        \
+    };
+#define UpdateUniform1f(A)                                          \
+    if ((u_uniform.A.mod || sh_program_mod)) {                                            \
+        u_uniform.A.mod = GL_FALSE;                                   \
+        wes_gl->glUniform1f(sh_program->uloc.A, u_uniform.A.f);            \
+    };
+#define UpdateUniform2f(A)                                          \
+    if ((u_uniform.A.mod || sh_program_mod)) {                                            \
+        u_uniform.A.mod = GL_FALSE;                                   \
+        wes_gl->glUniform2fv(sh_program->uloc.A, 1, u_uniform.A.v);        \
+    };
+#define UpdateUniform3f(A)                                          \
+    if ((u_uniform.A.mod || sh_program_mod)) {                          \
+        u_uniform.A.mod = GL_FALSE;                                   \
+        wes_gl->glUniform3fv(sh_program->uloc.A, 1, u_uniform.A.v);   \
+    };
+#define UpdateUniform4f(A)                                          \
+    if ((u_uniform.A.mod || sh_program_mod)) {                          \
+        u_uniform.A.mod = GL_FALSE;                                   \
+        wes_gl->glUniform4fv(sh_program->uloc.A, 1, u_uniform.A.v);   \
+    };
+
+#endif
 #endif
 
 #define SetUniform1i(A, P)                                          \
@@ -171,72 +216,37 @@ uniforms_t      u_uniform;
 GLenum          u_activetex;
 progstate_t     u_progstate;
 
+extern int OGL_CheckError();
+
 GLvoid
 wes_state_update()
 {
 
     int i;
-
     wes_choose_program(&u_progstate);
 
-    UpdateUniform1i(uEnableRescaleNormal);
-    UpdateUniform1i(uEnableNormalize);
-    for(i = 0; i != WES_CLIPPLANE_NUM; i++){
-        UpdateUniform1i(uEnableClipPlane[i]);
-        UpdateUniform4f(uClipPlane[i]);
-    }
-    UpdateUniform1i(uEnableColorMaterial);
     UpdateUniform1i(uEnableFog);
-    UpdateUniform1i(uEnableFogCoord);
-    UpdateUniform1i(uEnableLighting);
+    UpdateUniform1i(uEnablePrimitiveZ);
+    UpdateUniform1i(uEnableTexGen);
 
-    for(i = 0; i != WES_LIGHT_NUM; i++){
-        UpdateUniform1i(uEnableLight[i]);
-        UpdateUniform4f(uLight[i].Position);
-        UpdateUniform3f(uLight[i].Attenuation);
-        UpdateUniform4f(uLight[i].ColorAmbient);
-        UpdateUniform4f(uLight[i].ColorDiffuse);
-        UpdateUniform4f(uLight[i].ColorSpec);
-        UpdateUniform3f(uLight[i].SpotDir);
-        UpdateUniform2f(uLight[i].SpotVar);
-    }
-    for(i = 0; i < WES_MULTITEX_NUM; i++){
-        UpdateUniform4i(uEnableTextureGen[i]);
+    UpdateUniform1f(uPrimitiveZ);
+
+    for(i = 0; i < WES_MULTITEX_NUM; i++)
+    {
+        UpdateUniform2f(uCacheShiftScale[i]);
+        UpdateUniform2f(uCacheScale[i]);
+        UpdateUniform2f(uCacheOffset[i]);
+        UpdateUniform2f(uTexOffset[i]);
+        UpdateUniform2f(uTexScale[i]);
         UpdateUniform1i(uTexUnit[i]);
         UpdateUniform4f(uTexEnvColor[i]);
     }
-    UpdateUniform1f(uRescaleFactor);
 
-    for(i = 0; i != WES_FACE_NUM; i++){
-        UpdateUniform1i(uMaterial[i].ColorMaterial);
-        UpdateUniform4f(uMaterial[i].ColorAmbient);
-        UpdateUniform4f(uMaterial[i].ColorDiffuse);
-        UpdateUniform4f(uMaterial[i].ColorSpec);
-        UpdateUniform4f(uMaterial[i].ColorEmissive);
-        UpdateUniform1f(uMaterial[i].SpecExponent);
-    }
-    UpdateUniform4f(uLightModel.ColorAmbient);
-    UpdateUniform1i(uLightModel.TwoSided);
-    UpdateUniform1i(uLightModel.LocalViewer);
-    UpdateUniform1i(uLightModel.ColorControl);
-
-    UpdateUniform1i(uFogMode);
-    UpdateUniform1f(uFogDensity);
-    UpdateUniform1f(uFogStart);
-    UpdateUniform1f(uFogEnd);
+    UpdateUniform1f(uFogMultiplier);
+    UpdateUniform1f(uFogOffset);
     UpdateUniform4f(uFogColor);
-    UpdateUniform1f(uAlphaRef);
 
-    if (m_modelview_mod || sh_program_mod){
-        wes_gl->glUniformMatrix4fv(sh_program->uloc.uMV, 1, GL_FALSE, m_modelview->data);
-    }
-    if (wes_matrix_mvp() || sh_program_mod){
-        wes_gl->glUniformMatrix4fv(sh_program->uloc.uMVP, 1, GL_FALSE, m_modelview_proj->data);
-    }
-    if (wes_matrix_normal() || sh_program_mod){
-        wes_gl->glUniformMatrix3fv(sh_program->uloc.uMVIT, 1, GL_FALSE, m_modelview_normal->data);
-    }
-    wes_matrix_update();
+    UpdateUniform1f(uAlphaRef);
     sh_program_mod = GL_FALSE;
 }
 
@@ -324,7 +334,7 @@ GLvoid wes_state_init()
     }
     u_progstate.uTexture[0].Enable = 1;
 
-    //wes_state_update();
+    wes_state_update();
 }
 
 const char*
@@ -444,7 +454,6 @@ GLvoid
 wes_setstate(GLenum e, GLboolean b)
 {
     wes_vertbuffer_flush();
-
     switch(e)
     {
         case GL_RESCALE_NORMAL:     SetUniform1i(uEnableRescaleNormal, b);   break;
@@ -490,10 +499,14 @@ wes_setstate(GLenum e, GLboolean b)
             else    wes_gl->glDisable(e);
             break;
 
+        /* N64 Extensions for GLES2N64*/
+        case GL_ZPRIM_N64:          SetUniform1i(uEnablePrimitiveZ, b);     break;
+        case GL_FOG_N64:            SetUniform1i(uEnableFog, b);            break;
+        case GL_TEXGEN_N64:         SetUniform1i(uEnableTexGen, b);         break;
+
         default:
             if (b)  wes_gl->glEnable(e);
             else    wes_gl->glDisable(e);
-
             break;
     }
 }
@@ -790,6 +803,14 @@ glFogf(GLenum pname, GLfloat param)
             SetUniform1f(uFogStart, param); break;
         case GL_FOG_END:
             SetUniform1f(uFogEnd, param); break;
+
+        /* N64 Extensions */
+        case GL_FOG_MULTIPLIER_N64:
+            SetUniform1f(uFogMultiplier, param); break;
+
+        case GL_FOG_OFFSET_N64:
+            SetUniform1f(uFogOffset, param); break;
+
     }
 }
 
@@ -822,7 +843,6 @@ GLvoid
 glTexGenfv(GLenum coord, GLenum pname, GLfloat* param)
 {
     wes_vertbuffer_flush();
-
     switch(pname)
     {
         case GL_OBJECT_PLANE: break;
@@ -832,10 +852,30 @@ glTexGenfv(GLenum coord, GLenum pname, GLfloat* param)
 }
 
 GLvoid
+glTexGen2fN64(GLenum pname, GLfloat s, GLfloat t)
+{
+    switch(pname)
+    {
+        case GL_TEXSCALE_N64:
+            SetUniform2f(uTexScale[u_activetex], s, t);    break;
+
+        case GL_TEXOFFSET_N64:
+            SetUniform2f(uTexOffset[u_activetex], s, t);    break;
+
+        case GL_CACHESCALE_N64:
+            SetUniform2f(uCacheScale[u_activetex], s, t);    break;
+
+        case GL_CACHESHIFTSCALE_N64:
+            SetUniform2f(uCacheShiftScale[u_activetex], s, t);    break;
+
+        case GL_CACHEOFFSET_N64:
+            SetUniform2f(uCacheOffset[u_activetex], s, t);    break;
+    }
+}
+
+GLvoid
 glActiveTexture(GLenum texture)
 {
-    wes_vertbuffer_flush();
-
     u_activetex = texture - GL_TEXTURE0;
     wes_gl->glActiveTexture(texture);
 }
@@ -926,6 +966,12 @@ glTexEnvfv(GLenum target, GLenum pname, GLfloat *param)
                 break;
         }
     }
+}
+
+GLvoid
+glPrimitiveZ(GLfloat z)
+{
+    SetUniform1f(uPrimitiveZ, z);
 }
 
 GLvoid

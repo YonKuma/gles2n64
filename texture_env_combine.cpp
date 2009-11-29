@@ -219,16 +219,15 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
         envCombiner->color[i].outputTexture = GL_TEXTURE0_ARB + i;
 
         //Alpha source not being set correctly somewhere.
-#if 1
-        SetAlphaCombinerValues( i, arg0, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
-        SetAlphaCombinerValues( i, arg1, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
-        SetAlphaCombinerValues( i, arg2, GL_TEXTURE, GL_SRC_ALPHA );
-#else
-        SetAlphaCombinerValues( i, arg0, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
-        SetAlphaCombinerValues( i, arg1, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
-        SetAlphaCombinerValues( i, arg2, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
-#endif
-
+        if (OGL.alphaHack){
+            SetAlphaCombinerValues( i, arg0, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
+            SetAlphaCombinerValues( i, arg1, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
+            SetAlphaCombinerValues( i, arg2, GL_TEXTURE, GL_SRC_ALPHA );
+        } else {
+            SetAlphaCombinerValues( i, arg0, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
+            SetAlphaCombinerValues( i, arg1, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
+            SetAlphaCombinerValues( i, arg2, GL_PREVIOUS_ARB, GL_SRC_ALPHA );
+        }
         envCombiner->alpha[i].constant = COMBINED;
         envCombiner->alpha[i].outputTexture = GL_TEXTURE0_ARB + i;
     }
@@ -543,15 +542,16 @@ TexEnvCombiner *Compile_texture_env_combine( Combiner *color, Combiner *alpha )
 
                             curUnit++;
                         }
-#if 1
-                        envCombiner->color[curUnit].combine = GL_INTERPOLATE_ARB;
-                        SetColorCombinerArg( curUnit, arg0, color->stage[i].op[j].param1 );
-                        SetColorCombinerArg( curUnit, arg1, color->stage[i].op[j].param2 );
-                        SetColorCombinerArg( curUnit, arg2, color->stage[i].op[j].param3 );
-#else
-                        envCombiner->color[curUnit].combine = GL_REPLACE;
-                        SetColorCombinerArg( curUnit, arg0, color->stage[i].op[j].param1 );
-#endif
+
+                        if (OGL.textureHack){
+                            envCombiner->color[curUnit].combine = GL_REPLACE;
+                            SetColorCombinerArg( curUnit, arg0, color->stage[i].op[j].param1 );
+                        } else {
+                            envCombiner->color[curUnit].combine = GL_INTERPOLATE_ARB;
+                            SetColorCombinerArg( curUnit, arg0, color->stage[i].op[j].param1 );
+                            SetColorCombinerArg( curUnit, arg2, color->stage[i].op[j].param3 );
+                            SetColorCombinerArg( curUnit, arg1, color->stage[i].op[j].param2 );
+                        }
                         curUnit++;
                         break;
                 }

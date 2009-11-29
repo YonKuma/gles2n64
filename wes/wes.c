@@ -35,11 +35,52 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
     #include <dlfcn.h>
 #endif
 
-void*           wes_libhandle = NULL;
-gles2lib_t*     wes_gl = NULL;
+void            *wes_glhandle = NULL;
+gles2lib_t      *wes_gl = NULL;
+void            *wes_eglhandle = NULL;
+egllib_t        *wes_egl = NULL;
+
+
+const char * eglfuncnames[] =
+{
+    "eglGetError",
+    "eglGetDisplay",
+    "eglInitialize",
+    "eglTerminate",
+    "eglQueryString",
+    "eglGetConfigs",
+    "eglChooseConfig",
+    "eglGetConfigAttrib",
+    "eglCreateWindowSurface",
+    "eglCreatePbufferSurface",
+    "eglCreatePixmapSurface",
+    "eglDestroySurface",
+    "eglQuerySurface",
+    "eglBindAPI",
+    "eglQueryAPI",
+    "eglWaitClient",
+    "eglReleaseThread",
+    "eglCreatePbufferFromClientBuffer",
+    "eglSurfaceAttrib",
+    "eglBindTexImage",
+    "eglReleaseTexImage",
+    "eglSwapInterval",
+    "eglCreateContext",
+    "eglDestroyContext",
+    "eglMakeCurrent",
+    "eglGetCurrentContext",
+    "eglGetCurrentSurface",
+    "eglGetCurrentDisplay",
+    "eglQueryContext",
+    "eglWaitGL",
+    "eglWaitNative",
+    "eglSwapBuffers",
+    "eglCopyBuffers",
+    "eglGetProcAddress"
+};
 
 //OpenGL ES 2 function names for runtime library loading:
-const char* glfuncnames[] =
+const char *glfuncnames[] =
 {
     "glActiveTexture",
     "glAttachShader",
@@ -185,9 +226,10 @@ const char* glfuncnames[] =
     "glViewport"
 };
 
+extern void OGL_CheckError();
 
 GLvoid
-wes_init(const char *gles2)
+wes_linklibrary(const char *gles2, const char *egl)
 {
     int i;
     void** ptr;
@@ -198,8 +240,8 @@ wes_init(const char *gles2)
         PRINT_ERROR("Could not load Allocate mem: %s", gles2);
     }
 
-    wes_libhandle = dlopen(gles2, RTLD_LAZY | RTLD_GLOBAL);
-    if (wes_libhandle == NULL)
+    wes_glhandle = dlopen(gles2, RTLD_LAZY | RTLD_GLOBAL);
+    if (wes_glhandle == NULL)
     {
         PRINT_ERROR("Could not load OpenGL ES 2 runtime library: %s", gles2);
     }
@@ -207,15 +249,42 @@ wes_init(const char *gles2)
     ptr = (void**) wes_gl;
     for(i = 0; i != WES_OGLESV2_FUNCTIONCOUNT+1; i++)
     {
-        void* pfunc = (void*) dlsym(wes_libhandle, glfuncnames[i]);
+        void* pfunc = (void*) dlsym(wes_glhandle, glfuncnames[i]);
         if (pfunc == NULL)
         {
-            PRINT_ERROR("Could not find %s in %s", glfuncnames[i], gles2
-            );
+            PRINT_ERROR("Could not find %s in %s", glfuncnames[i], gles2);
         }
         *ptr++ = pfunc;
     }
 
+    //find EGL
+    wes_egl = (egllib_t*) malloc(sizeof(egllib_t));
+    if (wes_egl == NULL)
+    {
+        PRINT_ERROR("Could not load Allocate mem: %s", egl);
+    }
+
+    wes_eglhandle = dlopen(egl, RTLD_LAZY | RTLD_GLOBAL);
+    if (wes_eglhandle == NULL)
+    {
+        PRINT_ERROR("Could not load EGL runtime library: %s", egl);
+    }
+
+    ptr = (void**) wes_egl;
+    for(i = 0; i != WES_EGL_FUNCTIONCOUNT+1; i++)
+    {
+        void* pfunc = (void*) dlsym(wes_eglhandle, eglfuncnames[i]);
+        if (pfunc == NULL)
+        {
+            PRINT_ERROR("Could not find %s in %s", eglfuncnames[i], egl);
+        }
+        *ptr++ = pfunc;
+    }
+}
+
+GLvoid
+wes_init()
+{
     wes_shader_init();
     wes_matrix_init();
     wes_begin_init();
@@ -225,16 +294,18 @@ wes_init(const char *gles2)
 GLvoid
 wes_destroy()
 {
-    dlclose(wes_libhandle);
+    dlclose(wes_eglhandle);
+    dlclose(wes_glhandle);
     wes_shader_destroy();
     wes_begin_destroy();
+    free(wes_gl);
+    free(wes_egl);
 }
 
 
 GLvoid
 glMultiDrawArrays(GLenum mode, GLint *first, GLsizei *count, GLsizei primcount)
 {
-    wes_vertbuffer_flush();
     GLuint i;
     for (i = 0; i < (unsigned)primcount; i++) {
         if (count[i] > 0){
@@ -246,8 +317,6 @@ glMultiDrawArrays(GLenum mode, GLint *first, GLsizei *count, GLsizei primcount)
 GLvoid
 glMultiDrawElements(GLenum mode, GLsizei *count, GLenum type, GLvoid **indices, GLsizei primcount)
 {
-    wes_vertbuffer_flush();
-
     GLuint i;
     for (i = 0; i < (unsigned)primcount; i++) {
         if (count[i] > 0){

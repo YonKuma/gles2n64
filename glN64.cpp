@@ -64,7 +64,6 @@ void
 _init( void )
 {
     Config_LoadConfig();
-    OGL.hScreen = NULL;
 # ifdef RSPTHREAD
     RSP.thread = NULL;
 # endif
@@ -94,7 +93,6 @@ EXPORT void CALL CaptureScreen ( char * Directory )
 EXPORT void CALL ChangeWindow (void)
 {
 #ifdef __LINUX__
-    SDL_WM_ToggleFullScreen( OGL.hScreen );
 #else
 #ifdef RSPTHREAD
     // Textures seem to get corrupted when changing video modes (at least on my Radeon), so destroy them
@@ -237,7 +235,6 @@ EXPORT BOOL CALL InitiateGFX (GFX_INFO Gfx_Info)
     OGL.hScreen = NULL;
 #else // !__LINUX__
     Config_LoadConfig();
-    OGL.hScreen = NULL;
 # ifdef RSPTHREAD
     RSP.thread = NULL;
 # endif
@@ -280,11 +277,11 @@ EXPORT void CALL MoveScreen (int xpos, int ypos)
 {
 }
 
-int Frame = 0;
+
 EXPORT void CALL ProcessDList(void)
 {
-    Frame++;
-    if ((Frame % OGL.frameSkip) == 0 || OGL.frameSkip == 0)
+    OGL.frame++;
+    if (OGL.frame % OGL.frameSkip == 0 || OGL.frameSkip == 0)
     {
 
     #ifdef RSPTHREAD

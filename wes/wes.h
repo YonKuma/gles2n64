@@ -20,30 +20,72 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #include "wes_config.h"
 #include "wes_gl_defines.h"
+#include "wes_egl_defines.h"
 #include <stdio.h>
 
 #ifndef __WES_H__
 #define __WES_H__
 
 #define     WES_OGLESV2_FUNCTIONCOUNT   141
+#define     WES_EGL_FUNCTIONCOUNT       34
 
 #define WES_LIGHT_NUM           8
 #define WES_CLIPPLANE_NUM       6
-#define WES_MULTITEX_NUM        4
+#define WES_MULTITEX_NUM        2
 #define WES_FACE_NUM            2
 
 //WES2 Defines:
-#ifdef WES_OUTPUT_ERRORS
+//#ifdef WES_OUTPUT_ERRORS
+#if 1
 #define PRINT_ERROR(...)        fprintf(stdout, __VA_ARGS__); fflush(stdout)
 #else
 #define PRINT_ERROR(...)
 #endif
 
-typedef struct gles2lib_s gles2lib_t;
+typedef struct gles2lib_s   gles2lib_t;
+typedef struct egllib_s     egllib_t;
+
+struct egllib_s
+{
+    EGLint      (*eglGetError)(void);
+    EGLDisplay  (*eglGetDisplay)(EGLNativeDisplayType display_id);
+    EGLBoolean  (*eglInitialize)(EGLDisplay dpy, EGLint *major, EGLint *minor);
+    EGLBoolean  (*eglTerminate)(EGLDisplay dpy);
+    const char * (*eglQueryString)(EGLDisplay dpy, EGLint name);
+    EGLBoolean  (*eglGetConfigs)(EGLDisplay dpy, EGLConfig *configs, EGLint config_size, EGLint *num_config);
+    EGLBoolean  (*eglChooseConfig)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
+    EGLBoolean  (*eglGetConfigAttrib)(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value);
+    EGLSurface  (*eglCreateWindowSurface)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list);
+    EGLSurface  (*eglCreatePbufferSurface)(EGLDisplay dpy, EGLConfig config, const EGLint *attrib_list);
+    EGLSurface  (*eglCreatePixmapSurface)(EGLDisplay dpy, EGLConfig config, EGLNativePixmapType pixmap, const EGLint *attrib_list);
+    EGLBoolean  (*eglDestroySurface)(EGLDisplay dpy, EGLSurface surface);
+    EGLBoolean  (*eglQuerySurface)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value);
+    EGLBoolean  (*eglBindAPI)(EGLenum api);
+    EGLenum     (*eglQueryAPI)(void);
+    EGLBoolean  (*eglWaitClient)(void);
+    EGLBoolean  (*eglReleaseThread)(void);
+    EGLSurface  (*eglCreatePbufferFromClientBuffer)(EGLDisplay dpy, EGLenum buftype, EGLClientBuffer buffer, EGLConfig config, const EGLint *attrib_list);
+    EGLBoolean  (*eglSurfaceAttrib)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint value);
+    EGLBoolean  (*eglBindTexImage)(EGLDisplay dpy, EGLSurface surface, EGLint buffer);
+    EGLBoolean  (*eglReleaseTexImage)(EGLDisplay dpy, EGLSurface surface, EGLint buffer);
+    EGLBoolean  (*eglSwapInterval)(EGLDisplay dpy, EGLint interval);
+    EGLContext  (*eglCreateContext)(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list);
+    EGLBoolean  (*eglDestroyContext)(EGLDisplay dpy, EGLContext ctx);
+    EGLBoolean  (*eglMakeCurrent)(EGLDisplay dpy, EGLSurface draw,EGLSurface read, EGLContext ctx);
+    EGLContext  (*eglGetCurrentContext)(void);
+    EGLSurface  (*eglGetCurrentSurface)(EGLint readdraw);
+    EGLDisplay  (*eglGetCurrentDisplay)(void);
+    EGLBoolean  (*eglQueryContext)(EGLDisplay dpy, EGLContext ctx, EGLint attribute, EGLint *value);
+    EGLBoolean  (*eglWaitGL)(void);
+    EGLBoolean  (*eglWaitNative)(EGLint engine);
+    EGLBoolean  (*eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
+    EGLBoolean  (*eglCopyBuffers)(EGLDisplay dpy, EGLSurface surface, EGLNativePixmapType target);
+    void        (*(*eglGetProcAddress(const char *procname)))(void);
+};
 
 struct gles2lib_s
 {
-     void         (*glActiveTexture)(GLenum texture);
+     void        (*glActiveTexture)(GLenum texture);
      void         (*glAttachShader)(GLuint program, GLuint shader);
      void         (*glBindAttribLocation)(GLuint program, GLuint index, const char* name);
      void         (*glBindBuffer)(GLenum target, GLuint buffer);
@@ -187,8 +229,10 @@ struct gles2lib_s
      void         (*glViewport)(GLint x, GLint y, GLsizei width, GLsizei height);
 };
 
-extern gles2lib_t* wes_gl;
+extern gles2lib_t*  wes_gl;
+extern egllib_t*    wes_egl;
 
-extern GLvoid wes_init(const char *gles2);
+extern GLvoid wes_init();
+extern GLvoid wes_linklibrary(const char *gles2, const char *egl);
 extern GLvoid wes_destroy();
 #endif

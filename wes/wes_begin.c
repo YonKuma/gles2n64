@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "wes_shader.h"
 #include "wes_matrix.h"
 #include "wes_state.h"
+#include "wes_gl_arb.h"
 
 GLenum          vt_mode;
 GLuint          vt_count;
@@ -158,7 +159,7 @@ wes_begin_init()
 {
     int i;
     vt_clienttex = 0;
-    wes_reset();
+    //wes_reset();
     vt_const->x = vt_const->y = vt_const->z = 0.0f;
     vt_const->w = 0.0f;
     vt_const->nx = 1.0f;
@@ -474,6 +475,20 @@ glColorPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr)
     wes_gl->glVertexAttribPointer(WES_ACOLOR0, size, type, GL_FALSE, stride, ptr);
 }
 
+#define WES_ACOLOR0ALPHA                    4
+
+GLvoid
+glColorAlphaPointerN64(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr)
+{
+    wes_vertbuffer_flush();
+    vt_attrib_pointer[WES_ACOLOR0ALPHA].isenabled = GL_TRUE;
+    vt_attrib_pointer[WES_ACOLOR0ALPHA].size = size;
+    vt_attrib_pointer[WES_ACOLOR0ALPHA].type = type;
+    vt_attrib_pointer[WES_ACOLOR0ALPHA].stride = stride;
+    vt_attrib_pointer[WES_ACOLOR0ALPHA].ptr = ptr;
+    wes_gl->glVertexAttribPointer(WES_ACOLOR0ALPHA, size, type, GL_FALSE, stride, ptr);
+}
+
 GLvoid
 glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr)
 {
@@ -541,6 +556,13 @@ glEnableClientState(GLenum array)
             wes_gl->glEnableVertexAttribArray(WES_ATEXCOORD0 + vt_clienttex);
             vt_attrib_pointer[WES_ATEXCOORD0 + vt_clienttex].isenabled = GL_TRUE;
             break;
+
+        /*N64 Specific*/
+        case GL_COLORALPHA_ARRAY_N64:
+            wes_gl->glEnableVertexAttribArray(WES_ACOLOR0ALPHA);
+            vt_attrib_pointer[WES_ACOLOR0ALPHA].isenabled = GL_TRUE;
+            break;
+
         default:
             PRINT_ERROR("EnableClientState Unhandled enum");
     }
@@ -578,6 +600,13 @@ glDisableClientState(GLenum array)
             wes_gl->glDisableVertexAttribArray(WES_ATEXCOORD0 + vt_clienttex);
             vt_attrib_pointer[WES_ATEXCOORD0 + vt_clienttex].isenabled = GL_FALSE;
             break;
+
+        /*N64 Specific*/
+        case GL_COLORALPHA_ARRAY_N64:
+            wes_gl->glDisableVertexAttribArray(WES_ACOLOR0ALPHA);
+            vt_attrib_pointer[WES_ACOLOR0ALPHA].isenabled = GL_FALSE;
+            break;
+
         default:
             PRINT_ERROR("DisableClientState Unhandled enum");
     }
@@ -737,15 +766,22 @@ glInterleavedArrays(GLenum format, GLsizei stride, const GLvoid *pointer)
 GLvoid
 glClientActiveTexture(GLenum texture)
 {
-    wes_vertbuffer_flush();
     vt_clienttex = texture - GL_TEXTURE0;
 }
 
 GLvoid
 glDrawArrays(GLenum mode, GLint off, GLint num)
 {
-    wes_vertbuffer_flush();
+    //wes_vertbuffer_flush();
     wes_state_update();
     wes_gl->glDrawArrays(mode, off, num);
+}
+
+GLvoid
+glDrawElements(GLenum mode, GLsizei size, GLenum type, void *indices)
+{
+    //wes_vertbuffer_flush();
+    wes_state_update();
+    wes_gl->glDrawElements(mode, size, type, indices);
 }
 

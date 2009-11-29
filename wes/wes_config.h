@@ -27,6 +27,6 @@ if defined WES will output errors to stdout, otherwise they are ignored
 */
 #define     WES_OUTPUT_ERRORS
 
-#define     WES_PRINT_SHADER
+//#define     WES_PRINT_SHADER
 
 #endif

@@ -19,9 +19,9 @@
 #ifdef MAINDEF
 const char *MicrocodeTypes[] =
 {
-"Fast3D", 
-"F3DEX", 
-"F3DEX2", 
+"Fast3D",
+"F3DEX",
+"F3DEX2",
 "Line3D",
 "L3DEX",
 "L3DEX2",
@@ -96,7 +96,7 @@ static const int numMicrocodeTypes = 11;
 #define G_TEXTURE_GEN_LINEAR    0x00080000
 #define G_LOD                   0x00100000
 
-#define G_MV_MMTX       2   
+#define G_MV_MMTX       2
 #define G_MV_PMTX       6
 #define G_MV_LIGHT      10
 #define G_MV_POINT      12
@@ -249,7 +249,7 @@ extern u32 G_MWO_aLIGHT_8, G_MWO_bLIGHT_8;
 #ifdef DEBUG
 static const char *ImageFormatText[] =
 {
-    "G_IM_FMT_RGBA", 
+    "G_IM_FMT_RGBA",
     "G_IM_FMT_YUV",
     "G_IM_FMT_CI",
     "G_IM_FMT_IA",
@@ -261,9 +261,9 @@ static const char *ImageFormatText[] =
 
 static const char *ImageSizeText[] =
 {
-    "G_IM_SIZ_4b", 
-    "G_IM_SIZ_8b", 
-    "G_IM_SIZ_16b", 
+    "G_IM_SIZ_4b",
+    "G_IM_SIZ_8b",
+    "G_IM_SIZ_16b",
     "G_IM_SIZ_32b"
 };
 
@@ -441,7 +441,7 @@ static const char *CvgXAlphaText = "CVG_X_ALPHA";
 static const char *AlphaCvgSelText = "ALPHA_CVG_SEL";
 static const char *ForceBlenderText = "FORCE_BL";
 
-static const char *AlphaCompareText[] = 
+static const char *AlphaCompareText[] =
 {
     "G_AC_NONE", "G_AC_THRESHOLD", "G_AC_INVALID", "G_AC_DITHER"
 };
@@ -560,7 +560,7 @@ static const char *ScissorModeText[] =
 #ifdef DEBUG
 static const char *saRGBText[] =
 {
-    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE", 
+    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE",
     "SHADE",            "ENVIRONMENT",      "NOISE",            "1",
     "0",                "0",                "0",                "0",
     "0",                "0",                "0",                "0"
@@ -568,7 +568,7 @@ static const char *saRGBText[] =
 
 static const char *sbRGBText[] =
 {
-    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE", 
+    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE",
     "SHADE",            "ENVIRONMENT",      "CENTER",           "K4",
     "0",                "0",                "0",                "0",
     "0",                "0",                "0",                "0"
@@ -576,7 +576,7 @@ static const char *sbRGBText[] =
 
 static const char *mRGBText[] =
 {
-    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE", 
+    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE",
     "SHADE",            "ENVIRONMENT",      "SCALE",            "COMBINED_ALPHA",
     "TEXEL0_ALPHA",     "TEXEL1_ALPHA",     "PRIMITIVE_ALPHA",  "SHADE_ALPHA",
     "ENV_ALPHA",        "LOD_FRACTION",     "PRIM_LOD_FRAC",    "K5",
@@ -588,31 +588,31 @@ static const char *mRGBText[] =
 
 static const char *aRGBText[] =
 {
-    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE", 
+    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE",
     "SHADE",            "ENVIRONMENT",      "1",                "0",
 };
 
 static const char *saAText[] =
 {
-    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE", 
+    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE",
     "SHADE",            "ENVIRONMENT",      "1",                "0",
 };
 
 static const char *sbAText[] =
 {
-    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE", 
+    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE",
     "SHADE",            "ENVIRONMENT",      "1",                "0",
 };
 
 static const char *mAText[] =
 {
-    "LOD_FRACTION",     "TEXEL0",           "TEXEL1",           "PRIMITIVE", 
+    "LOD_FRACTION",     "TEXEL0",           "TEXEL1",           "PRIMITIVE",
     "SHADE",            "ENVIRONMENT",      "PRIM_LOD_FRAC",    "0",
 };
 
 static const char *aAText[] =
 {
-    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE", 
+    "COMBINED",         "TEXEL0",           "TEXEL1",           "PRIMITIVE",
     "SHADE",            "ENVIRONMENT",      "1",                "0",
 };
 #endif
@@ -680,7 +680,7 @@ typedef struct
     };
 } Vertex;
 
-typedef struct 
+typedef struct
 {
     s16 y, x;
     u16 ci;
@@ -733,9 +733,25 @@ struct GBIInfo
 
     u32 PCStackSize, numMicrocodes;
     MicrocodeInfo *current, *top, *bottom;
+
+#ifdef PROFILE_GBI
+    unsigned int profileTimer[256 * 12];
+    unsigned int profileTmp;
+#endif
 };
 
 extern GBIInfo GBI;
+
+#ifdef PROFILE_GBI
+#include <stdio.h>
+void GBI_ProfileReset();
+void GBI_ProfileInit();
+void GBI_ProfileBegin(u32 cmd);
+void GBI_ProfileEnd(u32 cmd);
+void GBI_ProfilePrint(FILE *file);
+const char* GBI_GetFuncName(u32 ucode, u32 cmd);
+u32  GBI_GetFuncTime(u32 ucode, u32 cmd);
+#endif
 
 void GBI_MakeCurrent( MicrocodeInfo *current );
 MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize );
