@@ -47,11 +47,7 @@ extern RSPInfo RSP;
 void RSP_Init();
 void RSP_ProcessDList();
 #ifdef RSPTHREAD
-#ifndef WIN32
 int RSP_ThreadProc(void *param);
-#else
-DWORD WINAPI RSP_ThreadProc( LPVOID lpParameter );
-#endif
 #endif
 void RSP_LoadMatrix( f32 mtx[4][4], u32 address );
 

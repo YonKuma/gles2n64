@@ -4,15 +4,9 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
-
 #include <png.h>
-
 #include <SDL.h>
 #include <SDL/SDL_syswm.h>
-#include <EGL/egl.h>
-
-#define GL_GLEXT_PROTOTYPES
-#include <wes_gl.h>
 
 #ifndef min
 #define min(a,b) ((a) < (b) ? (a) : (b))
@@ -20,40 +14,31 @@
 #ifndef max
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #endif
+
 #define timeGetTime() time(NULL)
 
 #include "winlnxdefs.h"
-
-#include "glN64.h"
+#include "gles2N64.h"
 #include "OpenGL.h"
 #include "Types.h"
 #include "N64.h"
 #include "gSP.h"
 #include "gDP.h"
 #include "Textures.h"
-#include "Combiner.h"
+#include "ShaderCombiner.h"
 #include "VI.h"
 
-#define WES_APOS                            0
-#define WES_ANORMAL                         1
-#define WES_AFOGCOORD                       2
-#define WES_ACOLOR0                         3
-#define WES_ACOLOR0ALPHA                    4
+//#define BATCH_TEST
 
-#define WES_ACOLOR1                         4
-#define WES_ATEXCOORD0                      5
-#define WES_ATEXCOORD1                      6
-#define WES_ATEXCOORD2                      7
-#define WES_ATEXCOORD3                      8
-#define WES_ANUM                            9
+#ifdef BATCH_TEST
+int     TotalTriangles = 0;
+int     TotalDrawCalls = 0;
+#define glDrawElements(A,B,C,D) TotalTriangles += B; TotalDrawCalls++; glDrawElements(A,B,C,D)
+#define glDrawArrays(A,B,C)     TotalTriangles += C; TotalDrawCalls++; glDrawArrays(A,B,C)
+
+#endif
 
 GLInfo OGL;
-
-#ifdef WIN32
-const char *libGLESv2 = "libGLESv2.dll";
-#else
-const char *libGLESv2 = "libGLESv2.so";
-#endif
 
 EGLint		VersionMajor;
 EGLint		VersionMinor;
@@ -66,7 +51,8 @@ EGLSurface  Surface;
 EGLNativeDisplayType    Device;
 EGLNativeWindowType     Handle;
 
-const EGLint ConfigAttribs[] = {
+const EGLint ConfigAttribs[] =
+{
 	EGL_LEVEL,				0,
 	EGL_DEPTH_SIZE,         16,
 	EGL_STENCIL_SIZE,       0,
@@ -76,7 +62,8 @@ const EGLint ConfigAttribs[] = {
 	EGL_NONE
 };
 
-const EGLint ContextAttribs[] = {
+const EGLint ContextAttribs[] =
+{
 	EGL_CONTEXT_CLIENT_VERSION, 	2,
 	EGL_NONE
 };
@@ -98,7 +85,8 @@ void OGL_EnableRunfast()
 #endif
 }
 
-const char* EGLErrorString(){
+const char* EGLErrorString()
+{
 	EGLint nErr = eglGetError();
 	switch(nErr){
 		case EGL_SUCCESS: 				return "EGL_SUCCESS";
@@ -119,40 +107,42 @@ const char* EGLErrorString(){
 	}
 };
 
-void OGL_InitExtensions()
+int OGL_IsExtSupported( const char *extension )
 {
-    OGL.NV_register_combiners = 0;
-    OGL.maxGeneralCombiners = 0;
-    OGL.ARB_multitexture = 1;
-    OGL.maxTextureUnits = 2;
-    OGL.EXT_fog_coord = 1;
-    OGL.EXT_secondary_color = 0;
-    OGL.ARB_texture_env_combine = 1;
-    OGL.EXT_texture_env_combine = 1;
-    OGL.ARB_texture_env_crossbar = 1;
-    OGL.ATI_texture_env_combine3 = 1;
-    OGL.ATIX_texture_env_route = 0;
-    OGL.NV_texture_env_combine4 = 0;
+	const GLubyte *extensions = NULL;
+	const GLubyte *start;
+	GLubyte *where, *terminator;
+
+	where = (GLubyte *) strchr(extension, ' ');
+	if (where || *extension == '\0')
+		return 0;
+
+	extensions = glGetString(GL_EXTENSIONS);
+
+    if (!extensions) return 0;
+
+	start = extensions;
+	for (;;)
+	{
+		where = (GLubyte *) strstr((const char *) start, extension);
+		if (!where)
+			break;
+
+		terminator = where + strlen(extension);
+		if (where == start || *(where - 1) == ' ')
+			if (*terminator == ' ' || *terminator == '\0')
+				return 1;
+
+		start = terminator;
+	}
+
+	return 0;
 }
 
 void OGL_InitStates()
 {
-    glMatrixMode( GL_MODELVIEW );
-    glLoadIdentity();
-
-    glMatrixMode( GL_PROJECTION );
-    glLoadIdentity();
-
-    if (OGL.EXT_fog_coord)
-    {
-        glFogi( GL_FOG_COORD_SRC, GL_FOG_COORD);
-        glFogi( GL_FOG_MODE, GL_LINEAR );
-        glFogf( GL_FOG_START, 0.0f );
-        glFogf( GL_FOG_END, 255.0f );
-    }
-
+    glEnableVertexAttribArray(SC_POSITION);
     glPolygonOffset(3.0f, 3.0f);
-
     glClearDepthf(0.0f);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -160,8 +150,7 @@ void OGL_InitStates()
     glDepthFunc(GL_ALWAYS);
     glDepthMask(GL_FALSE);
     glEnable(GL_SCISSOR_TEST);
-    glDepthRange(1.0f, 0.0f);
-
+    glDepthRangef(1.0f, 0.0f);
     OGL_SwapBuffers();
 }
 
@@ -180,18 +169,9 @@ bool OGL_Start()
 {
     EGLint nConfigs;
 
-    if (OGL.fullscreen)
-    {
-        OGL.width = OGL.fullscreenWidth;
-        OGL.height = OGL.fullscreenHeight;
-    }
-    else
-    {
-        OGL.width = OGL.windowedWidth;
-        OGL.height = OGL.windowedHeight;
-    }
+    SDL_Init(SDL_INIT_TIMER);
 
-#ifdef _WIN32
+#ifdef WIN32
     const SDL_VideoInfo *videoInfo;
 
     /* Initialize SDL */
@@ -212,7 +192,7 @@ bool OGL_Start()
     }
     /* Set the video mode */
     printf( "[glN64]: (II) Setting video mode %dx%d...\n", (int)OGL.width, (int)OGL.height );
-    if (!(OGL.hScreen = SDL_SetVideoMode( OGL.width, OGL.height - 32, 0, SDL_SWSURFACE )))
+    if (!(OGL.hScreen = SDL_SetVideoMode( OGL.width, OGL.height - 32, 16, SDL_SWSURFACE )))
     {
         printf( "[glN64]: (EE) Error setting videomode %dx%d: %s\n", (int)OGL.width, (int)OGL.height, SDL_GetError() );
         SDL_QuitSubSystem( SDL_INIT_VIDEO );
@@ -230,9 +210,7 @@ bool OGL_Start()
     Device = 0;
 #endif
 
-    printf("[gles2n64]: Link EGL and GL Libraries \n");
-    wes_linklibrary(libGLESv2, libGLESv2);
-
+    printf( "[gles2n64]: EGL Context Creation\n");
     Display = eglGetDisplay((EGLNativeDisplayType) Device);
     if (Display == EGL_NO_DISPLAY){
         printf("[gles2n64]: EGL Display Get failed: %s \n", EGLErrorString());
@@ -278,36 +256,44 @@ bool OGL_Start()
 
     //Print some info
     EGLint attrib;
-    printf( "[gles2n64]: EGL Context Creation Done\n");
     printf( "[gles2n64]: Width: %i Height:%i \n", OGL.width, OGL.height);
     eglGetConfigAttrib(Display, Config, EGL_DEPTH_SIZE, &attrib);
     printf( "[gles2n64]: Depth Size: %i \n", attrib);
     eglGetConfigAttrib(Display, Config, EGL_BUFFER_SIZE, &attrib);
     printf( "[gles2n64]: Color Buffer Size: %i \n", attrib);
 
-    printf( "[gles2n64]: Initialize WES... \n");
-    wes_init();
-
     printf( "[gles2n64]: Enable Runfast... \n");
     OGL_EnableRunfast();
 
-    OGL_InitExtensions();
     OGL_InitStates();
+    OGL_UpdateScale();
 
+    //check extensions
+    if (OGL.enableAnisotropicFiltering && !OGL_IsExtSupported("GL_EXT_texture_filter_anistropic"))
+    {
+        printf("[gles2n64]: Anistropic Filtering is not supported.\n");
+        OGL.enableAnisotropicFiltering = 0;
+    }
+
+    float f = 0;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &f);
+    if (OGL.maxAnisotropy > (int)f)
+    {
+        printf("[gles2n64]: Clamping max anistropy to %ix.\n", (int)f);
+        OGL.maxAnisotropy = (int)f;
+    }
+
+
+    //We must have a shader bound before binding any textures:
+    ShaderCombiner_Init();
+    ShaderCombiner_Set(EncodeCombineMode(0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0));
+    ShaderCombiner_Set(EncodeCombineMode(0, 0, 0, SHADE, 0, 0, 0, 1, 0, 0, 0, SHADE, 0, 0, 0, 1));
     TextureCache_Init();
-    Combiner_Init();
 
     memset(gSP.vertices, 0, 80 * sizeof(SPVertex));
     OGL.numElements = 0;
     OGL.renderState = RS_NONE;
     gSP.changed = gDP.changed = 0xFFFFFFFF;
-    OGL_UpdateScale();
-
-    glEnableVertexAttribArray(WES_APOS);
-    glEnableVertexAttribArray(WES_ACOLOR0);
-    glEnableVertexAttribArray(WES_ACOLOR0ALPHA);
-    glEnableVertexAttribArray(WES_ATEXCOORD0);
-    glEnableVertexAttribArray(WES_ATEXCOORD1);
 
     return TRUE;
 }
@@ -318,15 +304,13 @@ void OGL_Stop()
     SDL_QuitSubSystem( SDL_INIT_VIDEO );
 #endif
 
-    Combiner_Destroy();
+    ShaderCombiner_Destroy();
     TextureCache_Destroy();
 
-    wes_destroy();
 	eglMakeCurrent(Display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 	eglDestroySurface(Display, Surface);
  	eglDestroyContext(Display, Context);
    	eglTerminate(Display);
-
 }
 
 void OGL_UpdateCullFace()
@@ -373,22 +357,23 @@ void OGL_UpdateScissor()
 
 void OGL_UpdateStates()
 {
+    if (gDP.otherMode.cycleType == G_CYC_COPY)
+        ShaderCombiner_Set(EncodeCombineMode(0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0));
+    else if (gDP.otherMode.cycleType == G_CYC_FILL)
+        ShaderCombiner_Set(EncodeCombineMode(0, 0, 0, SHADE, 0, 0, 0, 1, 0, 0, 0, SHADE, 0, 0, 0, 1));
+    else
+        ShaderCombiner_Set(gDP.combine.mux);
+
     if (gSP.changed & CHANGED_GEOMETRYMODE)
     {
         OGL_UpdateCullFace();
 
-        if ((gSP.geometryMode & G_FOG) && OGL.EXT_fog_coord && OGL.fog)
-            glEnable( GL_FOG );
+        if (gSP.geometryMode & G_ZBUFFER)
+            glEnable( GL_DEPTH_TEST );
         else
-            glDisable( GL_FOG );
+            glDisable( GL_DEPTH_TEST );
 
-        gSP.changed &= ~CHANGED_GEOMETRYMODE;
     }
-
-    if (gSP.geometryMode & G_ZBUFFER)
-        glEnable( GL_DEPTH_TEST );
-    else
-        glDisable( GL_DEPTH_TEST );
 
     if (gDP.changed & CHANGED_RENDERMODE)
     {
@@ -401,96 +386,67 @@ void OGL_UpdateStates()
             glDisable( GL_POLYGON_OFFSET_FILL );
     }
 
+    if (gDP.changed & CHANGED_DEPTHSOURCE)
+        SC_SetUniform1i(uEnablePrimitiveZ, (gDP.otherMode.depthSource == G_ZS_PRIM));
+
+    if (gDP.changed & CHANGED_PRIMITIVEZ)
+        SC_SetUniform1f(uPrimitiveZ, gDP.primDepth.z);
+
     if ((gDP.changed & CHANGED_ALPHACOMPARE) || (gDP.changed & CHANGED_RENDERMODE))
-    {
-        // Enable alpha test for threshold mode
-        if ((gDP.otherMode.alphaCompare == G_AC_THRESHOLD) && !(gDP.otherMode.alphaCvgSel))
-        {
-            if (OGL.enableAlphaTest)
-            {
-                glEnable(GL_ALPHA_TEST);
-                glAlphaFunc( (gDP.blendColor.a > 0.0f) ? GL_GEQUAL : GL_GREATER, gDP.blendColor.a );
-            }
-        }
-        // Used in TEX_EDGE and similar render modes
-        else if (gDP.otherMode.cvgXAlpha)
-        {
-            if (OGL.enableAlphaTest)
-            {
-                glEnable( GL_ALPHA_TEST );
-                glAlphaFunc( GL_GEQUAL, 0.5f ); // Arbitrary number -- gives nice results though
-            }
-        }
-        else
-            glDisable( GL_ALPHA_TEST );
-    }
+        SC_SetUniform1f(uAlphaRef, (gDP.otherMode.cvgXAlpha) ? 0.5f : gDP.blendColor.a);
 
     if (gDP.changed & CHANGED_SCISSOR)
-    {
         OGL_UpdateScissor();
-    }
 
     if (gSP.changed & CHANGED_VIEWPORT)
-    {
         OGL_UpdateViewport();
+
+    if (gSP.changed & CHANGED_FOGPOSITION)
+    {
+        SC_SetUniform1f(uFogMultiplier, (float) gSP.fog.multiplier);
+        SC_SetUniform1f(uFogOffset, (float) gSP.fog.offset);
     }
 
-    if ((gDP.changed & CHANGED_COMBINE) || (gDP.changed & CHANGED_CYCLETYPE))
+    if (gSP.changed & CHANGED_TEXTURESCALE)
     {
-        if (gDP.otherMode.cycleType == G_CYC_COPY)
-            Combiner_SetCombine(EncodeCombineMode(0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0));
-        else if (gDP.otherMode.cycleType == G_CYC_FILL)
-            Combiner_SetCombine(EncodeCombineMode(0, 0, 0, SHADE, 0, 0, 0, 1, 0, 0, 0, SHADE, 0, 0, 0, 1));
-        else
-            Combiner_SetCombine(gDP.combine.mux);
-
-        OGL_SetTextureArrays();
-        OGL_SetColors();
-    }
-
-    if (gDP.changed & CHANGED_COMBINE_COLORS)
-    {
-        Combiner_UpdateCombineColors();
+        if (scProgramCurrent->usesT0 || scProgramCurrent->usesT1)
+            SC_SetUniform2f(uTexScale, gSP.texture.scales, gSP.texture.scalet);
     }
 
     if ((gSP.changed & CHANGED_TEXTURE) || (gDP.changed & CHANGED_TILE) || (gDP.changed & CHANGED_TMEM))
     {
-        Combiner_BeginTextureUpdate();
+        if (scProgramCurrent->usesT0)
+        {
+            TextureCache_Update(0);
+            SC_SetUniform2f(uTexOffset[0], gSP.textureTile[0]->fuls, gSP.textureTile[0]->fult);
+            SC_SetUniform2f(uCacheShiftScale[0], cache.current[0]->shiftScaleS, cache.current[0]->shiftScaleT);
+            SC_SetUniform2f(uCacheScale[0], cache.current[0]->scaleS, cache.current[0]->scaleT);
+            SC_SetUniform2f(uCacheOffset[0], cache.current[0]->offsetS, cache.current[0]->offsetT);
+        }
+        //else TextureCache_ActivateDummy(0);
 
-        if (combiner.usesT0)
+        if (scProgramCurrent->usesT1)
         {
-            TextureCache_Update( 0 );
-            gSP.changed &= ~CHANGED_TEXTURE;
-            gDP.changed &= ~CHANGED_TILE;
-            gDP.changed &= ~CHANGED_TMEM;
+            TextureCache_Update(1);
+            SC_SetUniform2f(uTexOffset[1], gSP.textureTile[1]->fuls, gSP.textureTile[1]->fult);
+            SC_SetUniform2f(uCacheShiftScale[1], cache.current[1]->shiftScaleS, cache.current[1]->shiftScaleT);
+            SC_SetUniform2f(uCacheScale[1], cache.current[1]->scaleS, cache.current[1]->scaleT);
+            SC_SetUniform2f(uCacheOffset[1], cache.current[1]->offsetS, cache.current[1]->offsetT);
         }
-        else
-        {
-            TextureCache_ActivateDummy( 0 );
-        }
-
-        if (combiner.usesT1)
-        {
-            TextureCache_Update( 1 );
-            gSP.changed &= ~CHANGED_TEXTURE;
-            gDP.changed &= ~CHANGED_TILE;
-            gDP.changed &= ~CHANGED_TMEM;
-        }
-        else
-        {
-            TextureCache_ActivateDummy( 1 );
-        }
-        Combiner_EndTextureUpdate();
-        glActiveTexture(GL_TEXTURE0);
-        glTexGen2fN64(GL_TEXSCALE_N64, gSP.texture.scales, gSP.texture.scalet);
-        glTexGen2fN64(GL_TEXOFFSET_N64, gSP.textureTile[0]->fuls, gSP.textureTile[0]->fult);
-        glActiveTexture(GL_TEXTURE1);
-        glTexGen2fN64(GL_TEXSCALE_N64, gSP.texture.scales, gSP.texture.scalet);
-        glTexGen2fN64(GL_TEXOFFSET_N64, gSP.textureTile[1]->fuls, gSP.textureTile[1]->fult);
+        //else TextureCache_ActivateDummy(1);
     }
 
-    if ((gDP.changed & CHANGED_FOGCOLOR) && OGL.fog)
-        glFogfv( GL_FOG_COLOR, &gDP.fogColor.r );
+    if ((gDP.changed & CHANGED_FOGCOLOR) && OGL.enableFog)
+        SC_SetUniform4fv(uFogColor, &gDP.fogColor.r );
+
+    if (gDP.changed & CHANGED_ENV_COLOR)
+        SC_SetUniform4fv(uEnvColor, &gDP.envColor.r);
+
+    if (gDP.changed & CHANGED_PRIM_COLOR)
+    {
+        SC_SetUniform4fv(uPrimColor, &gDP.primColor.r);
+        SC_SetUniform1f(uPrimLODFrac, gDP.primColor.l);
+    }
 
     if ((gDP.changed & CHANGED_RENDERMODE) || (gDP.changed & CHANGED_CYCLETYPE))
     {
@@ -556,84 +512,25 @@ void OGL_AddTriangle(int v0, int v1, int v2 )
     OGL.elements[OGL.numElements++] = v2;
 }
 
-void OGL_SetColors()
+void OGL_SetColorArray()
 {
-    glDisableVertexAttribArray(WES_ACOLOR0);
-    glDisableVertexAttribArray(WES_ACOLOR0ALPHA);
-    switch (combiner.vertex.color)
-    {
-        case PRIMITIVE:
-            glVertexAttrib3f(WES_ACOLOR0, gDP.primColor.r, gDP.primColor.g, gDP.primColor.b);
-            break;
-        case ENVIRONMENT:
-            glVertexAttrib3f(WES_ACOLOR0, gDP.envColor.r, gDP.envColor.g, gDP.envColor.b);
-            break;
-        case PRIMITIVE_ALPHA:
-            glVertexAttrib3f(WES_ACOLOR0, gDP.primColor.a, gDP.primColor.a, gDP.primColor.a);
-            break;
-        case ENV_ALPHA:
-            glVertexAttrib3f(WES_ACOLOR0, gDP.envColor.a, gDP.envColor.a, gDP.envColor.a);
-            break;
-        case PRIM_LOD_FRAC:
-            glVertexAttrib3f(WES_ACOLOR0, gDP.primColor.l, gDP.primColor.l, gDP.primColor.l);
-            break;
-        case ONE:
-            glVertexAttrib3f(WES_ACOLOR0, 1.0f, 1.0f, 1.0f);
-            break;
-        case ZERO:
-            glVertexAttrib3f(WES_ACOLOR0, 0.0f, 0.0f, 0.0f);
-            break;
-        default:
-            glEnableVertexAttribArray(WES_ACOLOR0);
-
-    }
-
-    switch (combiner.vertex.alpha)
-    {
-        case PRIMITIVE_ALPHA:
-            glVertexAttrib1f(WES_ACOLOR0ALPHA, gDP.primColor.a);
-            break;
-        case ENV_ALPHA:
-            glVertexAttrib1f(WES_ACOLOR0ALPHA, gDP.envColor.a);
-            break;
-        case PRIM_LOD_FRAC:
-            glVertexAttrib1f(WES_ACOLOR0ALPHA, gDP.primColor.l);
-            break;
-        case ONE:
-            glVertexAttrib1f(WES_ACOLOR0ALPHA, 1.0f);
-            break;
-        case ZERO:
-            glVertexAttrib1f(WES_ACOLOR0ALPHA, 0.0f);
-            break;
-        default:
-            glEnableVertexAttribArray(WES_ACOLOR0ALPHA);
-    }
+    if (scProgramCurrent->usesCol)
+        glEnableVertexAttribArray(SC_COLOR);
+    else
+        glDisableVertexAttribArray(SC_COLOR);
 }
 
-void OGL_SetTextureArrays()
+void OGL_SetTexCoordArrays()
 {
-    if (combiner.usesT0)
-        glEnableVertexAttribArray(WES_ATEXCOORD0);
+    if (scProgramCurrent->usesT0)
+        glEnableVertexAttribArray(SC_TEXCOORD0);
     else
-        glDisableVertexAttribArray(WES_ATEXCOORD0);
+        glDisableVertexAttribArray(SC_TEXCOORD0);
 
-    if (combiner.usesT1)
-        glEnableVertexAttribArray(WES_ATEXCOORD1);
+    if (scProgramCurrent->usesT1)
+        glEnableVertexAttribArray(SC_TEXCOORD1);
     else
-        glDisableVertexAttribArray(WES_ATEXCOORD1);
-
-}
-
-void OGL_SetArrays()
-{
-    glVertexAttribPointer(WES_APOS, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].x);
-    glVertexAttribPointer(WES_ACOLOR0, 3, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].r);
-    glVertexAttribPointer(WES_ACOLOR0ALPHA, 1, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].a);
-    glVertexAttribPointer(WES_ATEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].s);
-    glVertexAttribPointer(WES_ATEXCOORD1, 2, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].s);
-    glEnable(GL_TEXGEN_N64);
-    OGL_SetColors();
-    OGL_SetTextureArrays();
+        glDisableVertexAttribArray(SC_TEXCOORD1);
 }
 
 void OGL_DrawTriangles()
@@ -641,19 +538,27 @@ void OGL_DrawTriangles()
     if (gSP.changed || gDP.changed)
         OGL_UpdateStates();
 
+    if (OGL.renderState != RS_TRIANGLE || scProgramChanged)
+    {
+        OGL_SetColorArray();
+        OGL_SetTexCoordArrays();
+        glDisableVertexAttribArray(SC_TEXCOORD1);
+        SC_SetUniform1i(uTriangleRS, 1);
+    }
+
     if (OGL.renderState != RS_TRIANGLE)
     {
-        if (OGL.renderState == RS_RECT) OGL_SetColors();
+        glVertexAttribPointer(SC_POSITION, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].x);
+#ifdef __PACKVERTEX_OPT
+        glVertexAttribPointer(SC_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(SPVertex), &gSP.vertices[0].r);
+#else
+        glVertexAttribPointer(SC_COLOR, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].r);
+#endif
+        glVertexAttribPointer(SC_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].s);
 
-        glVertexAttribPointer(WES_APOS, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].x);
-        glVertexAttribPointer(WES_ACOLOR0, 3, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].r);
-        glVertexAttribPointer(WES_ACOLOR0ALPHA, 1, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].a);
-        glVertexAttribPointer(WES_ATEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].s);
-        glVertexAttribPointer(WES_ATEXCOORD1, 2, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].s);
-        glEnable(GL_TEXGEN_N64);
         OGL_UpdateCullFace();
         OGL_UpdateViewport();
-        glEnable( GL_SCISSOR_TEST );
+        glEnable(GL_SCISSOR_TEST);
         OGL.renderState = RS_TRIANGLE;
     }
 
@@ -668,25 +573,20 @@ void OGL_DrawLine( SPVertex *vertices, int v0, int v1, float width )
     if (gSP.changed || gDP.changed)
         OGL_UpdateStates();
 
-    if (OGL.renderState != RS_LINE)
+    if (OGL.renderState != RS_LINE || scProgramChanged)
     {
-            glVertexAttrib4f(WES_APOS, 0, 0, (gDP.otherMode.depthSource == G_ZS_PRIM) ? gDP.primDepth.z : gSP.viewport.nearz, 1.0);
-            glVertexAttribPointer(WES_APOS, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].x);
-            glVertexAttribPointer(WES_ACOLOR0, 3, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].color.r);
-            glVertexAttribPointer(WES_ACOLOR0ALPHA, 1, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].color.a);
-            glVertexAttribPointer(WES_ATEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].s0);
-            glVertexAttribPointer(WES_ATEXCOORD1, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].s1);
-            glDisable(GL_TEXGEN_N64);
-            glViewport( OGL.xpos, OGL.ypos, OGL.width, OGL.height );
-            OGL.renderState = RS_LINE;
+        OGL_SetColorArray();
+        glDisableVertexAttribArray(SC_TEXCOORD0);
+        glDisableVertexAttribArray(SC_TEXCOORD1);
+        SC_SetUniform1i(uTriangleRS, 0);
+        OGL_UpdateCullFace();
+        OGL_UpdateViewport();
+        OGL.renderState = RS_LINE;
     }
-
-    glDisable(GL_TEXGEN_N64);
 
     glLineWidth( width * OGL.scaleX );
     float vert[8];
     GLcolor color[2];
-    GLcolor color2nd[2];
     for (int i = 0; i < 2; i++)
     {
         vert[i*4+0] = vertices[v[i]].x;
@@ -697,21 +597,10 @@ void OGL_DrawLine( SPVertex *vertices, int v0, int v1, float width )
         color[i].g = vertices[v[i]].g;
         color[i].b = vertices[v[i]].b;
         color[i].a = vertices[v[i]].a;
-        SetConstant(color[i], combiner.vertex.color, combiner.vertex.alpha );
-
-        if (OGL.EXT_secondary_color)
-        {
-            color2nd[i].r = vertices[v[i]].r;
-            color2nd[i].g = vertices[v[i]].g;
-            color2nd[i].b = vertices[v[i]].b;
-            color2nd[i].a = vertices[v[i]].a;
-            SetConstant(color2nd[i], combiner.vertex.secondaryColor, combiner.vertex.alpha );
-        }
     }
 
-    glVertexAttribPointer(WES_APOS, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat), vert);
-    glVertexAttribPointer(WES_ACOLOR0, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat), &color[0].r);
-    glVertexAttribPointer(WES_ACOLOR0ALPHA, 1, GL_FLOAT, GL_FALSE, sizeof(GLfloat), &color[0].a);
+    glVertexAttribPointer(SC_POSITION, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat), vert);
+    glVertexAttribPointer(SC_COLOR, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat), &color[0].r);
     glDrawArrays(GL_LINES, 0, 2);
 }
 
@@ -720,23 +609,23 @@ void OGL_DrawRect( int ulx, int uly, int lrx, int lry, float *color)
     if (gSP.changed || gDP.changed)
         OGL_UpdateStates();
 
+    if (OGL.renderState != RS_RECT || scProgramChanged)
+    {
+        glDisableVertexAttribArray(SC_COLOR);
+        glDisableVertexAttribArray(SC_TEXCOORD0);
+        glDisableVertexAttribArray(SC_TEXCOORD1);
+        SC_SetUniform1i(uTriangleRS, 0);
+    }
+
     if (OGL.renderState != RS_RECT)
     {
-        if (OGL.renderState != RS_TEXTUREDRECT)
-        {
-            glVertexAttrib4f(WES_APOS, 0, 0, (gDP.otherMode.depthSource == G_ZS_PRIM) ? gDP.primDepth.z : gSP.viewport.nearz, 1.0);
-            glVertexAttribPointer(WES_APOS, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].x);
-            glVertexAttribPointer(WES_ACOLOR0, 3, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].color.r);
-            glVertexAttribPointer(WES_ACOLOR0ALPHA, 1, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].color.a);
-            glVertexAttribPointer(WES_ATEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].s0);
-            glVertexAttribPointer(WES_ATEXCOORD1, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].s1);
-            glDisable(GL_TEXGEN_N64);
-            glViewport( OGL.xpos, OGL.ypos, OGL.width, OGL.height );
-        }
+        glVertexAttrib4f(SC_POSITION, 0, 0, gSP.viewport.nearz, 1.0);
+        glVertexAttribPointer(SC_POSITION, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].x);
         OGL.renderState = RS_RECT;
     }
 
-    glDisable(GL_SCISSOR_TEST);
+    glViewport( OGL.xpos, OGL.ypos, OGL.width, OGL.height );
+    //glDisable(GL_SCISSOR_TEST);
     glDisable(GL_CULL_FACE);
 
     OGL.rect[0].x = (float) ulx * (2.0f * VI.rwidth) - 1.0;
@@ -748,10 +637,7 @@ void OGL_DrawRect( int ulx, int uly, int lrx, int lry, float *color)
     OGL.rect[3].x = OGL.rect[1].x;
     OGL.rect[3].y = OGL.rect[2].y;
 
-    glVertexAttrib3fv(WES_ACOLOR0, color);
-    glVertexAttrib1f(WES_ACOLOR0ALPHA, color[3]);
-
-    glVertexAttribPointer(WES_APOS, 2 , GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].x);
+    glVertexAttrib4fv(SC_COLOR, color);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
@@ -760,44 +646,37 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
     if (gSP.changed || gDP.changed)
         OGL_UpdateStates();
 
+    if (OGL.renderState != RS_TEXTUREDRECT || scProgramChanged)
+    {
+        glDisableVertexAttribArray(SC_COLOR);
+        OGL_SetTexCoordArrays();
+        SC_SetUniform1i(uTriangleRS, 0);
+    }
+
     if (OGL.renderState != RS_TEXTUREDRECT)
     {
-        if (OGL.renderState == RS_RECT)
-        {
-            OGL_SetColors();
-        }
-        else
-        {
-            glVertexAttrib4f(WES_APOS, 0, 0, (gDP.otherMode.depthSource == G_ZS_PRIM) ? gDP.primDepth.z : gSP.viewport.nearz, 1.0);
-            glVertexAttribPointer(WES_APOS, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].x);
-            glVertexAttribPointer(WES_ACOLOR0, 3, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].color.r);
-            glVertexAttribPointer(WES_ACOLOR0ALPHA, 1, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].color.a);
-            glVertexAttribPointer(WES_ATEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].s0);
-            glVertexAttribPointer(WES_ATEXCOORD1, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].s1);
-            glDisable(GL_TEXGEN_N64);
-            glViewport( OGL.xpos, OGL.ypos, OGL.width, OGL.height );
-        }
+        glVertexAttrib4f(SC_POSITION, 0, 0, gSP.viewport.nearz, 1.0);
+        glVertexAttribPointer(SC_POSITION, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].x);
+        glVertexAttribPointer(SC_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].s0);
+        glVertexAttribPointer(SC_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].s1);
+        OGL_UpdateScissor();
         OGL.renderState = RS_TEXTUREDRECT;
     }
 
+    glViewport( OGL.xpos, OGL.ypos, OGL.width, OGL.height );
     glDisable(GL_CULL_FACE);
     //glDisable(GL_SCISSOR_TEST);
 
-    OGL.rect[0].x = (float) ulx * (2.0f * VI.rwidth) - 1.0;
-    OGL.rect[0].y = (float) uly * (-2.0f * VI.rheight) + 1.0;
-    OGL.rect[1].x = (float) lrx * (2.0f * VI.rwidth) - 1.0;
+    OGL.rect[0].x = (float) ulx * (2.0f * VI.rwidth) - 1.0f;
+    OGL.rect[0].y = (float) uly * (-2.0f * VI.rheight) + 1.0f;
+    OGL.rect[1].x = (float) lrx * (2.0f * VI.rwidth) - 1.0f;
     OGL.rect[1].y = OGL.rect[0].y;
     OGL.rect[2].x = OGL.rect[0].x;
-    OGL.rect[2].y = (float) lry * (-2.0f * VI.rheight) + 1.0;
+    OGL.rect[2].y = (float) lry * (-2.0f * VI.rheight) + 1.0f;
     OGL.rect[3].x = OGL.rect[1].x;
     OGL.rect[3].y = OGL.rect[2].y;
 
-
-    //OGL.rect[0].z = (gDP.otherMode.depthSource == G_ZS_PRIM) ? gDP.primDepth.z : gSP.viewport.nearz;
-    //OGL.rect[3].z = OGL.rect[2].z = OGL.rect[1].z = OGL.rect[0].z;
-    //OGL.rect[3].w = OGL.rect[2].w = OGL.rect[1].w = OGL.rect[0].w = 1.0f;
-
-    if (combiner.usesT0)
+    if (scProgramCurrent->usesT0 && cache.current[0] && gSP.textureTile[0])
     {
         OGL.rect[0].s0 = uls * cache.current[0]->shiftScaleS - gSP.textureTile[0]->fuls;
         OGL.rect[0].t0 = ult * cache.current[0]->shiftScaleT - gSP.textureTile[0]->fult;
@@ -832,7 +711,7 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
         OGL.rect[3].t0 *= cache.current[0]->scaleT;
     }
 
-    if (combiner.usesT1)
+    if (scProgramCurrent->usesT1 && cache.current[1] && gSP.textureTile[1])
     {
         OGL.rect[0].s1 = uls * cache.current[1]->shiftScaleS - gSP.textureTile[1]->fuls;
         OGL.rect[0].t1 = ult * cache.current[1]->shiftScaleT - gSP.textureTile[1]->fult;
@@ -874,12 +753,6 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
     }
 #endif
 
-
-#if 0
-    if (OGL.EXT_secondary_color)
-        SetConstant(OGL.rect[0].secondaryColor, combiner.OGL.rectex.secondaryColor, combiner.OGL.rectex.alpha );
-#endif
-
     OGL.rect[1].s0 = OGL.rect[3].s0;
     OGL.rect[1].t0 = OGL.rect[0].t0;
     OGL.rect[1].s1 = OGL.rect[3].s1;
@@ -890,12 +763,10 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
     OGL.rect[2].t1 = OGL.rect[3].t1;
 
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
 }
 
 void OGL_ClearDepthBuffer()
 {
-   // OGL_UpdateStates();
     glDisable( GL_SCISSOR_TEST );
     glDepthMask(GL_TRUE );
     glClear( GL_DEPTH_BUFFER_BIT );
@@ -910,7 +781,6 @@ void OGL_ClearColorBuffer( float *color )
     glClear( GL_COLOR_BUFFER_BIT );
     glEnable( GL_SCISSOR_TEST );
 }
-
 
 static void OGL_png_error(png_structp png_write, const char *message)
 {
@@ -973,14 +843,13 @@ void OGL_SaveScreenshot()
     }
     // give the file handle to the PNG compressor
     png_init_io(png_write, savefile);
-    // read pixel data from OpenGL
-    char *pixels = (char*)malloc( OGL.width * OGL.height * 3 );
 
-    glReadPixels( OGL.xpos, OGL.ypos, OGL.width, OGL.height, GL_RGB, GL_UNSIGNED_BYTE, pixels );
+    // read pixel data from OpenGL
+    char *pixels;
+    int width, height;
+    OGL_ReadScreen(pixels, &width, &height );
 
     // set the info
-    int width = OGL.width;
-    int height = OGL.height;
     png_set_IHDR(png_write, png_info, width, height, 8, PNG_COLOR_TYPE_RGB,
                  PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
     // lock the screen, get a pointer and row pitch
@@ -1025,7 +894,7 @@ int OGL_CheckError()
 void
 OGL_SwapBuffers()
 {
-    if (OGL.logFrameRate){
+   if (OGL.logFrameRate){
         static int frames[5] = { 0, 0, 0, 0, 0 };
         static int framesIndex = 0;
         static Uint32 lastTicks = 0;
@@ -1037,6 +906,12 @@ OGL_SwapBuffers()
             for (int i = 0; i < 5; i++) fps += frames[i];
             fps /= 5.0f;
             printf("fps = %f \n", fps);
+#ifdef BATCH_TEST
+            printf("average draw calls per frame = %f\n", (float)TotalDrawCalls / frames[framesIndex]);
+            printf("average vertices per draw call = %f\n", (float)TotalTriangles / TotalDrawCalls);
+            TotalDrawCalls = 0;
+            TotalTriangles = 0;
+#endif
             framesIndex = (framesIndex + 1) % 5;
             frames[framesIndex] = 0;
             lastTicks = ticks;
@@ -1061,28 +936,29 @@ OGL_SwapBuffers()
     if (renderCallback) (*renderCallback)();
 
     eglSwapBuffers(Display, Surface);
+
 }
 
 
-
-
-
-void OGL_ReadScreen( void **dest, int *width, int *height )
+void OGL_ReadScreen( void *dest, int *width, int *height )
 {
-    void *rgba = malloc( OGL.height * OGL.width * 4 );
-    *dest = malloc(OGL.height * OGL.width * 3);
+
+    int w = OGL.width - OGL.xpos;
+    int h = OGL.height - OGL.ypos;
+    void *rgba = malloc( w * h * 4 );
+    dest = malloc(w * h * 3);
     if (rgba == 0 || dest == 0)
         return;
 
-    *width = OGL.width;
-    *height = OGL.height;
+    *width = w;
+    *height = h;
 
-    glReadPixels( 0, 0, OGL.width, OGL.height, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+    glReadPixels( OGL.xpos, OGL.ypos, OGL.width, OGL.height, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
 
     //convert to RGB format:
     char *c = (char*) rgba;
-    char *d = (char*) *dest;
-    for(uint32_t i = 0; i < (OGL.width * OGL.height); i++)
+    char *d = (char*) dest;
+    for(int i = 0; i < (w * h); i++)
     {
         d[0] = c[0];
         d[1] = c[1];

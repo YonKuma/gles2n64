@@ -4,7 +4,7 @@
 # include "winlnxdefs.h"
 #endif
 #include <math.h>
-#include "glN64.h"
+#include "gles2N64.h"
 #include "OpenGL.h"
 #include "Debug.h"
 #include "RSP.h"
@@ -13,9 +13,7 @@
 #include "F3D.h"
 #include "3DMath.h"
 #include "VI.h"
-#include "Combiner.h"
-//#include "textures.h"
-//#include "Config.h"
+#include "ShaderCombiner.h"
 #include "DepthBuffer.h"
 #include "GBI.h"
 
@@ -39,7 +37,6 @@ void RSP_LoadMatrix( f32 mtx[4][4], u32 address )
 }
 
 #ifdef RSPTHREAD
-#ifndef WIN32
 int RSP_ThreadProc(void *param)
 {
     RSP_Init();
@@ -84,63 +81,6 @@ int RSP_ThreadProc(void *param)
 
     return 0;
 }
-
-#else
-DWORD WINAPI RSP_ThreadProc( LPVOID lpParameter )
-{
-    RSP_Init();
-
-    SetEvent( RSP.threadFinished );
-#ifndef _DEBUG
-    __try
-    {
-#endif
-        while (TRUE)
-        {
-            switch (WaitForMultipleObjects( 6, RSP.threadMsg, FALSE, INFINITE ))
-            {
-                case (WAIT_OBJECT_0 + RSPMSG_PROCESSDLIST):
-                    RSP_ProcessDList();
-                    break;
-                case (WAIT_OBJECT_0 + RSPMSG_UPDATESCREEN):
-                    VI_UpdateScreen();
-                    break;
-                case (WAIT_OBJECT_0 + RSPMSG_CLOSE):
-                    OGL_Stop();
-                    SetEvent( RSP.threadFinished );
-                    return 1;
-                case (WAIT_OBJECT_0 + RSPMSG_DESTROYTEXTURES):
-                    Combiner_Destroy();
-                    TextureCache_Destroy();
-                    break;
-                case (WAIT_OBJECT_0 + RSPMSG_INITTEXTURES):
-                    TextureCache_Init();
-                    Combiner_Init();
-                    gSP.changed = gDP.changed = 0xFFFFFFFF;
-                    break;
-                case (WAIT_OBJECT_0 + RSPMSG_CAPTURESCREEN):
-                    OGL_SaveScreenshot();
-                    break;
-            }
-            SetEvent( RSP.threadFinished );
-        }
-#ifndef _DEBUG
-    }
-    __except(EXCEPTION_EXECUTE_HANDLER)
-    {
-        char exception[256];
-        sprintf( exception, "Win32 exception 0x%08X occured in glN64", GetExceptionCode() );
-        MessageBox( NULL, exception, pluginName, MB_OK | MB_ICONERROR );
-
-        GBI_Destroy();
-        DepthBuffer_Destroy();
-        OGL_Stop();
-    }
-#endif
-    RSP.thread = NULL;
-    return 0;
-}
-#endif //Win32
 #endif // RSPTHREAD
 
 void RSP_ProcessDList()
@@ -226,17 +166,14 @@ void RSP_ProcessDList()
 void RSP_Init()
 {
     RDRAMSize = 1024 * 1024 * 8;
-
     RSP.DList = 0;
     RSP.uc_start = RSP.uc_dstart = 0;
-
     gDP.loadTile = &gDP.tiles[7];
     gSP.textureTile[0] = &gDP.tiles[0];
     gSP.textureTile[1] = &gDP.tiles[1];
+
     DepthBuffer_Init();
     GBI_Init();
-
     OGL_Start();
-
 }
 

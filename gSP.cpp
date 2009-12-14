@@ -1,5 +1,5 @@
 #include <math.h>
-#include "glN64.h"
+#include "gles2N64.h"
 #include "Debug.h"
 #include "Types.h"
 #include "RSP.h"
@@ -16,15 +16,12 @@
 #include "DepthBuffer.h"
 #include <stdlib.h>
 
-#ifndef __LINUX__
-#else
 # ifndef min
 #  define min(a,b) ((a) < (b) ? (a) : (b))
 # endif
 # ifndef max
 #  define max(a,b) ((a) > (b) ? (a) : (b))
 # endif
-#endif // !__LINUX__
 
 #ifdef DEBUG
 extern u32 uc_crc, uc_dcrc;
@@ -33,12 +30,13 @@ extern char uc_str[256];
 
 void gSPCombineMatrices();
 
+
 #define gSPFlushTriangles() \
     if ((OGL.numElements > 0) && \
         (RSP.nextCmd != G_TRI1) && \
         (RSP.nextCmd != G_TRI2) && \
         (RSP.nextCmd != G_TRI4) && \
-        (RSP.nextCmd != G_QUAD)) \
+        (RSP.nextCmd != G_QUAD))\
         OGL_DrawTriangles()
 
 gSPInfo gSP;
@@ -137,23 +135,20 @@ void acosf_neon(float x[2], float r[2])
 }
 #endif
 
-//sizeof(SPVertex) = 72
-
 #ifdef __VEC4_OPT
 void gSPTransformVertex4(u32 v, float mtx[4][4])
 {
-//#ifdef __NEON_OPT
-#if 1
+#ifdef __NEON_OPT
     float *ptr = &gSP.vertices[v].x;
 	asm volatile (
 	"vld1.32 		{d0, d1}, [%1]		  	\n\t"	//q0 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2   		  	\n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d2, d3}, [%1]	    	\n\t"	//q1 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2 	    	  	\n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d4, d5}, [%1]	        \n\t"	//q2 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2 		      	\n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d6, d7}, [%1]	        \n\t"	//q3 = {x,y,z,w}
-    "sub 		    %1, %1, #216 		  	\n\t"	//q0 = {x,y,z,w}
+    "sub 		    %1, %1, %3   		  	\n\t"	//q0 = {x,y,z,w}
 
 	"vld1.32 		{d18, d19}, [%0]!		\n\t"	//q9 = m
 	"vld1.32 		{d20, d21}, [%0]!       \n\t"	//q10 = m
@@ -178,15 +173,15 @@ void gSPTransformVertex4(u32 v, float mtx[4][4])
 	"vmla.f32 		q15, q11, d7[0]			\n\t"	//q15 = q11*d1[0]
 
 	"vst1.32 		{d24, d25}, [%1] 		\n\t"	//q12
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2 		      	\n\t"	//q0 = {x,y,z,w}
 	"vst1.32 		{d26, d27}, [%1] 	    \n\t"	//q13
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2 	    	  	\n\t"	//q0 = {x,y,z,w}
 	"vst1.32 		{d28, d29}, [%1] 	    \n\t"	//q14
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2   		  	\n\t"	//q0 = {x,y,z,w}
 	"vst1.32 		{d30, d31}, [%1]     	\n\t"	//q15
 
 	: "+&r"(mtx), "+&r"(ptr)
-	:
+	: "I"(sizeof(SPVertex)), "I"(3 * sizeof(SPVertex))
     : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
       "d18","d19", "d20", "d21", "d22", "d23", "d24",
       "d25", "d26", "d27", "d28", "d29", "d30", "d31", "memory"
@@ -194,7 +189,8 @@ void gSPTransformVertex4(u32 v, float mtx[4][4])
 #else
     float x, y, z, w;
     int i;
-    for(i = 0; i < 4; i++){
+    for(i = 0; i < 4; i++)
+    {
         x = gSP.vertices[v+i].x;
         y = gSP.vertices[v+i].y;
         z = gSP.vertices[v+i].z;
@@ -211,103 +207,6 @@ void gSPTransformVertex4(u32 v, float mtx[4][4])
 #ifdef __VEC4_OPT
 void gSPClipVertex4(u32 v)
 {
-#if defined(__NEON_OPT)
-    int tmp;
-    void *ptr0 = (void*)&gSP.vertices[v].x;
-    void *ptr1 = (void*)&gSP.vertices[v].xClip;
-    asm volatile (
-	"vld1.32 		{d0, d1}, [%1]		  	\n\t"	//q0 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d2, d3}, [%1]	    	\n\t"	//q1 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d4, d5}, [%1]	        \n\t"	//q2 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d6, d7}, [%1]	        \n\t"	//q3 = {x,y,z,w}
-    "sub 		    %1, %1, #216 		  	\n\t"	//q0 = {x,y,z,w}
-
-    "vdup.f32 		q12, d1[1]	        		\n\t"	//q12={w,w,w,w}
-    "vdup.f32 		q13, d3[1]	        		\n\t"	//q13={w,w,w,w}
-    "vdup.f32 		q14, d5[1]	        		\n\t"	//q14={w,w,w,w}
-    "vdup.f32 		q15, d7[1]	        		\n\t"	//q15={w,w,w,w}
-
-    "vcgt.f32 		q8, q0, q12	    		    \n\t"	//q8={x>w, y>w, z>w, w>w}
-    "vcgt.f32 		q9, q1, q13	    		    \n\t"	//q9={x>w, y>w, z>w, w>w}
-    "vcgt.f32 		q10, q2, q14	    		\n\t"	//q10={x>w, y>w, z>w, w>w}
-    "vcgt.f32 		q11, q3, q15	    		\n\t"	//q11={x>w, y>w, z>w, w>w}
-    "vneg.f32 		q12, q12	              	\n\t"	//q12={-w,-w,-w,-w}
-    "vneg.f32 		q13, q13	              	\n\t"	//q13={-w,-w,-w,-w}
-    "vneg.f32 		q14, q14	              	\n\t"	//q14={-w,-w,-w,-w}
-    "vneg.f32 		q15, q15	              	\n\t"	//q15={-w,-w,-w,-w}
-    "vclt.f32 		q12, q0, q12	    		\n\t"	//q12={x<-w, y<-w, z<-w, w<-w}
-    "vclt.f32 		q13, q1, q13	    		\n\t"	//q13={x<-w, y<-w, z<-w, w<-w}
-    "vclt.f32 		q14, q2, q14	    		\n\t"	//q14={x<-w, y<-w, z<-w, w<-w}
-    "vclt.f32 		q15, q3, q15	    		\n\t"	//q15={x<-w, y<-w, z<-w, w<-w}
-
-    "vshr.u32 		q8, q8, #31	    		    \n\t"	//q8=q8>>31
-    "vshr.u32 		q9, q9, #31	    		    \n\t"	//q9=q9>>31
-    "vshr.u32 		q10, q10, #31	    		\n\t"	//q10=q10>>31
-    "vshr.u32 		q11, q11, #31	    		\n\t"	//q11=q11>>31
-
-    "vshr.u32 		q0, q12, #31	    		\n\t"	//q12=q12>>31
-    "vshr.u32 		q1, q13, #31	    		\n\t"	//q13=q13>>31
-    "vshr.u32 		q2, q14, #31	    		\n\t"	//q14=q14>>31
-    "vshr.u32 		q3, q15, #31	    		\n\t"	//q15=q15>>31
-
-	"vmov.i32 		q12, #1	    			    \n\t"	//q0=1
-	"vmov.i32 		q13, #1	    			    \n\t"	//q1=1
-	"vmov.i32 		q14, #1	    			    \n\t"	//q2=1
-	"vmov.i32 		q15, #1	    			    \n\t"	//q3=1
-
-	"vadd.s32 		q12, q12, q8	    		\n\t"	//q12=q12+q8
-	"vadd.s32 		q13, q13, q9	    		\n\t"	//q13=q13+q9
-	"vadd.s32 		q14, q14, q10	    		\n\t"	//q14=q14+q10
-	"vadd.s32 		q15, q15, q11	    		\n\t"	//q15=q15+q11
-
-	"vmls.s32 		q0, q12, q8	    		    \n\t"	//q0 -= q12*q8
-	"vmls.s32 		q1, q13, q9	    		    \n\t"	//q1 -= q13*q9
-	"vmls.s32 		q2, q14, q10	    		\n\t"	//q2 -= q14*q10
-	"vmls.s32 		q3, q15, q11	    		\n\t"	//q3 -= q15*q11
-
-    "vst1.32 		{d0}, [%2]	         		\n\t"	//q0={x, y, z, w}
-    "add     		%2, %2, #72	         		\n\t"	//q0={x, y, z, w}
-    "vst1.32 		{d2}, [%2]	                \n\t"	//q0={x, y, z, w}
-    "add     		%2, %2, #72	         		\n\t"	//q0={x, y, z, w}
-    "vst1.32 		{d4}, [%2]	                \n\t"	//q0={x, y, z, w}
-    "add     		%2, %2, #72	          		\n\t"	//q0={x, y, z, w}
-    "vst1.32 		{d6}, [%2]	                \n\t"	//q0={x, y, z, w}
-    "sub     		%2, %2, #216	          	\n\t"	//q0={x, y, z, w}
-
-	"ldr 		    %0, [%1, #12]	        	\n\t"	//r1=w
-    "cmp 		    %0, #0	                	\n\t"	//w<0
-	"fstspl 	    s2, [%2, #8]	  	        \n\t"	//
-	"mvn       		%0, #0	    			    \n\t"	//r0=0xFFFFFFFF
-    "strmi 		    %0, [%2, #8]		        \n\t"	//
-
-	"ldr 		    %0, [%1, #84]	        	\n\t"	//r1=w
-    "cmp 		    %0, #0	                	\n\t"	//w<0
-	"fstspl 	    s6, [%2, #80]	  	        \n\t"	//
-	"mvn       		%0, #0	    			    \n\t"	//r0=0xFFFFFFFF
-    "strmi 		    %0, [%2, #80]		        \n\t"	//
-
-	"ldr 		    %0, [%1, #156]	        	\n\t"	//r1=w
-    "cmp 		    %0, #0	                	\n\t"	//w<0
-	"fstspl 	    s10, [%2, #152]	  	        \n\t"	//
-	"mvn       		%0, #0	    			    \n\t"	//r0=0xFFFFFFFF
-    "strmi 		    %0, [%2, #152]		        \n\t"	//
-
-	"ldr 		    %0, [%1, #228]	        	\n\t"	//r1=w
-    "cmp 		    %0, #0	                	\n\t"	//w<0
-	"fstspl 	    s14, [%2, #224]	  	        \n\t"	//
-	"mvn       		%0, #0	    			    \n\t"	//r0=0xFFFFFFFF
-    "strmi 		    %0, [%2, #224]		        \n\t"	//
-
-    :"=&r"(tmp), "+&r"(ptr0), "+&r"(ptr1)
-    :: "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
-      "d18","d19", "d20", "d21", "d22", "d23", "d24",
-      "d25", "d26", "d27", "d28", "d29", "d30", "d31",
-      "memory"
-    );
-#else
     int i;
     for(i = 0; i < 4; i++){
         gSP.vertices[v+i].xClip = (gSP.vertices[v+i].x > gSP.vertices[v+i].w) - (gSP.vertices[v+i].x < -gSP.vertices[v+i].w);
@@ -318,7 +217,6 @@ void gSPClipVertex4(u32 v)
             gSP.vertices[v+i].zClip = (gSP.vertices[v+i].z > gSP.vertices[v+i].w) - (gSP.vertices[v+i].z < -gSP.vertices[v+i].w);
         }
     }
-#endif
 }
 #endif
 
@@ -330,13 +228,13 @@ void gSPTransformNormal4(u32 v, float mtx[4][4])
     void *ptr = (void*)&gSP.vertices[v].nx;
 	asm volatile (
     "vld1.32 		{d0, d1}, [%1]		  	\n\t"	//q0 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2  		  	\n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d2, d3}, [%1]	    	\n\t"	//q1 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2  		  	\n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d4, d5}, [%1]	        \n\t"	//q2 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2  		  	\n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d6, d7}, [%1]	        \n\t"	//q3 = {x,y,z,w}
-    "sub 		    %1, %1, #216 		  	\n\t"	//q0 = {x,y,z,w}
+    "sub 		    %1, %1, %3  		  	\n\t"	//q0 = {x,y,z,w}
 
 	"vld1.32 		{d18, d19}, [%0]!		\n\t"	//q9 = m
 	"vld1.32 		{d20, d21}, [%0]!	    \n\t"	//q10 = m+16
@@ -390,14 +288,15 @@ void gSPTransformNormal4(u32 v, float mtx[4][4])
 	"vmul.f32 		q0, q12, d0[0]			\n\t"	//q0 = q12*d0[0]
 
 	"vst1.32 		{d0, d1}, [%1]  	    \n\t"	//d0={nx,ny,nz,pad}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2   		  	\n\t"	//q0 = {x,y,z,w}
 	"vst1.32 		{d2, d3}, [%1]  	    \n\t"	//d2={nx,ny,nz,pad}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2  		  	\n\t"	//q0 = {x,y,z,w}
 	"vst1.32 		{d4, d5}, [%1]  	    \n\t"	//d4={nx,ny,nz,pad}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2  		  	\n\t"	//q0 = {x,y,z,w}
     "vst1.32 		{d6, d7}, [%1]        	\n\t"	//d6={nx,ny,nz,pad}
 
-    : "+&r"(mtx), "+&r"(ptr) :
+    : "+&r"(mtx), "+&r"(ptr)
+    : "I"(sizeof(SPVertex)), "I"(3 * sizeof(SPVertex))
     : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
       "d16","d17", "d18","d19", "d20", "d21", "d22",
       "d23", "d24", "d25", "d26", "d27", "d28", "d29",
@@ -435,21 +334,23 @@ void __attribute__((noinline))
 gSPLightVertex4(u32 v)
 {
 #ifdef __NEON_OPT
+    volatile float result[16];
+
  	volatile int i = gSP.numLights;
     volatile int tmp = 0;
     volatile void *ptr0 = &(gSP.lights[0].r);
     volatile void *ptr1 = &(gSP.vertices[v].nx);
-    volatile void *ptr2 = &(gSP.vertices[v].r);
+    volatile void *ptr2 = result;
 	volatile void *ptr3 = gSP.matrix.modelView[gSP.matrix.modelViewi];
 	asm volatile (
     "vld1.32 		{d0, d1}, [%1]		  	\n\t"	//q0 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2 		      	\n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d2, d3}, [%1]	    	\n\t"	//q1 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2 	    	  	\n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d4, d5}, [%1]	        \n\t"	//q2 = {x,y,z,w}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2   		  	\n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d6, d7}, [%1]	        \n\t"	//q3 = {x,y,z,w}
-    "sub 		    %1, %1, #216 		  	\n\t"	//q0 = {x,y,z,w}
+    "sub 		    %1, %1, %3   		  	\n\t"	//q0 = {x,y,z,w}
 
 	"vld1.32 		{d18, d19}, [%0]!		\n\t"	//q9 = m
 	"vld1.32 		{d20, d21}, [%0]!	    \n\t"	//q10 = m+16
@@ -503,14 +404,15 @@ gSPLightVertex4(u32 v)
 	"vmul.f32 		q0, q12, d0[0]			\n\t"	//q0 = q12*d0[0]
 
 	"vst1.32 		{d0, d1}, [%1]  	    \n\t"	//d0={nx,ny,nz,pad}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2 		  	    \n\t"	//q0 = {x,y,z,w}
 	"vst1.32 		{d2, d3}, [%1]  	    \n\t"	//d2={nx,ny,nz,pad}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2 		  	    \n\t"	//q0 = {x,y,z,w}
 	"vst1.32 		{d4, d5}, [%1]  	    \n\t"	//d4={nx,ny,nz,pad}
-	"add 		    %1, %1, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %1, %1, %2 		  	    \n\t"	//q0 = {x,y,z,w}
     "vst1.32 		{d6, d7}, [%1]        	\n\t"	//d6={nx,ny,nz,pad}
 
-    : "+&r"(ptr3), "+&r"(ptr1) :
+    : "+&r"(ptr3), "+&r"(ptr1)
+    : "I"(sizeof(SPVertex)), "I"(3 * sizeof(SPVertex))
     : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
       "d16","d17", "d18","d19", "d20", "d21", "d22",
       "d23", "d24", "d25", "d26", "d27", "d28", "d29",
@@ -518,7 +420,7 @@ gSPLightVertex4(u32 v)
 	);
     asm volatile (
 
-    "mov    		%0, #24        			\n\t"	//r0=24
+    "mov    		%0, %5        			\n\t"	//r0=sizeof(light)
     "mla    		%0, %1, %0, %2 			\n\t"	//r0=r1*r0+r2
 
     "vmov.f32 		q8, q0  			    \n\t"	//q8=q0
@@ -578,41 +480,66 @@ gSPLightVertex4(u32 v)
     "bne     		1b                 		\n\t"	//(r1!=0) goto 1
 
     "2:                          			\n\t"	//
-    "vst1.32 		{d0}, [%4]!	        	\n\t"	//
-    "fsts   		s2, [%4]    	    	\n\t"	//
-    "add    		%4, %4, #64   			\n\t"	//r0=r1*r0+r2
-    "vst1.32 		{d2}, [%4]! 	        \n\t"	//
-    "fsts   		s6, [%4]    	    	\n\t"	//
-    "add    		%4, %4, #64   			\n\t"	//r0=r1*r0+r2
-    "vst1.32 		{d4}, [%4]!	            \n\t"	//
-    "fsts   		s10, [%4]	        	\n\t"	//
-    "add    		%4, %4, #64   			\n\t"	//r0=r1*r0+r2
-    "vst1.32 		{d6}, [%4]!     	    \n\t"	//
-    "fsts   		s14, [%4]	        	\n\t"	//
+#ifdef __PACKVERTEX_OPT
+    "vmov.i32        q4, #255	        	\n\t"	//q4 = 255
+    "vcvt.f32.u32    q4, q4	        	    \n\t"	//q4 = (float)q4
+#else
+    "vmov.f32        q4, #1.0	        	\n\t"	//
+#endif
+    "vmin.f32 		q0, q0, q4  	        \n\t"	//
+    "vmin.f32 		q1, q1, q4  	        \n\t"	//
+    "vmin.f32 		q2, q2, q4  	        \n\t"	//
+    "vmin.f32 		q3, q3, q4  	        \n\t"	//
+    "vst1.32 		{d0, d1}, [%4]!	        \n\t"	//
+    "vst1.32 		{d2, d3}, [%4]! 	    \n\t"	//
+    "vst1.32 		{d4, d5}, [%4]!	        \n\t"	//
+    "vst1.32 		{d6, d7}, [%4]     	    \n\t"	//
 
-    :: "r"(tmp), "r"(i), "r"(ptr0), "r"(ptr1), "r"(ptr2)
+    :: "r"(tmp), "r"(i), "r"(ptr0), "r"(ptr1), "r"(ptr2),
+        "I"(sizeof(SPLight))
     : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
       "d8", "d9", "d10", "d11", "d12", "d13", "d14", "d15",
       "d16","d17", "d18","d19", "d20", "d21", "d22", "d23",
       "d24", "d25", "d26", "d27", "d28", "d29", "d30", "d31",
-      "memory"
+      "memory", "cc"
     );
+    gSP.vertices[v].r = result[0];
+    gSP.vertices[v].g = result[1];
+    gSP.vertices[v].b = result[2];
+    gSP.vertices[v+1].r = result[4];
+    gSP.vertices[v+1].g = result[5];
+    gSP.vertices[v+1].b = result[6];
+    gSP.vertices[v+2].r = result[8];
+    gSP.vertices[v+2].g = result[9];
+    gSP.vertices[v+2].b = result[10];
+    gSP.vertices[v+3].r = result[12];
+    gSP.vertices[v+3].g = result[13];
+    gSP.vertices[v+3].b = result[14];
 #else
     gSPTransformNormal4(v, gSP.matrix.modelView[gSP.matrix.modelViewi]);
-    f32 intensity;
     for(int j = 0; j < 4; j++)
     {
-        gSP.vertices[v+j].r = gSP.lights[gSP.numLights].r;
-        gSP.vertices[v+j].g = gSP.lights[gSP.numLights].g;
-        gSP.vertices[v+j].b = gSP.lights[gSP.numLights].b;
+        f32 r,g,b;
+        r = gSP.lights[gSP.numLights].r;
+        g = gSP.lights[gSP.numLights].g;
+        b = gSP.lights[gSP.numLights].b;
         for (int i = 0; i < gSP.numLights; i++)
         {
-            intensity = DotProduct( &gSP.vertices[v+j].nx, &gSP.lights[i].x );
+            f32 intensity = DotProduct( &gSP.vertices[v+j].nx, &gSP.lights[i].x );
             if (intensity < 0.0f) intensity = 0.0f;
             gSP.vertices[v+j].r += gSP.lights[i].r * intensity;
             gSP.vertices[v+j].g += gSP.lights[i].g * intensity;
             gSP.vertices[v+j].b += gSP.lights[i].b * intensity;
         }
+#ifdef __PACKVERTEX_OPT
+        gSP.vertices[v+j].r = min(255.0f, r);
+        gSP.vertices[v+j].g = min(255.0f, g);
+        gSP.vertices[v+j].b = min(255.0f, b);
+#else
+        gSP.vertices[v].r = min(1.0, r);
+        gSP.vertices[v].g = min(1.0, g);
+        gSP.vertices[v].b = min(1.0, b);
+#endif
     }
 #endif
 }
@@ -627,13 +554,13 @@ void gSPBillboardVertex4(u32 v)
     asm volatile (
 
     "vld1.32 		{d0, d1}, [%0]		  	\n\t"	//q0 = {x,y,z,w}
-	"add 		    %0, %0, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %0, %0, %2 		  	    \n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d2, d3}, [%0]	    	\n\t"	//q1 = {x,y,z,w}
-	"add 		    %0, %0, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %0, %0, %2 		      	\n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d4, d5}, [%0]	        \n\t"	//q2 = {x,y,z,w}
-	"add 		    %0, %0, #72 		  	\n\t"	//q0 = {x,y,z,w}
+	"add 		    %0, %0, %2 	    	  	\n\t"	//q0 = {x,y,z,w}
 	"vld1.32 		{d6, d7}, [%0]	        \n\t"	//q3 = {x,y,z,w}
-    "sub 		    %0, %0, #216 		  	\n\t"	//q0 = {x,y,z,w}
+    "sub 		    %0, %0, %3   		  	\n\t"	//q0 = {x,y,z,w}
 
     "vld1.32 		{d16, d17}, [%1]		\n\t"	//q2={x1,y1,z1,w1}
     "vadd.f32 		q0, q0, q8 			    \n\t"	//q1=q1+q1
@@ -641,13 +568,14 @@ void gSPBillboardVertex4(u32 v)
     "vadd.f32 		q2, q2, q8 			    \n\t"	//q1=q1+q1
     "vadd.f32 		q3, q3, q8 			    \n\t"	//q1=q1+q1
     "vst1.32 		{d0, d1}, [%0] 		    \n\t"	//
-    "add 		    %0, %0, #72 		  	\n\t"	//q0 = {x,y,z,w}
+    "add 		    %0, %0, %2  		  	\n\t"	//q0 = {x,y,z,w}
 	"vst1.32 		{d2, d3}, [%0]          \n\t"	//
-    "add 		    %0, %0, #72 		  	\n\t"	//q0 = {x,y,z,w}
+    "add 		    %0, %0, %2 		  	    \n\t"	//q0 = {x,y,z,w}
 	"vst1.32 		{d4, d5}, [%0]          \n\t"	//
-    "add 		    %0, %0, #72 		  	\n\t"	//q0 = {x,y,z,w}
+    "add 		    %0, %0, %2 		  	    \n\t"	//q0 = {x,y,z,w}
 	"vst1.32 		{d6, d7}, [%0]          \n\t"	//
-    : "+&r"(ptr0), "+&r"(ptr1):
+    : "+&r"(ptr0), "+&r"(ptr1)
+    : "I"(sizeof(SPVertex)), "I"(3 * sizeof(SPVertex))
     : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
       "d16", "d17", "memory"
     );
@@ -742,7 +670,8 @@ void gSPProcessVertex4( u32 v )
         }
     }
 
-    gSPClipVertex4(v);
+    if (OGL.enableClipping)
+        gSPClipVertex4(v);
 }
 #endif
 
@@ -771,7 +700,7 @@ void gSPClipVertex(u32 v)
 	"strmi 		    %0, [%2, #8]		        \n\t"	//
     :"=&r"(tmp) : "r"(&gSP.vertices[v].x), "r"(&gSP.vertices[v].xClip)
     : "d0","d1","d2","d3","d4","d5","d6", "d7", "d16","d17",
-    "d18","d19","memory"
+    "d18","d19","memory", "cc"
     );
 #else
     gSP.vertices[v].xClip = (gSP.vertices[v].x > gSP.vertices[v].w) - (gSP.vertices[v].x < -gSP.vertices[v].w);
@@ -788,11 +717,13 @@ void __attribute__((noinline))
 gSPLightVertex(u32 v)
 {
 #ifdef __NEON_OPT
+    volatile float result[4];
+
     volatile int tmp = 0;
     volatile int i = gSP.numLights;
     volatile void *ptr0 = &gSP.lights[0].r;
     volatile void *ptr1 = &gSP.vertices[v].nx;
-    volatile void *ptr2 = &gSP.vertices[v].r;
+    volatile void *ptr2 = result;;
     volatile void *ptr3 = gSP.matrix.modelView[gSP.matrix.modelViewi];
 
 	asm volatile (
@@ -853,28 +784,48 @@ gSPLightVertex(u32 v)
     "bgt 		    1b 		                \n\t"	//(r1!=0) ? goto 1
     "b  		    2f 		                \n\t"	//(r1!=0) ? goto 1
     "2:                        	    		\n\t"	//
-    "vst1.32        {d0}, [%3]!	    		\n\t"	//
-    "fsts           s2, [%3]	        	\n\t"	//
+#ifdef __PACKVERTEX_OPT
+    "vmov.i32        q1, #255	        	\n\t"	//d2 = 255
+    "vcvt.f32.u32    q1, q1	        	    \n\t"	//d2 = (float)d2
+#else
+    "vmov.f32        q1, #1.0	        	\n\t"	//
+#endif
+    "vmin.f32        q0, q0, q1	        	\n\t"	//
+    "vst1.32        {d0, d1}, [%3]	    	\n\t"	//
 
     : "+&r"(tmp), "+&r"(i), "+&r"(ptr0), "+&r"(ptr2)
     :: "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
-      "d16", "memory"
+      "d16", "memory", "cc"
     );
-#else
-    f32 intensity;
+    gSP.vertices[v].r = result[0];
+    gSP.vertices[v].g = result[1];
+    gSP.vertices[v].b = result[2];
 
-    gSP.vertices[v].r = gSP.lights[gSP.numLights].r;
-    gSP.vertices[v].g = gSP.lights[gSP.numLights].g;
-    gSP.vertices[v].b = gSP.lights[gSP.numLights].b;
+#else
+
+    TransformVectorNormalize( &gSP.vertices[v].nx, gSP.matrix.modelView[gSP.matrix.modelViewi] );
+
+    f32 r, g, b;
+    r = gSP.lights[gSP.numLights].r;
+    g = gSP.lights[gSP.numLights].g;
+    b = gSP.lights[gSP.numLights].b;
     for (int i = 0; i < gSP.numLights; i++)
     {
-        intensity = DotProduct( &gSP.vertices[v].nx, &gSP.lights[i].x );
+        f32 intensity = DotProduct( &gSP.vertices[v].nx, &gSP.lights[i].x );
         if (intensity < 0.0f) intensity = 0.0f;
-        gSP.vertices[v].r += gSP.lights[i].r * intensity;
-        gSP.vertices[v].g += gSP.lights[i].g * intensity;
-        gSP.vertices[v].b += gSP.lights[i].b * intensity;
+        r += gSP.lights[i].r * intensity;
+        g += gSP.lights[i].g * intensity;
+        b += gSP.lights[i].b * intensity;
     }
-
+#ifdef __PACKVERTEX_OPT
+    gSP.vertices[v].r = min(255.0f, r);
+    gSP.vertices[v].g = min(255.0f, g);
+    gSP.vertices[v].b = min(255.0f, b);
+#else
+    gSP.vertices[v].r = min(1.0, r);
+    gSP.vertices[v].g = min(1.0, g);
+    gSP.vertices[v].b = min(1.0, b);
+#endif
 #endif
 }
 
@@ -901,12 +852,8 @@ void gSPLoadUcodeEx( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
         GBI_MakeCurrent( ucode );
     } else {
 #ifdef RSPTHREAD
-#ifdef WIN32
-        SetEvent( RSP.threadMsg[RSPMSG_CLOSE] );
-#else
         RSP.threadIdle = 0;
         RSP.threadEvents.push(RSPMSG_CLOSE);
-#endif
 #else
         puts( "Warning: Unknown UCODE!!!" );
 #endif
@@ -976,14 +923,8 @@ void gSPProcessVertex( u32 v )
 
             if (gSP.geometryMode & G_TEXTURE_GEN_LINEAR)
             {
-#ifdef __NEON_OPT2
-                acosf_neon(&gSP.vertices[v].nx, &gSP.vertices[v].s);
-                gSP.vertices[v].s *= 325.94931f;
-                gSP.vertices[v].t *= 325.94931f;
-#else
                 gSP.vertices[v].s = acosf(gSP.vertices[v].nx) * 325.94931f;
                 gSP.vertices[v].t = acosf(gSP.vertices[v].ny) * 325.94931f;
-#endif
             }
             else // G_TEXTURE_GEN
             {
@@ -993,7 +934,8 @@ void gSPProcessVertex( u32 v )
         }
     }
 
-    gSPClipVertex(v);
+    if (OGL.enableClipping)
+        gSPClipVertex(v);
 }
 
 void gSPNoOp()
@@ -1142,11 +1084,7 @@ void gSPViewport( u32 v )
     gSP.viewport.nearz  = gSP.viewport.vtrans[2] - gSP.viewport.vscale[2];
     gSP.viewport.farz   = (gSP.viewport.vtrans[2] + gSP.viewport.vscale[2]) ;
 
-#ifdef __STATE_OPT
-    OGL_UpdateViewport();
-#else
     gSP.changed |= CHANGED_VIEWPORT;
-#endif
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gSPViewport( 0x%08X );\n", v );
@@ -1194,10 +1132,15 @@ void gSPLight( u32 l, s32 n )
 
     if (n < 8)
     {
+#ifdef __PACKVERTEX_OPT
+        gSP.lights[n].r = light->r;
+        gSP.lights[n].g = light->g;
+        gSP.lights[n].b = light->b;
+#else
         gSP.lights[n].r = light->r * 0.0039215689f;
         gSP.lights[n].g = light->g * 0.0039215689f;
         gSP.lights[n].b = light->b * 0.0039215689f;
-
+#endif
         gSP.lights[n].x = light->x;
         gSP.lights[n].y = light->y;
         gSP.lights[n].z = light->z;
@@ -1249,20 +1192,30 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
                 gSP.vertices[i+j].flag = vertex->flag;
                 gSP.vertices[i+j].s = _FIXED2FLOAT( vertex->s, 5 );
                 gSP.vertices[i+j].t = _FIXED2FLOAT( vertex->t, 5 );
-
                 if (gSP.geometryMode & G_LIGHTING)
                 {
                     gSP.vertices[i+j].nx = vertex->normal.x;
                     gSP.vertices[i+j].ny = vertex->normal.y;
                     gSP.vertices[i+j].nz = vertex->normal.z;
+#ifdef __PACKVERTEX_OPT
+                    gSP.vertices[i+j].a = vertex->color.a;
+#else
                     gSP.vertices[i+j].a = vertex->color.a * 0.0039215689f;
+#endif
                 }
                 else
                 {
+#ifdef __PACKVERTEX_OPT
+                    gSP.vertices[i+j].r = vertex->color.r;
+                    gSP.vertices[i+j].g = vertex->color.g;
+                    gSP.vertices[i+j].b = vertex->color.b;
+                    gSP.vertices[i+j].a = vertex->color.a;
+#else
                     gSP.vertices[i+j].r = vertex->color.r * 0.0039215689f;
                     gSP.vertices[i+j].g = vertex->color.g * 0.0039215689f;
                     gSP.vertices[i+j].b = vertex->color.b * 0.0039215689f;
                     gSP.vertices[i+j].a = vertex->color.a * 0.0039215689f;
+#endif
                 }
                 vertex++;
             }
@@ -1277,20 +1230,30 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
             gSP.vertices[i].flag = vertex->flag;
             gSP.vertices[i].s = _FIXED2FLOAT( vertex->s, 5 );
             gSP.vertices[i].t = _FIXED2FLOAT( vertex->t, 5 );
-
             if (gSP.geometryMode & G_LIGHTING)
             {
                 gSP.vertices[i].nx = vertex->normal.x;
                 gSP.vertices[i].ny = vertex->normal.y;
                 gSP.vertices[i].nz = vertex->normal.z;
+#ifdef __PACKVERTEX_OPT
+                gSP.vertices[i].a = vertex->color.a;
+#else
                 gSP.vertices[i].a = vertex->color.a * 0.0039215689f;
+#endif
             }
             else
             {
+#ifdef __PACKVERTEX_OPT
+                gSP.vertices[i].r = vertex->color.r;
+                gSP.vertices[i].g = vertex->color.g;
+                gSP.vertices[i].b = vertex->color.b;
+                gSP.vertices[i].a = vertex->color.a;
+#else
                 gSP.vertices[i].r = vertex->color.r * 0.0039215689f;
                 gSP.vertices[i].g = vertex->color.g * 0.0039215689f;
                 gSP.vertices[i].b = vertex->color.b * 0.0039215689f;
                 gSP.vertices[i].a = vertex->color.a * 0.0039215689f;
+#endif
             }
 
 #ifdef DEBUG
@@ -1357,7 +1320,6 @@ void gSPCIVertex( u32 v, u32 n, u32 v0 )
                 gSP.vertices[i+j].flag = 0;
                 gSP.vertices[i+j].s = _FIXED2FLOAT( vertex->s, 5 );
                 gSP.vertices[i+j].t = _FIXED2FLOAT( vertex->t, 5 );
-
                 u8 *color = &RDRAM[gSP.vertexColorBase + (vertex->ci & 0xff)];
 
                 if (gSP.geometryMode & G_LIGHTING)
@@ -1365,14 +1327,25 @@ void gSPCIVertex( u32 v, u32 n, u32 v0 )
                     gSP.vertices[i+j].nx = (s8)color[3];
                     gSP.vertices[i+j].ny = (s8)color[2];
                     gSP.vertices[i+j].nz = (s8)color[1];
+#ifdef __PACKVERTEX_OPT
+                    gSP.vertices[i+j].a = color[0];
+#else
                     gSP.vertices[i+j].a = color[0] * 0.0039215689f;
+#endif
                 }
                 else
                 {
+#ifdef __PACKVERTEX_OPT
+                    gSP.vertices[i+j].r = color[3];
+                    gSP.vertices[i+j].g = color[2];
+                    gSP.vertices[i+j].b = color[1];
+                    gSP.vertices[i+j].a = color[0];
+#else
                     gSP.vertices[i+j].r = color[3] * 0.0039215689f;
                     gSP.vertices[i+j].g = color[2] * 0.0039215689f;
                     gSP.vertices[i+j].b = color[1] * 0.0039215689f;
                     gSP.vertices[i+j].a = color[0] * 0.0039215689f;
+#endif
                 }
                 vertex++;
             }
@@ -1387,7 +1360,6 @@ void gSPCIVertex( u32 v, u32 n, u32 v0 )
             gSP.vertices[i].flag = 0;
             gSP.vertices[i].s = _FIXED2FLOAT( vertex->s, 5 );
             gSP.vertices[i].t = _FIXED2FLOAT( vertex->t, 5 );
-
             u8 *color = &RDRAM[gSP.vertexColorBase + (vertex->ci & 0xff)];
 
             if (gSP.geometryMode & G_LIGHTING)
@@ -1395,14 +1367,25 @@ void gSPCIVertex( u32 v, u32 n, u32 v0 )
                 gSP.vertices[i].nx = (s8)color[3];
                 gSP.vertices[i].ny = (s8)color[2];
                 gSP.vertices[i].nz = (s8)color[1];
+#ifdef __PACKVERTEX_OPT
+                gSP.vertices[i].a = color[0];
+#else
                 gSP.vertices[i].a = color[0] * 0.0039215689f;
+#endif
             }
             else
             {
+#ifdef __PACKVERTEX_OPT
+                gSP.vertices[i].r = color[3];
+                gSP.vertices[i].g = color[2];
+                gSP.vertices[i].b = color[1];
+                gSP.vertices[i].a = color[0];
+#else
                 gSP.vertices[i].r = color[3] * 0.0039215689f;
                 gSP.vertices[i].g = color[2] * 0.0039215689f;
                 gSP.vertices[i].b = color[1] * 0.0039215689f;
                 gSP.vertices[i].a = color[0] * 0.0039215689f;
+#endif
             }
 
             gSPProcessVertex( i );
@@ -1451,14 +1434,25 @@ void gSPDMAVertex( u32 v, u32 n, u32 v0 )
                     gSP.vertices[i+j].nx = *(s8*)&RDRAM[(address + 6) ^ 3];
                     gSP.vertices[i+j].ny = *(s8*)&RDRAM[(address + 7) ^ 3];
                     gSP.vertices[i+j].nz = *(s8*)&RDRAM[(address + 8) ^ 3];
+#ifdef __PACKVERTEX_OPT
+                    gSP.vertices[i+j].a = *(u8*)&RDRAM[(address + 9) ^ 3];
+#else
                     gSP.vertices[i+j].a = *(u8*)&RDRAM[(address + 9) ^ 3] * 0.0039215689f;
+#endif
                 }
                 else
                 {
+#ifdef __PACKVERTEX_OPT
+                    gSP.vertices[i+j].r = *(u8*)&RDRAM[(address + 6) ^ 3];
+                    gSP.vertices[i+j].g = *(u8*)&RDRAM[(address + 7) ^ 3];
+                    gSP.vertices[i+j].b = *(u8*)&RDRAM[(address + 8) ^ 3];
+                    gSP.vertices[i+j].a = *(u8*)&RDRAM[(address + 9) ^ 3];
+#else
                     gSP.vertices[i+j].r = *(u8*)&RDRAM[(address + 6) ^ 3] * 0.0039215689f;
                     gSP.vertices[i+j].g = *(u8*)&RDRAM[(address + 7) ^ 3] * 0.0039215689f;
                     gSP.vertices[i+j].b = *(u8*)&RDRAM[(address + 8) ^ 3] * 0.0039215689f;
                     gSP.vertices[i+j].a = *(u8*)&RDRAM[(address + 9) ^ 3] * 0.0039215689f;
+#endif
                 }
                 address += 10;
             }
@@ -1476,14 +1470,25 @@ void gSPDMAVertex( u32 v, u32 n, u32 v0 )
                 gSP.vertices[i].nx = *(s8*)&RDRAM[(address + 6) ^ 3];
                 gSP.vertices[i].ny = *(s8*)&RDRAM[(address + 7) ^ 3];
                 gSP.vertices[i].nz = *(s8*)&RDRAM[(address + 8) ^ 3];
+#ifdef __PACKVERTEX_OPT
+                gSP.vertices[i].a = *(u8*)&RDRAM[(address + 9) ^ 3];
+#else
                 gSP.vertices[i].a = *(u8*)&RDRAM[(address + 9) ^ 3] * 0.0039215689f;
+#endif
             }
             else
             {
+#ifdef __PACKVERTEX_OPT
+                gSP.vertices[i].r = *(u8*)&RDRAM[(address + 6) ^ 3];
+                gSP.vertices[i].g = *(u8*)&RDRAM[(address + 7) ^ 3];
+                gSP.vertices[i].b = *(u8*)&RDRAM[(address + 8) ^ 3];
+                gSP.vertices[i].a = *(u8*)&RDRAM[(address + 9) ^ 3];
+#else
                 gSP.vertices[i].r = *(u8*)&RDRAM[(address + 6) ^ 3] * 0.0039215689f;
                 gSP.vertices[i].g = *(u8*)&RDRAM[(address + 7) ^ 3] * 0.0039215689f;
                 gSP.vertices[i].b = *(u8*)&RDRAM[(address + 8) ^ 3] * 0.0039215689f;
                 gSP.vertices[i].a = *(u8*)&RDRAM[(address + 9) ^ 3] * 0.0039215689f;
+#endif
             }
 
             gSPProcessVertex( i );
@@ -1670,31 +1675,6 @@ void gSPCopyVertex( SPVertex *dest, SPVertex *src )
 
 void gSPInterpolateVertex( SPVertex *dest, f32 percent, SPVertex *first, SPVertex *second )
 {
-#ifdef __NEON_OPT
-    asm volatile (
-    "vld1.32 		{d16, d17, d18, d19}, [%1]	\n\t"	//q8={x0,y0, z0, w0}
-    "vld1.32 		{d20}, [%1, #32]	        \n\t"	//q8={x0,y0, z0, w0}
-    "vld1.32 		{d22, d23, d24, d25}, [%2]  \n\t"	//q9={x1,y1, z1, w1}
-    "vld1.32 		{d26}, [%2, #32]		    \n\t"	//q9={x1,y1, z1, w1}
-    "vdup.f32 		d0, %0         		        \n\t"	//q9={x1,y1, z1, w1}
-
-    "vsub.f32 		q1, q11, q8			        \n\t"	//q2
-    "vsub.f32 		q2, q12, q9			        \n\t"	//q2
-    "vsub.f32 		d6, d26, d20			    \n\t"	//q2
-
-    "vmla.f32 		q8, q1, d0[0]			    \n\t"	//q2
-    "vmla.f32 		q9, q2, d0[0]			    \n\t"	//q2
-    "vmla.f32 		d20, d6, d0[0]			    \n\t"	//q2
-
-    "vst1.32 		{d16, d17, d18, d19}, [%3]	\n\t"	//q8={x0,y0, z0, w0}
-    "vst1.32 		{d20}, [%3, #32]	        \n\t"	//q8={x0,y0, z0, w0}
-
-    :: "r"(percent),"r"(first), "r"(second), "r"(dest)
-    : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d16", "d17",
-    "d18", "d19", "d20", "d21", "d22", "d23", "d24", "d25", "d26",
-    "memory"
-    );
-#else
     dest->x = first->x + percent * (second->x - first->x);
     dest->y = first->y + percent * (second->y - first->y);
     dest->z = first->z + percent * (second->z - first->z);
@@ -1705,7 +1685,6 @@ void gSPInterpolateVertex( SPVertex *dest, f32 percent, SPVertex *first, SPVerte
     dest->a = first->a + percent * (second->a - first->a);
     dest->s = first->s + percent * (second->s - first->s);
     dest->t = first->t + percent * (second->t - first->t);
-#endif
 }
 
 void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
@@ -1713,25 +1692,18 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
     if ((v0 < 80) && (v1 < 80) && (v2 < 80))
     {
         // Don't bother with triangles completely outside clipping frustrum
-        if (((gSP.vertices[v0].xClip < 0) &&
-             (gSP.vertices[v1].xClip < 0) &&
-             (gSP.vertices[v2].xClip < 0)) ||
-            ((gSP.vertices[v0].xClip > 0) &&
-             (gSP.vertices[v1].xClip > 0) &&
-             (gSP.vertices[v2].xClip > 0)) ||
-            ((gSP.vertices[v0].yClip < 0) &&
-             (gSP.vertices[v1].yClip < 0) &&
-             (gSP.vertices[v2].yClip < 0)) ||
-            ((gSP.vertices[v0].yClip > 0) &&
-             (gSP.vertices[v1].yClip > 0) &&
-             (gSP.vertices[v2].yClip > 0)) ||
-            ((gSP.vertices[v0].zClip > 0) &&
-             (gSP.vertices[v1].zClip > 0) &&
-             (gSP.vertices[v2].zClip > 0)) ||
-            ((gSP.vertices[v0].zClip < 0) &&
-             (gSP.vertices[v1].zClip < 0) &&
-             (gSP.vertices[v2].zClip < 0)))
-             return;
+        if ((OGL.enableClipping) && ((gSP.vertices[v0].xClip != 0) &&
+            (gSP.vertices[v0].xClip == gSP.vertices[v1].xClip) &&
+            (gSP.vertices[v1].xClip == gSP.vertices[v2].xClip)) ||
+           ((gSP.vertices[v0].yClip != 0) &&
+            (gSP.vertices[v0].yClip == gSP.vertices[v1].yClip) &&
+            (gSP.vertices[v1].yClip == gSP.vertices[v2].yClip)) ||
+           ((gSP.vertices[v0].zClip != 0) &&
+            (gSP.vertices[v0].zClip == gSP.vertices[v1].zClip) &&
+            (gSP.vertices[v1].zClip == gSP.vertices[v2].zClip)))
+        {
+            return;
+        }
 
         // NoN work-around, clips triangles, and draws the clipped-off parts with clamped z
         if (GBI.current->NoN &&
@@ -1827,7 +1799,6 @@ void gSP2Triangles( s32 v00, s32 v01, s32 v02, s32 flag0,
 {
     gSPTriangle( v00, v01, v02, flag0 );
     gSPTriangle( v10, v11, v12, flag1 );
-
     gSPFlushTriangles();
 
 #ifdef DEBUG
@@ -1847,7 +1818,6 @@ void gSP4Triangles( s32 v00, s32 v01, s32 v02,
     gSPTriangle( v10, v11, v12, 0 );
     gSPTriangle( v20, v21, v22, 0 );
     gSPTriangle( v30, v31, v32, 0 );
-
     gSPFlushTriangles();
 
 #ifdef DEBUG
@@ -1889,16 +1859,12 @@ void gSPDMATriangles( u32 tris, u32 n )
                 gSP.geometryMode |= G_CULL_FRONT;
         }
         gSP.changed |= CHANGED_GEOMETRYMODE;
-
         gSP.vertices[triangles->v0].s = _FIXED2FLOAT( triangles->s0, 5 );
         gSP.vertices[triangles->v0].t = _FIXED2FLOAT( triangles->t0, 5 );
-
         gSP.vertices[triangles->v1].s = _FIXED2FLOAT( triangles->s1, 5 );
         gSP.vertices[triangles->v1].t = _FIXED2FLOAT( triangles->t1, 5 );
-
         gSP.vertices[triangles->v2].s = _FIXED2FLOAT( triangles->s2, 5 );
         gSP.vertices[triangles->v2].t = _FIXED2FLOAT( triangles->t2, 5 );
-
         gSPTriangle( triangles->v0, triangles->v1, triangles->v2, 0 );
 
         triangles++;
@@ -1916,7 +1882,6 @@ void gSP1Quadrangle( s32 v0, s32 v1, s32 v2, s32 v3 )
 {
     gSPTriangle( v0, v1, v2, 0 );
     gSPTriangle( v0, v2, v3, 0 );
-
     gSPFlushTriangles();
 
 #ifdef DEBUG
@@ -2146,10 +2111,17 @@ void gSPModifyVertex( u32 vtx, u32 where, u32 val )
     switch (where)
     {
         case G_MWO_POINT_RGBA:
+#ifdef __PACKVERTEX_OPT
+            gSP.vertices[vtx].r = _SHIFTR( val, 24, 8 );
+            gSP.vertices[vtx].g = _SHIFTR( val, 16, 8 );
+            gSP.vertices[vtx].b = _SHIFTR( val, 8, 8 );
+            gSP.vertices[vtx].a = _SHIFTR( val, 0, 8 );
+#else
             gSP.vertices[vtx].r = _SHIFTR( val, 24, 8 ) * 0.0039215689f;
             gSP.vertices[vtx].g = _SHIFTR( val, 16, 8 ) * 0.0039215689f;
             gSP.vertices[vtx].b = _SHIFTR( val, 8, 8 ) * 0.0039215689f;
             gSP.vertices[vtx].a = _SHIFTR( val, 0, 8 ) * 0.0039215689f;
+#endif
 #ifdef DEBUG
             DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gSPModifyVertex( %i, %s, 0x%08X );\n",
                 vtx, MWOPointText[(where - 0x10) >> 2], val );
@@ -2199,9 +2171,15 @@ void gSPLightColor( u32 lightNum, u32 packedColor )
 
     if (lightNum < 8)
     {
+#ifdef __PACKVERTEX_OPT
+        gSP.lights[lightNum].r = _SHIFTR( packedColor, 24, 8 );
+        gSP.lights[lightNum].g = _SHIFTR( packedColor, 16, 8 );
+        gSP.lights[lightNum].b = _SHIFTR( packedColor, 8, 8 );
+#else
         gSP.lights[lightNum].r = _SHIFTR( packedColor, 24, 8 ) * 0.0039215689f;
         gSP.lights[lightNum].g = _SHIFTR( packedColor, 16, 8 ) * 0.0039215689f;
         gSP.lights[lightNum].b = _SHIFTR( packedColor, 8, 8 ) * 0.0039215689f;
+#endif
     }
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gSPLightColor( %i, 0x%08X );\n",
@@ -2238,11 +2216,15 @@ void gSPTexture( f32 sc, f32 tc, s32 level, s32 tile, s32 on )
     gSP.texture.level = level;
     gSP.texture.on = on;
 
-    gSP.texture.tile = tile;
-    gSP.textureTile[0] = &gDP.tiles[tile];
-    gSP.textureTile[1] = &gDP.tiles[(tile < 7) ? (tile + 1) : tile];
+    if (gSP.texture.tile != tile)
+    {
+        gSP.texture.tile = tile;
+        gSP.textureTile[0] = &gDP.tiles[tile];
+        gSP.textureTile[1] = &gDP.tiles[(tile < 7) ? (tile + 1) : tile];
+        gSP.changed |= CHANGED_TEXTURE;
+    }
 
-    gSP.changed |= CHANGED_TEXTURE;
+    gSP.changed |= CHANGED_TEXTURESCALE;
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TEXTURE, "gSPTexture( %f, %f, %i, %i, %i );\n",
@@ -2531,21 +2513,18 @@ void gSPObjSprite( u32 sp )
     gSP.vertices[0].w = 1.0f;
     gSP.vertices[0].s = 0.0f;
     gSP.vertices[0].t = 0.0f;
-
     gSP.vertices[1].x = gSP.objMatrix.A * x1 + gSP.objMatrix.B * y0 + gSP.objMatrix.X;
     gSP.vertices[1].y = gSP.objMatrix.C * x1 + gSP.objMatrix.D * y0 + gSP.objMatrix.Y;
     gSP.vertices[1].z = 0.0f;
     gSP.vertices[1].w = 1.0f;
     gSP.vertices[1].s = imageW - 1;
     gSP.vertices[1].t = 0.0f;
-
     gSP.vertices[2].x = gSP.objMatrix.A * x1 + gSP.objMatrix.B * y1 + gSP.objMatrix.X;
     gSP.vertices[2].y = gSP.objMatrix.C * x1 + gSP.objMatrix.D * y1 + gSP.objMatrix.Y;
     gSP.vertices[2].z = 0.0f;
     gSP.vertices[2].w = 1.0f;
     gSP.vertices[2].s = imageW - 1;
     gSP.vertices[2].t = imageH - 1;
-
     gSP.vertices[3].x = gSP.objMatrix.A * x0 + gSP.objMatrix.B * y1 + gSP.objMatrix.X;
     gSP.vertices[3].y = gSP.objMatrix.C * x0 + gSP.objMatrix.D * y1 + gSP.objMatrix.Y;
     gSP.vertices[3].z = 0.0f;
@@ -2557,15 +2536,20 @@ void gSPObjSprite( u32 sp )
     gDPSetTileSize( 0, 0, 0, (imageW - 1) << 2, (imageH - 1) << 2 );
     gSPTexture( 1.0f, 1.0f, 0, 0, TRUE );
 
-    glMatrixMode( GL_PROJECTION );
     VI_UpdateSize();
 
-    glLoadIdentity();
-    glOrtho( 0, VI.width, VI.height, 0, 0.0f, 32767.0f );
+    //glOrtho( 0, VI.width, VI.height, 0, 0.0f, 32767.0f );
+    for(int i = 0; i < 4;i++)
+    {
+        gSP.vertices[i].x = 2.0f * VI.rwidth * gSP.vertices[i].x - 1.0f;
+        gSP.vertices[i].y = -2.0f * VI.rheight * gSP.vertices[i].y + 1.0f;
+        gSP.vertices[i].z = -1.0f;
+        gSP.vertices[i].w = 1.0f;
+    }
+
     OGL_AddTriangle(0, 1, 2);
     OGL_AddTriangle(0, 2, 3);
     OGL_DrawTriangles();
-    glLoadIdentity();
 
     if (depthBuffer.current) depthBuffer.current->cleared = FALSE;
     gDP.colorImage.changed = TRUE;

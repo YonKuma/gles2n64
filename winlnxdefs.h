@@ -30,6 +30,7 @@
 # define WIN32_LEAN_AND_MEAN
 # include <windows.h>
 # include <winbase.h>
+# include <limits.h>
 # define sleep(x) Sleep(x*1000)
 #else
 typedef unsigned int BOOL;
@@ -60,6 +61,10 @@ typedef void* LPVOID;
 
 #ifndef TRUE
 #define TRUE 1
+#endif
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
 #endif
 
 #endif // __WIN32__

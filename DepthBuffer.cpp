@@ -22,7 +22,7 @@ void DepthBuffer_RemoveBottom()
     free( depthBuffer.bottom );
 
     depthBuffer.bottom = newBottom;
-    
+
     if (depthBuffer.bottom != NULL)
         depthBuffer.bottom->lower = NULL;
 
@@ -58,14 +58,12 @@ void DepthBuffer_Remove( DepthBuffer *buffer )
     }
 
     free( buffer );
-
     depthBuffer.numBuffers--;
 }
 
 void DepthBuffer_RemoveBuffer( u32 address )
 {
     DepthBuffer *current = depthBuffer.bottom;
-
     while (current != NULL)
     {
         if (current->address == address)

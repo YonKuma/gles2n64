@@ -1,4 +1,4 @@
-#include "glN64.h"
+#include "gles2N64.h"
 #include "N64.h"
 #include "GBI.h"
 #include "RSP.h"
@@ -13,14 +13,12 @@
 #include "VI.h"
 #include <stdlib.h>
 
-#ifdef __LINUX__
 # ifndef min
 #  define min(a,b) ((a) < (b) ? (a) : (b))
 # endif
 # ifndef max
 #  define max(a,b) ((a) > (b) ? (a) : (b))
 # endif
-#endif
 
 gDPInfo gDP;
 
@@ -28,7 +26,6 @@ void gDPSetOtherMode( u32 mode0, u32 mode1 )
 {
     gDP.otherMode.h = mode0;
     gDP.otherMode.l = mode1;
-
     gDP.changed |= CHANGED_RENDERMODE | CHANGED_CYCLETYPE | CHANGED_ALPHACOMPARE;
 
 #ifdef DEBUG
@@ -62,8 +59,7 @@ void gDPSetPrimDepth( u16 z, u16 dz )
 {
     gDP.primDepth.z = min( 1.0f, max( 0.0f, (_FIXED2FLOAT( z, 15 ) - gSP.viewport.vtrans[2]) / gSP.viewport.vscale[2] ) );
     gDP.primDepth.deltaZ = dz;
-
-    glPrimitiveZ(gDP.primDepth.z);
+    gDP.changed |= CHANGED_PRIMITIVEZ;
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gDPSetPrimDepth( %f, %f );\n",
@@ -85,7 +81,6 @@ void gDPPipelineMode( u32 mode )
 void gDPSetCycleType( u32 type )
 {
     gDP.otherMode.cycleType = type;
-
     gDP.changed |= CHANGED_CYCLETYPE;
 
 #ifdef DEBUG
@@ -187,7 +182,6 @@ void gDPSetAlphaDither( u32 type )
 void gDPSetAlphaCompare( u32 mode )
 {
     gDP.otherMode.alphaCompare = mode;
-
     gDP.changed |= CHANGED_ALPHACOMPARE;
 
 #ifdef DEBUG
@@ -199,10 +193,7 @@ void gDPSetAlphaCompare( u32 mode )
 void gDPSetDepthSource( u32 source )
 {
     gDP.otherMode.depthSource = source;
-    if (gDP.otherMode.depthSource == G_ZS_PRIM)
-        glEnable(GL_ZPRIM_N64);
-    else
-        glDisable(GL_ZPRIM_N64);
+    gDP.changed |= CHANGED_DEPTHSOURCE;
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gDPSetDepthSource( %s );\n",
@@ -214,7 +205,6 @@ void gDPSetRenderMode( u32 mode1, u32 mode2 )
 {
     gDP.otherMode.l &= 0x00000007;
     gDP.otherMode.l |= mode1 | mode2;
-
     gDP.changed |= CHANGED_RENDERMODE;
 
 #ifdef DEBUG
@@ -236,7 +226,6 @@ void gDPSetCombine( s32 muxs0, s32 muxs1 )
 {
     gDP.combine.muxs0 = muxs0;
     gDP.combine.muxs1 = muxs1;
-
     gDP.changed |= CHANGED_COMBINE;
 
 #ifdef DEBUG
@@ -301,7 +290,7 @@ void gDPUpdateColorImage()
         u32 i = 0;
 
         printf("READ PIXELS \n");
-        glReadPixels( OGL.xpos, (int)(OGL.height - gDP.colorImage.height * OGL.scaleY + OGL.ypos), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1_EXT, frameBuffer );
+        glReadPixels( OGL.xpos, (int)(OGL.height - gDP.colorImage.height * OGL.scaleY + OGL.ypos), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, frameBuffer );
 
         for (u32 y = 0; y < gDP.colorImage.height; y++)
         {
@@ -426,7 +415,7 @@ void gDPSetEnvColor( u32 r, u32 g, u32 b, u32 a )
     gDP.envColor.b = b * 0.0039215689f;
     gDP.envColor.a = a * 0.0039215689f;
 
-    gDP.changed |= CHANGED_COMBINE_COLORS;
+    gDP.changed |= CHANGED_ENV_COLOR;
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_COMBINE, "gDPSetEnvColor( %i, %i, %i, %i );\n",
@@ -486,7 +475,7 @@ void gDPSetPrimColor( u32 m, u32 l, u32 r, u32 g, u32 b, u32 a )
     gDP.primColor.b = b * 0.0039215689f;
     gDP.primColor.a = a * 0.0039215689f;
 
-    gDP.changed |= CHANGED_COMBINE_COLORS;
+    gDP.changed |= CHANGED_PRIM_COLOR;
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_COMBINE, "gDPSetPrimColor( %i, %i, %i, %i, %i, %i );\n",
@@ -647,25 +636,32 @@ void gDPLoadBlock( u32 tile, u32 uls, u32 ult, u32 lrs, u32 dxt )
 
     if (dxt > 0)
     {
-        void (*Interleave)( void *mem, u32 numDWords );
-
         u32 line = (2047 + dxt) / dxt;
         u32 bpl = line << 3;
         u32 height = bytes / bpl;
 
         if (gDP.loadTile->size == G_IM_SIZ_32b)
-            Interleave = QWordInterleave;
-        else
-            Interleave = DWordInterleave;
-
-        for (u32 y = 0; y < height; y++)
         {
-            UnswapCopy( src, dest, bpl );
-            if (y & 1) Interleave( dest, line );
-
-            src += line;
-            dest += line;
+            for (u32 y = 0; y < height; y++)
+            {
+                UnswapCopy( src, dest, bpl );
+                if (y & 1) QWordInterleave( dest, line );
+                src += line;
+                dest += line;
+            }
         }
+        else
+        {
+            for (u32 y = 0; y < height; y++)
+            {
+                UnswapCopy( src, dest, bpl );
+                if (y & 1) DWordInterleave( dest, line );
+                src += line;
+                dest += line;
+            }
+
+        }
+
     }
     else
         UnswapCopy( src, dest, bytes );
@@ -728,12 +724,7 @@ void gDPSetScissor( u32 mode, f32 ulx, f32 uly, f32 lrx, f32 lry )
     gDP.scissor.uly = uly;
     gDP.scissor.lrx = lrx;
     gDP.scissor.lry = lry;
-
-#ifdef __STATE_OPT
-    OGL_UpdateScissor();
-#else
     gDP.changed |= CHANGED_SCISSOR;
-#endif
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_IGNORED, "gDPSetScissor( %s, %.2f, %.2f, %.2f, %.2f );\n",

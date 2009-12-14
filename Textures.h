@@ -1,7 +1,7 @@
 #ifndef TEXTURES_H
 #define TEXTURES_H
 
-#include <wes_gl.h>
+#include <GLES2/gl2.h>
 
 #include "convert.h"
 

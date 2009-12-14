@@ -1,8 +1,5 @@
 #include <stdlib.h>
 
-#define GL_GLEXT_PROTOTYPES
-#include <wes_gl.h>
-
 #include "winlnxdefs.h"
 
 #include "OpenGL.h"

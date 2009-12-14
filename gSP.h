@@ -10,20 +10,32 @@
 #define CHANGED_COLORBUFFER     0x04
 #define CHANGED_GEOMETRYMODE    0x08
 #define CHANGED_TEXTURE         0x10
-#define CHANGED_FOGPOSITION     0x10
+#define CHANGED_FOGPOSITION     0x20
+#define CHANGED_TEXTURESCALE    0x40
 
 struct SPVertex
 {
     f32     x, y, z, w;
     f32     nx, ny, nz, __pad0;
+#ifdef __PACKVERTEX_OPT
+    u8      r, g, b, a;
+#else
     f32     r, g, b, a;
+#endif
     f32     s, t;
+
     s32     xClip, yClip, zClip;
     s16     flag;
     s16     __pad1;
 };
 
 typedef SPVertex SPTriangle[3];
+
+struct SPLight
+{
+    f32 r, g, b;
+    f32 x, y, z;
+};
 
 struct gSPInfo
 {
@@ -49,11 +61,7 @@ struct gSPInfo
     u32 vertexColorBase;
     u32 vertexi;
 
-    struct
-    {
-        f32 r, g, b;
-        f32 x, y, z;
-    } lights[8];
+    SPLight lights[8];
 
     struct
     {

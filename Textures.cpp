@@ -2,9 +2,6 @@
 #include <stdlib.h>
 #include <memory.h>
 
-#define GL_GLEXT_PROTOTYPES
-#include <wes_gl.h>
-
 #include "winlnxdefs.h"
 #ifndef min
 #define min(a,b) ((a) < (b) ? (a) : (b))
@@ -22,6 +19,12 @@
 #include "convert.h"
 #include "2xSAI.h"
 #include "FrameBuffer.h"
+
+//defines for autoformat (not used in actual texture upload)
+#define GL_RGBA8                          GL_RGBA
+#define GL_RGBA4                          0x8056
+#define GL_RGB5_A1                        0x8057
+#define GL_RGB565                         0x8D62
 
 TextureCache    cache;
 
@@ -198,39 +201,42 @@ const struct
 } imageFormat[4][5] =
 { //        Get16                   glType16                        glInternalFormat16  Get32                   glType32                        glInternalFormat32  autoFormat
     { // 4-bit
-        {   GetCI4RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1_EXT,  GL_RGB5_A1,         GetCI4RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGB5_A1, 4, 4096 }, // CI (Banjo-Kazooie uses this, doesn't make sense, but it works...)
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 4, 8192 }, // YUV
-        {   GetCI4RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1_EXT,  GL_RGB5_A1,         GetCI4RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGB5_A1, 4, 4096 }, // CI
-        {   GetIA31_RGBA4444,       GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetIA31_RGBA8888,       GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 4, 8192 }, // IA
-        {   GetI4_RGBA4444,         GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetI4_RGBA8888,         GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 4, 8192 }, // I
+        {   GetCI4RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1,      GL_RGBA,    GetCI4RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGB5_A1, 4, 4096 }, // CI (Banjo-Kazooie uses this, doesn't make sense, but it works...)
+        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 4, 8192 }, // YUV
+        {   GetCI4RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1,      GL_RGBA,    GetCI4RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGB5_A1, 4, 4096 }, // CI
+        {   GetIA31_RGBA4444,       GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetIA31_RGBA8888,       GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 4, 8192 }, // IA
+        {   GetI4_RGBA4444,         GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetI4_RGBA8888,         GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 4, 8192 }, // I
     },
     { // 8-bit
-        {   GetCI8RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1_EXT,  GL_RGB5_A1,         GetCI8RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGB5_A1, 3, 2048 }, // RGBA
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 0, 4096 }, // YUV
-        {   GetCI8RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1_EXT,  GL_RGB5_A1,         GetCI8RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGB5_A1, 3, 2048 }, // CI
-        {   GetIA44_RGBA4444,       GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetIA44_RGBA8888,       GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 3, 4096 }, // IA
-        {   GetI8_RGBA4444,         GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetI8_RGBA8888,         GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA8, 3, 4096 }, // I
+        {   GetCI8RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1,      GL_RGBA,    GetCI8RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGB5_A1, 3, 2048 }, // RGBA
+        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 4096 }, // YUV
+        {   GetCI8RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1,      GL_RGBA,    GetCI8RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGB5_A1, 3, 2048 }, // CI
+        {   GetIA44_RGBA4444,       GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetIA44_RGBA8888,       GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 3, 4096 }, // IA
+        {   GetI8_RGBA4444,         GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetI8_RGBA8888,         GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA8, 3, 4096 }, // I
     },
     { // 16-bit
-        {   GetRGBA5551_RGBA5551,   GL_UNSIGNED_SHORT_5_5_5_1_EXT,  GL_RGB5_A1,         GetRGBA5551_RGBA8888,   GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGB5_A1, 2, 2048 }, // RGBA
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 2, 2048 }, // YUV
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 0, 2048 }, // CI
-        {   GetIA88_RGBA4444,       GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetIA88_RGBA8888,       GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA8, 2, 2048 }, // IA
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 0, 2048 }, // I
+        {   GetRGBA5551_RGBA5551,   GL_UNSIGNED_SHORT_5_5_5_1,      GL_RGBA,    GetRGBA5551_RGBA8888,   GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGB5_A1, 2, 2048 }, // RGBA
+        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 2, 2048 }, // YUV
+        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 2048 }, // CI
+        {   GetIA88_RGBA4444,       GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetIA88_RGBA8888,       GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA8, 2, 2048 }, // IA
+        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 2048 }, // I
     },
     { // 32-bit
-        {   GetRGBA8888_RGBA4444,   GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetRGBA8888_RGBA8888,   GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA8, 2, 1024 }, // RGBA
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 0, 1024 }, // YUV
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 0, 1024 }, // CI
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 0, 1024 }, // IA
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4_EXT,  GL_RGBA4,           GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA8,           GL_RGBA4, 0, 1024 }, // I
+        {   GetRGBA8888_RGBA4444,   GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetRGBA8888_RGBA8888,   GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA8, 2, 1024 }, // RGBA
+        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 1024 }, // YUV
+        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 1024 }, // CI
+        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 1024 }, // IA
+        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 1024 }, // I
     }
 };
+
+int isTexCacheInit = 0;
 
 void TextureCache_Init()
 {
     u32 dummyTexture[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
+    isTexCacheInit = 1;
     cache.current[0] = NULL;
     cache.current[1] = NULL;
     cache.top = NULL;
@@ -240,18 +246,17 @@ void TextureCache_Init()
     cache.enable2xSaI = OGL.enable2xSaI;
     cache.bitDepth = OGL.textureBitDepth;
 
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glGenTextures( 32, cache.glNoiseNames );
 
     u8 noise[64*64*4];
     for (s16 i = 0; i < 32; i++)
     {
         glBindTexture( GL_TEXTURE_2D, cache.glNoiseNames[i] );
-
         srand( timeGetTime() );
-
-        for (s16 y = 0; y < 64; y++)
+        for (u32 y = 0; y < 64; y++)
         {
-            for (s16 x = 0; x < 64; x++)
+            for (u32 x = 0; x < 64; x++)
             {
                 u8 random = rand();
                 noise[y*64*4+x*4] = random;
@@ -260,21 +265,20 @@ void TextureCache_Init()
                 noise[y*64*4+x*4+3] = random;
             }
         }
-        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, 64, 64, 0, GL_RGBA, GL_UNSIGNED_BYTE, noise );
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, 64, 64, 0, GL_RGBA, GL_UNSIGNED_BYTE, noise );
     }
 
     cache.dummy = TextureCache_AddTop();
-
     cache.dummy->address = 0;
     cache.dummy->clampS = 1;
     cache.dummy->clampT = 1;
-    cache.dummy->clampWidth = 2;
-    cache.dummy->clampHeight = 2;
+    cache.dummy->clampWidth = 4;
+    cache.dummy->clampHeight = 4;
     cache.dummy->crc = 0;
     cache.dummy->format = 0;
     cache.dummy->size = 0;
-    cache.dummy->width = 2;
-    cache.dummy->height = 2;
+    cache.dummy->width = 4;
+    cache.dummy->height = 4;
     cache.dummy->realWidth = 0;
     cache.dummy->realHeight = 0;
     cache.dummy->maskS = 0;
@@ -287,14 +291,11 @@ void TextureCache_Init()
     cache.dummy->tMem = 0;
 
     glBindTexture( GL_TEXTURE_2D, cache.dummy->glName );
-    //glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, dummyTexture );
-    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, 4, 4, 0, GL_RGBA, GL_UNSIGNED_BYTE, dummyTexture);
 
     cache.cachedBytes = cache.dummy->textureBytes;
-
-    TextureCache_ActivateDummy( 0 );
-    TextureCache_ActivateDummy( 1 );
-
+    TextureCache_ActivateDummy(0);
+    TextureCache_ActivateDummy(1);
     CRC_BuildTable();
 }
 
@@ -440,7 +441,7 @@ void TextureCache_Destroy()
         TextureCache_RemoveBottom();
 
     glDeleteTextures( 32, cache.glNoiseNames );
-//  glDeleteTextures( 1, &cache.glDummyName );
+    glDeleteTextures( 1, &cache.dummy->glName  );
 
     cache.top = NULL;
     cache.bottom = NULL;
@@ -458,11 +459,11 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
     u16 clampSClamp;
     u16 clampTClamp;
     GetTexelFunc    GetTexel;
-    GLuint          glInternalFormat;
     GLenum          glType;
 
-    if (((imageFormat[texInfo->size][texInfo->format].autoFormat == GL_RGBA8) ||
-        ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16)) || (cache.bitDepth == 2)) && (cache.bitDepth != 0))
+    if (((imageFormat[texInfo->size][texInfo->format].autoFormat == GL_RGBA) ||
+        ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16)) ||
+         (cache.bitDepth == 2)) && (cache.bitDepth != 0))
     {
         texInfo->textureBytes = (texInfo->realWidth * texInfo->realHeight) << 2;
         if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
@@ -472,13 +473,11 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
             else
                 GetTexel = GetCI8IA_RGBA8888;
 
-            glInternalFormat = GL_RGBA8;
             glType = GL_UNSIGNED_BYTE;
         }
         else
         {
             GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
-            glInternalFormat = imageFormat[texInfo->size][texInfo->format].glInternalFormat32;
             glType = imageFormat[texInfo->size][texInfo->format].glType32;
         }
     }
@@ -492,81 +491,81 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
             else
                 GetTexel = GetCI8IA_RGBA4444;
 
-            glInternalFormat = GL_RGBA4;
-            glType = GL_UNSIGNED_SHORT_4_4_4_4_EXT;
+            glType = GL_UNSIGNED_SHORT_4_4_4_4;
         }
         else
         {
             GetTexel = imageFormat[texInfo->size][texInfo->format].Get16;
-            glInternalFormat = imageFormat[texInfo->size][texInfo->format].glInternalFormat16;
             glType = imageFormat[texInfo->size][texInfo->format].glType16;
         }
     }
 
     bpl = gSP.bgImage.width << gSP.bgImage.size >> 1;
     numBytes = bpl * gSP.bgImage.height;
-    swapped = (u8*)malloc( numBytes );
+    swapped = (u8*) malloc( numBytes );
     UnswapCopy( &RDRAM[gSP.bgImage.address], swapped, numBytes );
-    dest = (u32*)malloc( texInfo->textureBytes );
+    dest = (u32*) malloc( texInfo->textureBytes );
 
     clampSClamp = texInfo->width - 1;
     clampTClamp = texInfo->height - 1;
+
+    if (GetTexel == GetNone)
+        printf("[gles2n64]: Trying to retrieve texture data of unknown format \n");
 
     j = 0;
     for (y = 0; y < texInfo->realHeight; y++)
     {
         ty = min(y, clampTClamp);
-
         src = &swapped[bpl * ty];
 
         for (x = 0; x < texInfo->realWidth; x++)
         {
             tx = min(x, clampSClamp);
 
-            if (glInternalFormat == GL_RGBA8)
+            if (glType == GL_UNSIGNED_BYTE)
                 ((u32*)dest)[j++] = GetTexel( (u64*)src, tx, 0, texInfo->palette );
             else
                 ((u16*)dest)[j++] = GetTexel( (u64*)src, tx, 0, texInfo->palette );
         }
     }
 
-    if (cache.enable2xSaI)
+    if (!cache.enable2xSaI)
+    {
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, texInfo->realWidth, texInfo->realHeight, 0, GL_RGBA, glType, dest );
+        free( dest );
+    }
+    else
     {
         texInfo->textureBytes <<= 2;
 
         scaledDest = (u32*)malloc( texInfo->textureBytes );
 
-        if (glInternalFormat == GL_RGBA8)
+        if (glType == GL_UNSIGNED_BYTE)
             _2xSaI8888( (u32*)dest, (u32*)scaledDest, texInfo->realWidth, texInfo->realHeight, texInfo->clampS, texInfo->clampT );
-        else if (glInternalFormat == GL_RGBA4)
+        if (glType == GL_UNSIGNED_SHORT_4_4_4_4)
             _2xSaI4444( (u16*)dest, (u16*)scaledDest, texInfo->realWidth, texInfo->realHeight, texInfo->clampS, texInfo->clampT );
         else
             _2xSaI5551( (u16*)dest, (u16*)scaledDest, texInfo->realWidth, texInfo->realHeight, texInfo->clampS, texInfo->clampT );
 
-        glTexImage2D( GL_TEXTURE_2D, 0, glInternalFormat, texInfo->realWidth << 1, texInfo->realHeight << 1, 0, GL_RGBA, glType, scaledDest );
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, texInfo->realWidth << 1, texInfo->realHeight << 1, 0, GL_RGBA, glType, scaledDest );
 
         free( dest );
         free( scaledDest );
     }
-    else
-    {
-        glTexImage2D( GL_TEXTURE_2D, 0, glInternalFormat, texInfo->realWidth, texInfo->realHeight, 0, GL_RGBA, glType, dest );
-        free( dest );
-    }
+
+    if (OGL.textureMipmap)
+        glGenerateMipmap(GL_TEXTURE_2D);
 }
 
 void TextureCache_Load( CachedTexture *texInfo )
 {
     u32 *dest, *scaledDest;
 
-//    printf("LOAD TEXTURE \n");
-
     u64 *src;
     u16 x, y, i, j, tx, ty, line;
     u16 mirrorSBit, maskSMask, clampSClamp;
     u16 mirrorTBit, maskTMask, clampTClamp;
     GetTexelFunc    GetTexel;
-    GLuint          glInternalFormat;
     GLenum          glType;
 
     if (((imageFormat[texInfo->size][texInfo->format].autoFormat == GL_RGBA8) ||
@@ -581,13 +580,11 @@ void TextureCache_Load( CachedTexture *texInfo )
             else
                 GetTexel = GetCI8IA_RGBA8888;
 
-            glInternalFormat = GL_RGBA8;
             glType = GL_UNSIGNED_BYTE;
         }
         else
         {
             GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
-            glInternalFormat = imageFormat[texInfo->size][texInfo->format].glInternalFormat32;
             glType = imageFormat[texInfo->size][texInfo->format].glType32;
         }
     }
@@ -601,13 +598,11 @@ void TextureCache_Load( CachedTexture *texInfo )
             else
                 GetTexel = GetCI8IA_RGBA4444;
 
-            glInternalFormat = GL_RGBA4;
-            glType = GL_UNSIGNED_SHORT_4_4_4_4_EXT;
+            glType = GL_UNSIGNED_SHORT_4_4_4_4;
         }
         else
         {
             GetTexel = imageFormat[texInfo->size][texInfo->format].Get16;
-            glInternalFormat = imageFormat[texInfo->size][texInfo->format].glInternalFormat16;
             glType = imageFormat[texInfo->size][texInfo->format].glType16;
         }
     }
@@ -655,6 +650,8 @@ void TextureCache_Load( CachedTexture *texInfo )
     if (clampSClamp & 0x8000)
         clampSClamp = 0;
 
+    if (GetTexel == GetNone)
+        printf("[gles2n64]: Trying to retrieve texture data of unknown format \n");
 
     j = 0;
     for (y = 0; y < texInfo->realHeight; y++)
@@ -674,36 +671,40 @@ void TextureCache_Load( CachedTexture *texInfo )
             if (x & mirrorSBit)
                 tx ^= maskSMask;
 
-            if (glInternalFormat == GL_RGBA8)
+            if (glType == GL_UNSIGNED_BYTE)
                 ((u32*)dest)[j++] = GetTexel( src, tx, i, texInfo->palette );
             else
                 ((u16*)dest)[j++] = GetTexel( src, tx, i, texInfo->palette );
         }
     }
 
-    if (cache.enable2xSaI)
+    if (!cache.enable2xSaI)
+    {
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, texInfo->realWidth, texInfo->realHeight, 0, GL_RGBA, glType, dest );
+        free( dest );
+    }
+    else
     {
         texInfo->textureBytes <<= 2;
 
         scaledDest = (u32*)malloc( texInfo->textureBytes );
 
-        if (glInternalFormat == GL_RGBA8)
+        if (glType == GL_UNSIGNED_BYTE)
             _2xSaI8888( (u32*)dest, (u32*)scaledDest, texInfo->realWidth, texInfo->realHeight, 1, 1 );//texInfo->clampS, texInfo->clampT );
-        else if (glInternalFormat == GL_RGBA4)
+        else if (glType == GL_UNSIGNED_SHORT_4_4_4_4)
             _2xSaI4444( (u16*)dest, (u16*)scaledDest, texInfo->realWidth, texInfo->realHeight, 1, 1 );//texInfo->clampS, texInfo->clampT );
         else
             _2xSaI5551( (u16*)dest, (u16*)scaledDest, texInfo->realWidth, texInfo->realHeight, 1, 1 );//texInfo->clampS, texInfo->clampT );
 
-        glTexImage2D( GL_TEXTURE_2D, 0, glInternalFormat, texInfo->realWidth << 1, texInfo->realHeight << 1, 0, GL_RGBA, glType, scaledDest );
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, texInfo->realWidth << 1, texInfo->realHeight << 1, 0, GL_RGBA, glType, scaledDest );
 
         free( dest );
         free( scaledDest );
     }
-    else
-    {
-        glTexImage2D( GL_TEXTURE_2D, 0, glInternalFormat, texInfo->realWidth, texInfo->realHeight, 0, GL_RGBA, glType, dest );
-        free( dest );
-    }
+
+    if (OGL.textureMipmap)
+        glGenerateMipmap(GL_TEXTURE_2D);
+
 }
 
 u32 TextureCache_CalculateCRC( u32 t, u32 width, u32 height )
@@ -739,9 +740,7 @@ u32 TextureCache_CalculateCRC( u32 t, u32 width, u32 height )
 void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
 {
     // If multitexturing, set the appropriate texture
-    glActiveTexture( GL_TEXTURE0_ARB + t );
-
-    // Bind the cached texture
+    glActiveTexture( GL_TEXTURE0 + t );
     glBindTexture( GL_TEXTURE_2D, texture->glName );
 
     // Set filter mode. Almost always bilinear, but check anyways
@@ -757,29 +756,25 @@ void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
     }
 
     // Set clamping modes
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texture->clampS ? GL_CLAMP_TO_EDGE : GL_REPEAT );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texture->clampT ? GL_CLAMP_TO_EDGE : GL_REPEAT );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, (texture->clampS) ? GL_CLAMP_TO_EDGE : GL_REPEAT );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, (texture->clampT) ? GL_CLAMP_TO_EDGE : GL_REPEAT );
+
+    if (OGL.enableAnisotropicFiltering)
+    {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, OGL.maxAnisotropy);
+    }
 
     texture->lastDList = RSP.DList;
-
     TextureCache_MoveToTop( texture );
-
     cache.current[t] = texture;
-
-    glTexGen2fN64(GL_CACHESHIFTSCALE_N64, cache.current[t]->shiftScaleS, cache.current[t]->shiftScaleT);
-    glTexGen2fN64(GL_CACHESCALE_N64, cache.current[t]->scaleS, cache.current[t]->scaleT);
-    glTexGen2fN64(GL_CACHEOFFSET_N64, cache.current[t]->offsetS, cache.current[t]->offsetT);
 }
 
-void TextureCache_ActivateDummy( u32 t )
+void TextureCache_ActivateDummy( u32 t)
 {
-//TextureCache_ActivateTexture( t, cache.dummy );
-    glActiveTexture( GL_TEXTURE0 + t );
-
-    glBindTexture( GL_TEXTURE_2D, cache.dummy->glName );
-
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+    glActiveTexture(GL_TEXTURE0 + t);
+    glBindTexture(GL_TEXTURE_2D, cache.dummy->glName );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
 void TextureCache_UpdateBackground()

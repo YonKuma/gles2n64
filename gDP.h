@@ -4,15 +4,19 @@
 #include "Types.h"
 #include "FrameBuffer.h"
 
-#define CHANGED_RENDERMODE      0x001
-#define CHANGED_CYCLETYPE       0x002
-#define CHANGED_SCISSOR         0x004
-#define CHANGED_TMEM            0x008
-#define CHANGED_TILE            0x010
-#define CHANGED_COMBINE_COLORS  0x020
-#define CHANGED_COMBINE         0x040
-#define CHANGED_ALPHACOMPARE    0x080
-#define CHANGED_FOGCOLOR        0x100
+#define CHANGED_RENDERMODE      0x0001
+#define CHANGED_CYCLETYPE       0x0002
+#define CHANGED_SCISSOR         0x0004
+#define CHANGED_TMEM            0x0008
+#define CHANGED_TILE            0x0010
+#define CHANGED_COMBINE_COLORS  0x0020
+#define CHANGED_COMBINE         0x0040
+#define CHANGED_ALPHACOMPARE    0x0080
+#define CHANGED_FOGCOLOR        0x0100
+#define CHANGED_DEPTHSOURCE     0x0200
+#define CHANGED_PRIMITIVEZ      0x0400
+#define CHANGED_ENV_COLOR       0x0800
+#define CHANGED_PRIM_COLOR      0x1000
 
 #define TEXTUREMODE_NORMAL      0
 #define TEXTUREMODE_TEXRECT     1
@@ -131,7 +135,7 @@ struct gDPInfo
                 unsigned int blendMask : 4;
                 unsigned int alphaDither : 2;
                 unsigned int colorDither : 2;
-                
+
                 unsigned int combineKey : 1;
                 unsigned int textureConvert : 3;
                 unsigned int textureFilter : 2;

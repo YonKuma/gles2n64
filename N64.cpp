@@ -1,8 +1,4 @@
-#ifdef WIN32
-# include <windows.h>
-#else
-# include "winlnxdefs.h"
-#endif // __LINUX__
+#include "winlnxdefs.h"
 #include "N64.h"
 #include "Types.h"
 

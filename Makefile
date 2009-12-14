@@ -22,15 +22,17 @@
 
 ARCH = ARM
 OS = LINUX
+#ARCH = X86
+#OS = WIN32
 
-SO_EXTENSION = so
-CXX = 	C:/CS2007q3/bin/arm-none-linux-gnueabi-g++
-LD = 	C:/CS2007q3/bin/arm-none-linux-gnueabi-g++
-
-CFLAGS = -I./
-CFLAGS += -I./wes
+CFLAGS  = -Wall -pipe -O3
+LDFLAGS =
 
 ifeq ($(ARCH), X86)
+
+SO_EXTENSION = dll
+CXX = C:/MinGW/bin/g++
+LD = C:/MinGW/bin/g++
 CFLAGS += -IC:/MinGW/include
 CFLAGS += -IC:/MinGW/include/SDL
 CFLAGS += -IC:/MinGW/include/PVR
@@ -38,48 +40,55 @@ CFLAGS += -IC:/MinGW/include/libpng12
 
 else
 
+COMPILER_DIR = C:/CS2009q3
+SO_EXTENSION = so
+CXX = 	$(COMPILER_DIR)/bin/arm-none-linux-gnueabi-g++
+LD = 	$(COMPILER_DIR)/bin/arm-none-linux-gnueabi-g++
 INCLUDE	= C:/Users/jim/Desktop/Lachlan/Pandora/pnd_libs_081117/include
-#CFLAGS	+= -IC:/CS2007q3/include/PVR
 CFLAGS 	+= -I$(INCLUDE)/libpng12
 CFLAGS 	+= -I$(INCLUDE)/SDL
 CFLAGS	+= -I$(INCLUDE)
-CFLAGS 	+= -IC:/CS2007q3/arm-none-linux-gnueabi/libc/lib
-#LDFLAGS += -LG:/Pandora/lib_rev2
-#LDFLAGS += -LG:/Pandora/lib
+CFLAGS 	+= -I$(COMPILER_DIR)/arm-none-linux-gnueabi/libc/lib
+CFLAGS  += -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp -ffast-math \
+		  -fsingle-precision-constant  -ftree-vectorize -funroll-loops \
+		  -fexpensive-optimizations -fomit-frame-pointer
+
+CFLAGS  += -findirect-inlining
+CFLAGS  += -ftree-switch-conversion
+CFLAGS  += -floop-interchange -floop-strip-mine -floop-block
+
+CFLAGS  += -D__NEON_OPT -D__VEC4_OPT -D__PACKVERTEX_OPT
 endif
 
 ifeq ($(OS), LINUX)
-CFLAGS += -Wall -D__LINUX__ -fPIC -D__NEON_OPT -D__VEC4_OPT -D__VSH_OPT
-LDFLAGS += C:/Users/jim/Desktop/Lachlan/Pandora/lib_rev2/libEGL.so 
+CFLAGS += -Wall -D__LINUX__ -fPIC
+LDFLAGS += -LC:/Users/jim/Desktop/Lachlan/Pandora/lib
+LDFLAGS += -lEGL -lGLESv2 -lsrv_um -lSDL-1.2 -lpng12 -lz -lIMGegl
 else
 CFLAGS += -Wall
 LDFLAGS +=  -LC:/MinGW/lib/PVR -lSDLmain -lSDL -lpng -lGLESv2
 endif
 
-CFLAGS  += -O2 -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp -ffast-math \
-		  -fsingle-precision-constant -save-temps -fomit-frame-pointer -fno-tree-vectorize
+#CFLAGS += -save-temps
+CFLAGS += -DPROFILE_GBI
 
-#CFLAGS += -DPROFILE_GBI
-
-OBJECTS = Config_nogui.o
-OBJECTS += ./wes/wes_matrix.o ./wes/wes_begin.o ./wes/wes_fragment.o ./wes/wes_shader.o ./wes/wes_state.o ./wes/wes_texture.o ./wes/wes.o
+OBJECTS =
 
 # list of object files to generate
-OBJECTS += glN64.o \
+OBJECTS = Config.o \
+    gles2N64.o \
 	OpenGL.o \
 	N64.o \
 	RSP.o \
 	VI.o \
 	Textures.o \
-	Combiner.o \
+	ShaderCombiner.o \
 	gDP.o \
 	gSP.o \
 	GBI.o \
 	DepthBuffer.o \
 	CRC.o \
 	2xSAI.o \
-	texture_env.o \
-	texture_env_combine.o \
 	RDP.o \
 	F3D.o \
 	F3DEX.o \
@@ -97,7 +106,7 @@ OBJECTS += glN64.o \
 all: gles2n64.$(SO_EXTENSION)
 
 clean:
-	del -f *.o ".\wes\*.o" *.$(SO_EXTENSION) ui_gln64config.*
+	del -f *.o *.s *.ii *.$(SO_EXTENSION) ui_gln64config.*
 
 # build rules
 .cpp.o:
@@ -110,9 +119,9 @@ ui_gln64config.h: gln64config.ui
 	$(UIC) $< -o $@
 
 gles2n64.$(SO_EXTENSION): $(OBJECTS)
-	$(CXX) $^ $(LDFLAGS) $(ASM_LDFLAGS) $(PLUGIN_LDFLAGS) $(SDL_LIBS) $(LIBGL_LIBS) -shared -o $@
+	$(CXX) $^ $(LDFLAGS) $(SDL_LIBS) $(LIBGL_LIBS) -shared -o $@
 
-glN64.o: glN64.cpp
+gles2n64.o: gles2N64.cpp
 	$(CXX) $(CFLAGS) $(SDL_FLAGS) -DMAINDEF -c -o $@ $<
 
 Config_qt4.o: Config_qt4.cpp ui_gln64config.h

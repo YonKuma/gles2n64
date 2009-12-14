@@ -1,8 +1,12 @@
 #ifndef OPENGL_H
 #define OPENGL_H
 
-# include "winlnxdefs.h"
-# include "SDL.h"
+#include <EGL/egl.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+#include <GLES2/gl2extimg.h>
+#include "winlnxdefs.h"
+#include "SDL.h"
 
 #include "gSP.h"
 
@@ -35,51 +39,29 @@ struct GLInfo
     SDL_Surface *hScreen;
 #endif
 
-    DWORD   fullscreenWidth, fullscreenHeight, fullscreenBits, fullscreenRefresh;
-    DWORD   width, height, windowedWidth, windowedHeight;
+    int     screenWidth, screenHeight;
+    int     width, height;
     int     xpos, ypos;
-
+    int     centre;
     int     frameSkip, vSync, frame;
     int     logFrameRate;
-    int     highpIntermediates;
-    int     textureHack;        //makes texture show for banjo kazooie / RR64.
-    int     alphaHack;          //makes alpha set properly in most games.
+    int     enableFog;
     int     enableLighting;
     int     enableAlphaTest;
-    int     combinerCompiler;
+    int     enableClipping;
+    int     accurateRDP;
+    int     fullscreen, forceBilinear;
+    int     enable2xSaI;
+    int     enableAnisotropicFiltering;
+    int     maxAnisotropy;
+    int     textureBitDepth;
+    int     textureMipmap;
 
-    BOOL    fullscreen, forceBilinear, fog;
 
     float   scaleX, scaleY;
-
-    BOOL    ATI_texture_env_combine3;   // Radeon
-    BOOL    ATIX_texture_env_route;     // Radeon
-
-    BOOL    ARB_multitexture;           // TNT, GeForce, Rage 128, Radeon
-    BOOL    ARB_texture_env_combine;    // GeForce, Rage 128, Radeon
-    BOOL    ARB_texture_env_crossbar;   // Radeon (GeForce supports it, but doesn't report it)
-
-    BOOL    EXT_fog_coord;              // TNT, GeForce, Rage 128, Radeon
-    BOOL    EXT_texture_env_combine;    // TNT, GeForce, Rage 128, Radeon
-    BOOL    EXT_secondary_color;        // GeForce, Radeon
-
-    BOOL    NV_texture_env_combine4;    // TNT, GeForce
-    BOOL    NV_register_combiners;      // GeForce
-    BOOL    ARB_buffer_region;
-    BOOL    ARB_pbuffer;
-    BOOL    ARB_render_texture;
-    BOOL    ARB_pixel_format;
-
-    GLint   maxTextureUnits;            // TNT = 2, GeForce = 2-4, Rage 128 = 2, Radeon = 3-6
-    GLint   maxGeneralCombiners;
-
-    BOOL    enable2xSaI;
-    BOOL    enableAnisotropicFiltering;
-    int     textureBitDepth;
-
     GLubyte elements[255];
     int     numElements;
-    uint32_t    renderState;
+    unsigned int    renderState;
 
     GLVertex rect[4];
 
@@ -118,11 +100,9 @@ void OGL_ClearColorBuffer(float *color);
 void OGL_ResizeWindow();
 void OGL_SaveScreenshot();
 void OGL_SwapBuffers();
-void OGL_ReadScreen( void **dest, int *width, int *height );
+void OGL_ReadScreen( void *dest, int *width, int *height );
 
 int  OGL_CheckError();
-void OGL_SetArrays();
-void OGL_SetColors();
-void OGL_SetTextureArrays();
+int  OGL_IsExtSupported( const char *extension );
 #endif
 

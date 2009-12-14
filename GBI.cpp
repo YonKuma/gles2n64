@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include "glN64.h"
+#include "gles2N64.h"
 #include "GBI.h"
 #include "RDP.h"
 #include "RSP.h"
