@@ -7,6 +7,9 @@
 #include "gSP.h"
 #include "gDP.h"
 #include "GBI.h"
+#include "OpenGL.h"
+#include "DepthBuffer.h"
+#include "gSPFunc.h"
 
 void F3D_SPNoOp( u32 w0, u32 w1 )
 {
@@ -114,12 +117,65 @@ void F3D_Sprite2D_Base( u32 w0, u32 w1 )
     RSP.PC[RSP.PCi] += 8;
 }
 
+
+inline bool __isclipped(const u32 v0, const u32 v1, const u32 v2)
+{
+    if (!OGL.enableClipping) return 0;
+
+    SPVertex * sv0 = &gSP.vertices[v0];
+    SPVertex * sv1 = &gSP.vertices[v1];
+    SPVertex * sv2 = &gSP.vertices[v2];
+
+    if  (sv0->xClip != 0)
+    {
+         if ((sv0->xClip == sv1->xClip) && (sv1->xClip == sv2->xClip)) return 1;
+    }
+
+    if  (sv0->yClip != 0)
+    {
+         if ((sv0->yClip == sv1->yClip) && (sv1->yClip == sv2->yClip)) return 1;
+    }
+
+    if  (sv0->zClip != 0)
+    {
+         if ((sv0->zClip == sv1->zClip) && (sv1->zClip == sv2->zClip)) return 1;
+    }
+
+    return 0;
+}
+
 void F3D_Tri1( u32 w0, u32 w1 )
 {
+#if 1
+    u32 v0 = _SHIFTR( w1, 16, 8 );
+    u32 v1 = _SHIFTR( w1, 8, 8 );
+    u32 v2 = _SHIFTR( w1, 0, 8 );
+
+#if 1
+    //doesn't use umull = faster.
+    v0 = ((v0 << 12) * 410) >> 24;
+    v1 = ((v1 << 12) * 410) >> 24;
+    v2 = ((v2 << 12) * 410) >> 24;
+#else
+    v0 /= 10;
+    v1 /= 10;
+    v2 /= 10;
+#endif
+
+    if (!__isclipped(v0,v1,v2)) OGL_AddTriangle(v0, v1, v2);
+
+    if ((RSP.nextCmd != G_TRI1) && (RSP.nextCmd != G_TRI2) &&
+        (RSP.nextCmd != G_TRI4) && (RSP.nextCmd != G_QUAD))
+    {
+        OGL_DrawTriangles();
+    }
+
+#else
     gSP1Triangle( _SHIFTR( w1, 16, 8 ) / 10,
                   _SHIFTR( w1, 8, 8 ) / 10,
                   _SHIFTR( w1, 0, 8 ) / 10,
                   _SHIFTR( w1, 24, 8 ) );
+#endif
 }
 
 void F3D_CullDL( u32 w0, u32 w1 )

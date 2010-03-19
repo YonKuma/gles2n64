@@ -13,8 +13,9 @@
 #include "convert.h"
 #include "S2DEX.h"
 #include "VI.h"
-#include "DepthBuffer.h"
 #include <stdlib.h>
+#include "gSPFunc.h"
+
 
 # ifndef min
 #  define min(a,b) ((a) < (b) ? (a) : (b))
@@ -30,14 +31,6 @@ extern char uc_str[256];
 
 void gSPCombineMatrices();
 
-
-#define gSPFlushTriangles() \
-    if ((OGL.numElements > 0) && \
-        (RSP.nextCmd != G_TRI1) && \
-        (RSP.nextCmd != G_TRI2) && \
-        (RSP.nextCmd != G_TRI4) && \
-        (RSP.nextCmd != G_QUAD))\
-        OGL_DrawTriangles()
 
 gSPInfo gSP;
 
@@ -608,8 +601,7 @@ void gSPProcessVertex4( u32 v )
 
     gSPTransformVertex4(v, gSP.matrix.combined );
 
-    if (gSP.matrix.billboard)
-        gSPBillboardVertex4(v);
+    if (gSP.matrix.billboard) gSPBillboardVertex4(v);
 
     if (!(gSP.geometryMode & G_ZBUFFER))
     {
@@ -670,8 +662,7 @@ void gSPProcessVertex4( u32 v )
         }
     }
 
-    if (OGL.enableClipping)
-        gSPClipVertex4(v);
+    if (OGL.enableClipping) gSPClipVertex4(v);
 }
 #endif
 
@@ -1164,6 +1155,9 @@ void gSPLookAt( u32 l )
 
 void gSPVertex( u32 v, u32 n, u32 v0 )
 {
+    //flush batched triangles:
+    OGL_DrawTriangles();
+
     u32 address = RSP_SegmentToPhysical( v );
 
     if ((address + sizeof( Vertex ) * n) > RDRAMSize)
@@ -1178,7 +1172,7 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
 
     Vertex *vertex = (Vertex*)&RDRAM[address];
 
-    if ((n + v0) < (80))
+    if ((n + v0) < 80)
     {
         unsigned int i = v0;
 #ifdef __VEC4_OPT
@@ -1189,7 +1183,7 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
                 gSP.vertices[i+j].x = vertex->x;
                 gSP.vertices[i+j].y = vertex->y;
                 gSP.vertices[i+j].z = vertex->z;
-                gSP.vertices[i+j].flag = vertex->flag;
+                //gSP.vertices[i+j].flag = vertex->flag;
                 gSP.vertices[i+j].s = _FIXED2FLOAT( vertex->s, 5 );
                 gSP.vertices[i+j].t = _FIXED2FLOAT( vertex->t, 5 );
                 if (gSP.geometryMode & G_LIGHTING)
@@ -1206,10 +1200,7 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
                 else
                 {
 #ifdef __PACKVERTEX_OPT
-                    gSP.vertices[i+j].r = vertex->color.r;
-                    gSP.vertices[i+j].g = vertex->color.g;
-                    gSP.vertices[i+j].b = vertex->color.b;
-                    gSP.vertices[i+j].a = vertex->color.a;
+                    gSP.vertices[i+j].col = vertex->col;
 #else
                     gSP.vertices[i+j].r = vertex->color.r * 0.0039215689f;
                     gSP.vertices[i+j].g = vertex->color.g * 0.0039215689f;
@@ -1227,7 +1218,7 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
             gSP.vertices[i].x = vertex->x;
             gSP.vertices[i].y = vertex->y;
             gSP.vertices[i].z = vertex->z;
-            gSP.vertices[i].flag = vertex->flag;
+            //gSP.vertices[i].flag = vertex->flag;
             gSP.vertices[i].s = _FIXED2FLOAT( vertex->s, 5 );
             gSP.vertices[i].t = _FIXED2FLOAT( vertex->t, 5 );
             if (gSP.geometryMode & G_LIGHTING)
@@ -1244,10 +1235,7 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
             else
             {
 #ifdef __PACKVERTEX_OPT
-                gSP.vertices[i].r = vertex->color.r;
-                gSP.vertices[i].g = vertex->color.g;
-                gSP.vertices[i].b = vertex->color.b;
-                gSP.vertices[i].a = vertex->color.a;
+                gSP.vertices[i].col = vertex->col;
 #else
                 gSP.vertices[i].r = vertex->color.r * 0.0039215689f;
                 gSP.vertices[i].g = vertex->color.g * 0.0039215689f;
@@ -1292,6 +1280,10 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
 
 void gSPCIVertex( u32 v, u32 n, u32 v0 )
 {
+
+    //flush batched triangles:
+    OGL_DrawTriangles();
+
     u32 address = RSP_SegmentToPhysical( v );
 
     if ((address + sizeof( PDVertex ) * n) > RDRAMSize)
@@ -1407,6 +1399,9 @@ void gSPCIVertex( u32 v, u32 n, u32 v0 )
 
 void gSPDMAVertex( u32 v, u32 n, u32 v0 )
 {
+    //flush batched triangles:
+    OGL_DrawTriangles();
+
     u32 address = gSP.DMAOffsets.vtx + RSP_SegmentToPhysical( v );
 
     if ((address + 10 * n) > RDRAMSize)
@@ -1687,150 +1682,7 @@ void gSPInterpolateVertex( SPVertex *dest, f32 percent, SPVertex *first, SPVerte
     dest->t = first->t + percent * (second->t - first->t);
 }
 
-void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
-{
-    if ((v0 < 80) && (v1 < 80) && (v2 < 80))
-    {
-        // Don't bother with triangles completely outside clipping frustrum
-        if ((OGL.enableClipping) && ((gSP.vertices[v0].xClip != 0) &&
-            (gSP.vertices[v0].xClip == gSP.vertices[v1].xClip) &&
-            (gSP.vertices[v1].xClip == gSP.vertices[v2].xClip)) ||
-           ((gSP.vertices[v0].yClip != 0) &&
-            (gSP.vertices[v0].yClip == gSP.vertices[v1].yClip) &&
-            (gSP.vertices[v1].yClip == gSP.vertices[v2].yClip)) ||
-           ((gSP.vertices[v0].zClip != 0) &&
-            (gSP.vertices[v0].zClip == gSP.vertices[v1].zClip) &&
-            (gSP.vertices[v1].zClip == gSP.vertices[v2].zClip)))
-        {
-            return;
-        }
 
-        // NoN work-around, clips triangles, and draws the clipped-off parts with clamped z
-        if (GBI.current->NoN &&
-            ((gSP.vertices[v0].zClip < 0) ||
-            (gSP.vertices[v1].zClip < 0) ||
-            (gSP.vertices[v2].zClip < 0)))
-        {
-            SPVertex nearVertices[4];
-            SPVertex clippedVertices[4];
-            //s32 numNearTris = 0;
-            //s32 numClippedTris = 0;
-            s32 nearIndex = 0;
-            s32 clippedIndex = 0;
-
-            s32 v[3] = { v0, v1, v2 };
-
-            for (s32 i = 0; i < 3; i++)
-            {
-                s32 j = i + 1;
-                if (j == 3) j = 0;
-
-                if (((gSP.vertices[v[i]].zClip < 0) && (gSP.vertices[v[j]].zClip >= 0)) ||
-                    ((gSP.vertices[v[i]].zClip >= 0) && (gSP.vertices[v[j]].zClip < 0)))
-                {
-                    f32 percent = (-gSP.vertices[v[i]].w - gSP.vertices[v[i]].z) / ((gSP.vertices[v[j]].z - gSP.vertices[v[i]].z) + (gSP.vertices[v[j]].w - gSP.vertices[v[i]].w));
-
-                    gSPInterpolateVertex( &clippedVertices[clippedIndex], percent, &gSP.vertices[v[i]], &gSP.vertices[v[j]] );
-
-                    gSPCopyVertex( &nearVertices[nearIndex], &clippedVertices[clippedIndex] );
-                    nearVertices[nearIndex].z = -nearVertices[nearIndex].w;
-
-                    clippedIndex++;
-                    nearIndex++;
-                }
-
-                if (((gSP.vertices[v[i]].zClip < 0) && (gSP.vertices[v[j]].zClip >= 0)) ||
-                    ((gSP.vertices[v[i]].zClip >= 0) && (gSP.vertices[v[j]].zClip >= 0)))
-                {
-                    gSPCopyVertex( &clippedVertices[clippedIndex], &gSP.vertices[v[j]] );
-                    clippedIndex++;
-                }
-                else
-                {
-                    gSPCopyVertex( &nearVertices[nearIndex], &gSP.vertices[v[j]] );
-                    nearVertices[nearIndex].z = -nearVertices[nearIndex].w;// + 0.00001f;
-                    nearIndex++;
-                }
-            }
-
-            OGL_DrawTriangle( clippedVertices, 0, 1, 2 );
-
-            if (clippedIndex == 4) OGL_DrawTriangle( clippedVertices, 0, 2, 3 );
-
-            //glDisable( GL_POLYGON_OFFSET_FILL );
-
-            //glDepthFunc( GL_GEQUAL );
-
-            OGL_DrawTriangle( nearVertices, 0, 1, 2 );
-            if (nearIndex == 4) OGL_DrawTriangle( nearVertices, 0, 2, 3 );
-
-            if (gDP.otherMode.depthMode == ZMODE_DEC)
-                glEnable( GL_POLYGON_OFFSET_FILL );
-
-            //if (gDP.otherMode.depthCompare)
-            //    glDepthFunc( GL_GEQUAL );
-        }
-        else
-            OGL_AddTriangle(v0, v1, v2);
-    }
-#ifdef DEBUG
-    else
-        DebugMsg( DEBUG_HIGH | DEBUG_ERROR | DEBUG_TRIANGLE, "// Vertex index out of range\n" );
-#endif
-
-    if (depthBuffer.current) depthBuffer.current->cleared = FALSE;
-    gDP.colorImage.changed = TRUE;
-    gDP.colorImage.height = (unsigned int)(max( gDP.colorImage.height, gDP.scissor.lry ));
-}
-
-void gSP1Triangle( s32 v0, s32 v1, s32 v2, s32 flag )
-{
-    gSPTriangle( v0, v1, v2, flag );
-    gSPFlushTriangles();
-
-#ifdef DEBUG
-    DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TRIANGLE, "gSP1Triangle( %i, %i, %i, %i );\n",
-        v0, v1, v2, flag );
-#endif
-}
-
-void gSP2Triangles( s32 v00, s32 v01, s32 v02, s32 flag0,
-                    s32 v10, s32 v11, s32 v12, s32 flag1 )
-{
-    gSPTriangle( v00, v01, v02, flag0 );
-    gSPTriangle( v10, v11, v12, flag1 );
-    gSPFlushTriangles();
-
-#ifdef DEBUG
-    DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TRIANGLE, "gSP2Triangles( %i, %i, %i, %i,\n",
-        v00, v01, v02, flag0 );
-    DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TRIANGLE, "               %i, %i, %i, %i );\n",
-        v10, v11, v12, flag1 );
-#endif
-}
-
-void gSP4Triangles( s32 v00, s32 v01, s32 v02,
-                    s32 v10, s32 v11, s32 v12,
-                    s32 v20, s32 v21, s32 v22,
-                    s32 v30, s32 v31, s32 v32 )
-{
-    gSPTriangle( v00, v01, v02, 0 );
-    gSPTriangle( v10, v11, v12, 0 );
-    gSPTriangle( v20, v21, v22, 0 );
-    gSPTriangle( v30, v31, v32, 0 );
-    gSPFlushTriangles();
-
-#ifdef DEBUG
-    DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TRIANGLE, "gSP4Triangles( %i, %i, %i,\n",
-        v00, v01, v02 );
-    DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TRIANGLE, "               %i, %i, %i,\n",
-        v10, v11, v12 );
-    DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TRIANGLE, "               %i, %i, %i,\n",
-        v20, v21, v22 );
-    DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TRIANGLE, "               %i, %i, %i );\n",
-        v30, v31, v32 );
-#endif
-}
 
 void gSPDMATriangles( u32 tris, u32 n )
 {
@@ -1865,7 +1717,7 @@ void gSPDMATriangles( u32 tris, u32 n )
         gSP.vertices[triangles->v1].t = _FIXED2FLOAT( triangles->t1, 5 );
         gSP.vertices[triangles->v2].s = _FIXED2FLOAT( triangles->s2, 5 );
         gSP.vertices[triangles->v2].t = _FIXED2FLOAT( triangles->t2, 5 );
-        gSPTriangle( triangles->v0, triangles->v1, triangles->v2, 0 );
+        gSPTriangle( triangles->v0, triangles->v1, triangles->v2);
 
         triangles++;
     }
@@ -1880,8 +1732,8 @@ void gSPDMATriangles( u32 tris, u32 n )
 
 void gSP1Quadrangle( s32 v0, s32 v1, s32 v2, s32 v3 )
 {
-    gSPTriangle( v0, v1, v2, 0 );
-    gSPTriangle( v0, v2, v3, 0 );
+    gSPTriangle( v0, v1, v2);
+    gSPTriangle( v0, v2, v3);
     gSPFlushTriangles();
 
 #ifdef DEBUG
@@ -2323,7 +2175,7 @@ void gSPClearGeometryMode( u32 mode )
 
 void gSPLine3D( s32 v0, s32 v1, s32 flag )
 {
-    OGL_DrawLine( gSP.vertices, v0, v1, 1.5f );
+    OGL_DrawLine(v0, v1, 1.5f );
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_UNHANDLED, "gSPLine3D( %i, %i, %i );\n", v0, v1, flag );
@@ -2332,7 +2184,7 @@ void gSPLine3D( s32 v0, s32 v1, s32 flag )
 
 void gSPLineW3D( s32 v0, s32 v1, s32 wd, s32 flag )
 {
-    OGL_DrawLine( gSP.vertices, v0, v1, 1.5f + wd * 0.5f );
+    OGL_DrawLine(v0, v1, 1.5f + wd * 0.5f );
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_UNHANDLED, "gSPLineW3D( %i, %i, %i, %i );\n", v0, v1, wd, flag );
 #endif

@@ -128,7 +128,11 @@ static inline void UnswapCopy( void *src, void *dest, u32 numBytes )
     while (numDWords--)
     {
         u32 dword = *(u32 *)src;
+#ifdef ARM_ASM
+        asm("rev %0, %0" : "+r"(dword)::);
+#else
         dword = ((dword<<24)|((dword<<8)&0x00FF0000)|((dword>>8)&0x0000FF00)|(dword>>24));
+#endif
         *(u32 *)dest = dword;
         dest = (void *)((long)dest+4);
         src  = (void *)((long)src +4);
@@ -156,25 +160,22 @@ static inline void DWordInterleave( void *mem, u32 numDWords )
         tmp = *(int *)((long)mem + 0);
         *(int *)((long)mem + 0) = *(int *)((long)mem + 4);
         *(int *)((long)mem + 4) = tmp;
-
         mem = (void *)((long)mem + 8);
     }
 }
 
 inline void QWordInterleave( void *mem, u32 numDWords )
 {
-    int tmp;
     numDWords >>= 1; // qwords
     while( numDWords-- )
     {
-        tmp = *(int *)((long)mem + 0);
+        int tmp0, tmp1;
+        tmp0 = *(int *)((long)mem + 0);
+        tmp1 = *(int *)((long)mem + 4);
         *(int *)((long)mem + 0) = *(int *)((long)mem + 8);
-        *(int *)((long)mem + 8) = tmp;
-
-        tmp = *(int *)((long)mem + 4);
+        *(int *)((long)mem + 8) = tmp0;
         *(int *)((long)mem + 4) = *(int *)((long)mem + 12);
-        *(int *)((long)mem + 12) = tmp;
-
+        *(int *)((long)mem + 12) = tmp1;
         mem = (void *)((long)mem + 16);
     }
 }
@@ -182,8 +183,8 @@ inline void QWordInterleave( void *mem, u32 numDWords )
 
 inline u32 swapdword( u32 value )
 {
-#if defined(__GNUC__) && !defined(NO_ASM)
-    asm volatile( "bswapl %0" : "+r"(value) );
+#ifdef ARM_ASM
+    asm("rev %0, %0" : "+r"(value)::);
     return value;
 #else
     return ((value & 0xff000000) >> 24) |
@@ -195,10 +196,10 @@ inline u32 swapdword( u32 value )
 
 inline u16 swapword( u16 value )
 {
-#if !defined(__GNUC__) && !defined(NO_ASM)
-    asm volatile("xchgb  %%al, %%ah;" : "+a"(value));
+#ifdef ARM_ASM
+    asm("rev16 %0, %0" : "+r"(value)::);
     return value;
-# else
+#else
     return (value << 8) | (value >> 8);
 #endif
 }
@@ -225,7 +226,7 @@ inline u32 RGBA5551_RGBA8888( u16 color )
 // Just swaps the word
 inline u16 RGBA5551_RGBA5551( u16 color )
 {
-  return swapword( color );
+    return swapword( color );
 }
 
 inline u32 IA88_RGBA8888( u16 color )

@@ -20,6 +20,7 @@
 # include <string.h>
 # include <unistd.h>
 # include <stdlib.h>
+# include "convert.h"
 
 #ifndef __LINUX__
 #elif defined(USE_GTK)
@@ -351,6 +352,7 @@ void
 GBI_ProfileEnd(u32 cmd)
 {
     unsigned int i = 256*GBI.current->type + cmd;
+    GBI.profileNum[i]++;
     GBI.profileTimer[i] += SDL_GetTicks() - GBI.profileTmp;
 }
 
@@ -358,6 +360,7 @@ void
 GBI_ProfileReset()
 {
     memset(GBI.profileTimer, 0, 12 * 256 * sizeof(int));
+    memset(GBI.profileNum, 0, 12 * 256 * sizeof(int));
 }
 
 u32
@@ -366,19 +369,34 @@ GBI_GetFuncTime(u32 ucode, u32 cmd)
     return GBI.profileTimer[ucode*256+cmd];
 }
 
+u32
+GBI_GetFuncNum(u32 ucode, u32 cmd)
+{
+    return GBI.profileNum[ucode*256+cmd];
+}
+
 void
 GBI_ProfilePrint(FILE *file)
 {
     int uc, cmd, total=0;
+
+    for(uc=0;uc<12;uc++)
+    {
+        for(cmd=0;cmd<256;cmd++)
+        {
+            total += GBI_GetFuncTime(uc, cmd);
+        }
+    }
+
+
     for(uc=0;uc<12;uc++)
     {
         for(cmd=0;cmd<256;cmd++)
         {
             unsigned int t = GBI_GetFuncTime(uc, cmd);
-            total+=t;
             if (t != 0)
             {
-                fprintf(file, "%s = %i ms\n",GBI_GetFuncName(uc,cmd), t);
+                fprintf(file, "%s x %i = %i ms (%.2f%%)\n", GBI_GetFuncName(uc,cmd), GBI_GetFuncNum(uc, cmd), t, 100.0f * (float)t / total);
             }
         }
     }

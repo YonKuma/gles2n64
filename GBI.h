@@ -677,6 +677,8 @@ typedef struct
             s8 y;   //g
             s8 x;   //r
         } normal;
+
+        u32 col;
     };
 } Vertex;
 
@@ -736,6 +738,7 @@ struct GBIInfo
 
 #ifdef PROFILE_GBI
     unsigned int profileTimer[256 * 12];
+    unsigned int profileNum[256 * 12];
     unsigned int profileTmp;
 #endif
 };

@@ -22,7 +22,7 @@ HWND        hToolBar;
 HINSTANCE   hInstance;
 #endif // !__LINUX__
 
-char        pluginName[] = "gles2N64 v0.0.2";
+char        pluginName[] = "gles2n64 v0.0.3";
 char        *screenDirectory;
 u32         last_good_ucode = (u32) -1;
 void        (*CheckInterrupts)( void );

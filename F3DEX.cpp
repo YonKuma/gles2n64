@@ -8,6 +8,8 @@
 #include "gSP.h"
 #include "gDP.h"
 #include "GBI.h"
+#include "gSPFunc.h"
+
 
 void F3DEX_Vtx( u32 w0, u32 w1 )
 {
@@ -16,7 +18,7 @@ void F3DEX_Vtx( u32 w0, u32 w1 )
 
 void F3DEX_Tri1( u32 w0, u32 w1 )
 {
-    gSP1Triangle( _SHIFTR( w1, 17, 7 ), _SHIFTR( w1, 9, 7 ), _SHIFTR( w1, 1, 7 ), 0 );
+    gSP1Triangle( _SHIFTR( w1, 17, 7 ), _SHIFTR( w1, 9, 7 ), _SHIFTR( w1, 1, 7 ));
 }
 
 void F3DEX_CullDL( u32 w0, u32 w1 )

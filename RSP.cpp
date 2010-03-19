@@ -132,7 +132,9 @@ void RSP_ProcessDList()
 
     while (!RSP.halt)
     {
-        if ((RSP.PC[RSP.PCi] + 8) > RDRAMSize)
+        u32 pc = RSP.PC[RSP.PCi];
+
+        if ((pc + 8) > RDRAMSize)
         {
 #ifdef DEBUG
             DebugMsg( DEBUG_LOW | DEBUG_ERROR, "ATTEMPTING TO EXECUTE RSP COMMAND AT INVALID RDRAM LOCATION\n" );
@@ -140,12 +142,12 @@ void RSP_ProcessDList()
             break;
         }
 
-        u32 w0 = *(u32*)&RDRAM[RSP.PC[RSP.PCi]];
-        u32 w1 = *(u32*)&RDRAM[RSP.PC[RSP.PCi] + 4];
-        RSP.cmd = _SHIFTR( w0, 24, 8 );
 
+        u32 w0 = *(u32*)&RDRAM[pc];
+        u32 w1 = *(u32*)&RDRAM[pc+4];
+        RSP.nextCmd = _SHIFTR( *(u32*)&RDRAM[pc+8], 24, 8 );
+        RSP.cmd = _SHIFTR( w0, 24, 8 );
         RSP.PC[RSP.PCi] += 8;
-        RSP.nextCmd = _SHIFTR( *(u32*)&RDRAM[RSP.PC[RSP.PCi]], 24, 8 );
 
 #ifdef PROFILE_GBI
         GBI_ProfileBegin(RSP.cmd);

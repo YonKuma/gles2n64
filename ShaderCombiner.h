@@ -188,9 +188,9 @@
 struct UniformLocation
 {
     struct {GLint loc; int val;} uTex0, uTex1;
-    struct {GLint loc; int val;} uEnableFog, uEnablePrimitiveZ, uTriangleRS;
+    struct {GLint loc; int val;} uEnableFog, uEnablePrimitiveZ;
     struct {GLint loc; float val;} uFogMultiplier, uFogOffset, uPrimitiveZ,
-        uAlphaRef, uPrimLODFrac;
+        uAlphaRef, uPrimLODFrac, uRenderState;
     struct {GLint loc; float val[4];} uEnvColor, uPrimColor, uFogColor;
     struct {GLint loc; float val[2];}  uTexScale, uTexOffset[2], uCacheShiftScale[2],
         uCacheScale[2], uCacheOffset[2];
@@ -236,7 +236,7 @@ extern int              scProgramCount;
 extern void ShaderCombiner_Init();
 extern void ShaderCombiner_Destroy();
 extern void ShaderCombiner_DeleteProgram(ShaderProgram *prog);
-extern void ShaderCombiner_Set(u64 mux);
+extern void ShaderCombiner_Set(u64 mux, int flags=-1);
 extern ShaderProgram *ShaderCombiner_Compile(u64 mux, int flags);
 
 #endif

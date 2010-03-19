@@ -95,6 +95,7 @@ void RDP_FillRect( u32 w0, u32 w1 )
 
 void RDP_SetTile( u32 w0, u32 w1 )
 {
+
     gDPSetTile( _SHIFTR( w0, 21, 3 ),   // fmt
                 _SHIFTR( w0, 19, 2 ),   // siz
                 _SHIFTR( w0,  9, 9 ),   // line

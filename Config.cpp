@@ -62,64 +62,73 @@ void Config_WriteConfig(const char *filename)
         printf("Could Not Open %s for writing\n", filename);
     }
     fprintf(f, "#gles2n64 Graphics Plugin for N64\n");
-    fprintf(f, "#by Lachlan Tychsen-Smith AKA Adventus\n\n");
+    fprintf(f, "#by Orkin / glN64 developers and Adventus               \n\n");
 
-    fprintf(f, "#Screen Width in Pixels\n");
-    fprintf(f, "screen width=%i\n\n", OGL.screenWidth);
+    fprintf(f, "#These values are the physical pixel dimensions of      \n");
+    fprintf(f, "#your screen. They are only used for centering the      \n");
+    fprintf(f, "#window.                                                \n");
 
-    fprintf(f, "#Screen Height in Pixels\n");
-    fprintf(f, "screen height=%i\n\n", OGL.screenHeight);
+    fprintf(f, "screen width=%i\n", OGL.scrWidth);
+    fprintf(f, "screen height=%i\n\n", OGL.scrHeight);
 
-    fprintf(f, "#Window Width in Pixels\n");
-    fprintf(f, "width=%i\n\n", OGL.width);
+    fprintf(f, "#The Window position and dimensions specify how and     \n");
+    fprintf(f, "#where the games will appear on the screen. Enabling    \n");
+    fprintf(f, "#Centre will ensure that the window is centered         \n");
+    fprintf(f, "#within the screen (overriding xpos/ypos).              \n\n");
 
-    fprintf(f, "#Window Height in Pixels\n");
-    fprintf(f, "height=%i\n\n", OGL.height);
+    fprintf(f, "window centre=%i\n", OGL.winCentre);
+    fprintf(f, "window xpos=%i\n", OGL.winXpos);
+    fprintf(f, "window ypos=%i\n", OGL.winYpos);
+    fprintf(f, "window width=%i\n", OGL.winWidth);
+    fprintf(f, "window height=%i\n\n", OGL.winHeight);
 
-    fprintf(f, "#Horizontal Position\n");
-    fprintf(f, "xpos=%i\n\n", OGL.xpos);
+    fprintf(f, "#Enabling offscreen frambuffering allows the resulting  \n");
+    fprintf(f, "#image to be upscaled to the window dimensions. The     \n");
+    fprintf(f, "#framebuffer dimensions specify the resolution which    \n");
+    fprintf(f, "#gles2n64 will render to. Some games are GPU            \n");
+    fprintf(f, "#bottlenecked (ie Banjo Kazooie) and will run           \n");
+    fprintf(f, "#signficantly faster at 400x240 or 320x240. When        \n");
+    fprintf(f, "#offscreen framebuffering is disabled the windows       \n");
+    fprintf(f, "#dimensions are used. Note that if the window and       \n");
+    fprintf(f, "#framebuffer dimensions are the same it is faster to    \n");
+    fprintf(f, "#disable offscreen framebuffering due to the additional \n");
+    fprintf(f, "#copy.                                                  \n\n");
 
-    fprintf(f, "#Vertical Position\n");
-    fprintf(f, "ypos=%i\n\n", OGL.ypos);
+    fprintf(f, "framebuffer enable=%i\n", OGL.fbEnable);
+    fprintf(f, "framebuffer bilinear=%i\n", OGL.fbBilinearScale);
+    fprintf(f, "framebuffer width=%i\n", OGL.fbWidth);
+    fprintf(f, "framebuffer height=%i\n\n", OGL.fbHeight);
 
-    fprintf(f, "#Automatically Centre Screen Position (overrides xpos/ypos)\n");
-    fprintf(f, "centre=%i\n\n", OGL.centre);
+    fprintf(f, "#Frameskipping allows more CPU time be spent on other   \n");
+    fprintf(f, "#tasks than GPU emulation, but at the cost of a lower   \n");
+    fprintf(f, "#framerate. 1=No Frameskip, 2=One Frameskipped, etc     \n\n");
 
-    fprintf(f, "#Enable Frameskip (1=No Frameskip, 2=One Frameskipped, etc)\n");
     fprintf(f, "frame skip=%i\n\n", OGL.frameSkip);
 
     fprintf(f, "#Vertical Sync Divider (0=No VSYNC, 1=60Hz, 2=30Hz, etc)\n");
     fprintf(f, "vertical sync=%i\n\n", OGL.vSync);
 
-    fprintf(f, "#Texture Bit Depth (0=force 16bit, 1=force 32bit, 2=either 16/32bit) \n");
-    fprintf(f, "texture depth=%i\n\n", OGL.textureBitDepth);
+    fprintf(f, "#These options enable different rendering paths, they   \n");
+    fprintf(f, "#can relieve pressure on the GPU / CPU.                 \n\n");
 
-    fprintf(f, "#Texture Mipmaps \n");
-    fprintf(f, "texture mipmap=%i\n\n", OGL.textureMipmap);
+    fprintf(f, "enable fog=%i\n", OGL.enableFog);
+    fprintf(f, "enable primitive z=%i\n", OGL.enablePrimZ);
+    fprintf(f, "enable lighting=%i\n", OGL.enableLighting);
+    fprintf(f, "enable alpha test=%i\n", OGL.enableAlphaTest);
+    fprintf(f, "enable clipping=%i\n", OGL.enableClipping);
+    fprintf(f, "enable face culling=%i\n", OGL.enableFaceCulling);
 
-    fprintf(f, "#Enable Fog\n");
-    fprintf(f, "enable fog=%i\n\n", OGL.enableFog);
+    fprintf(f, "#Texture Bit Depth (0=force 16bit, 1=either 16/32bit, 2=force 32bit) \n");
+    fprintf(f, "texture depth=%i\n", OGL.textureBitDepth);
+    fprintf(f, "texture mipmap=%i\n", OGL.textureMipmap);
+    fprintf(f, "texture 2xSAI=%i\n", OGL.texture2xSaI);
+    fprintf(f, "texture force bilinear=%i\n", OGL.textureForceBilinear);
+    fprintf(f, "texture max anisotropy=%i\n\n", OGL.textureMaxAnisotropy);
 
-    fprintf(f, "#Enable Lighting\n");
-    fprintf(f, "enable lighting=%i\n\n", OGL.enableLighting);
-
-    fprintf(f, "#Enable Alpha Test\n");
-    fprintf(f, "enable alpha test=%i\n\n", OGL.enableAlphaTest);
-
-    fprintf(f, "#Enable Clipping\n");
-    fprintf(f, "enable clipping=%i\n\n", OGL.enableClipping);
-
-    fprintf(f, "#Enable 2xSAI Texture Filter \n");
-    fprintf(f, "enable 2xSAI=%i\n\n", OGL.enable2xSaI);
-
-    fprintf(f, "#Enable Anisotropic Filtering \n");
-    fprintf(f, "enable anisotropic=%i\n\n", OGL.enableAnisotropicFiltering);
-
-    fprintf(f, "#Max Anisotropy \n");
-    fprintf(f, "max anisotropy=%i\n\n", OGL.maxAnisotropy);
-
-    fprintf(f, "#Enable Accurate RDP Clamping (do not enable by default) \n");
-    fprintf(f, "accurate rdp=%i\n\n", OGL.accurateRDP);
+    fprintf(f, "#RDP Clamping Mode (2=Fully Accurate, 1=Hack, 0=Default)\n");
+    fprintf(f, "rdp clamp mode=%i\n\n", OGL.rdpClampMode);
+    fprintf(f, "#Force Depthbuffer clear after Buffer swap \n");
+    fprintf(f, "force depth clear=%i\n\n", OGL.forceDepthClear);
 
     fclose(f);
 }
@@ -139,26 +148,29 @@ void Config_LoadConfig()
         pluginDir = GetPluginDir();
 
     // default configuration
-    OGL.xpos = 0;
-    OGL.ypos = 0;
-    OGL.width = 800;
-    OGL.height = 480;
-    OGL.screenWidth = 800;
-    OGL.screenHeight = 480;
-    OGL.centre = 1;
+    OGL.winCentre = 1;
+    OGL.fbYpos = OGL.fbXpos = OGL.winXpos = OGL.winYpos = 0;
+    OGL.scrWidth = OGL.winWidth = 800;
+    OGL.scrHeight = OGL.winHeight = 480;
+    OGL.fbWidth = 400;
+    OGL.fbHeight = 240;
+    OGL.fbEnable = 0;
+    OGL.fbBilinearScale = 0;
     OGL.frameSkip = 1;
     OGL.vSync = 0;
     OGL.enableLighting = 1;
     OGL.enableAlphaTest = 1;
-    OGL.enableClipping = 0;
+    OGL.enableClipping = 1;
     OGL.enableFog = 0;
-    OGL.accurateRDP = 0;
-    OGL.forceBilinear = 0;
-    OGL.enable2xSaI = 0;
-    OGL.enableAnisotropicFiltering = 0;
-    OGL.maxAnisotropy = 2;
-    OGL.textureBitDepth = 1; // normal (16 & 32 bits)
-    OGL.textureMipmap = 1;
+    OGL.enablePrimZ = 0;
+    OGL.enableFaceCulling = 1;
+    OGL.forceDepthClear = 0;
+    OGL.rdpClampMode = 0;
+    OGL.textureForceBilinear = 0;
+    OGL.textureMaxAnisotropy = 0;
+    OGL.textureBitDepth = 1;
+    OGL.textureMipmap = 0;
+    OGL.texture2xSaI = 0;
     OGL.logFrameRate = 1;
     cache.maxBytes = 32 * 1048576;
 
@@ -168,134 +180,165 @@ void Config_LoadConfig()
     f = fopen( filename, "r" );
     if (!f)
     {
-        fprintf( stdout, "[gles2N64]: (WW) Couldn't open config file '%s' for reading: %s\n", filename, strerror( errno ) );
+        fprintf( stdout, "[gles2N64]: Couldn't open config file '%s' for reading: %s\n", filename, strerror( errno ) );
         fprintf( stdout, "[gles2N64]: Attempting to write new Config \n");
         Config_WriteConfig(filename);
-        return;
     }
     else
     {
         printf("[gles2n64]: Loading Config from %s \n", filename);
+
+        while (!feof( f ))
+        {
+            char *val;
+            fgets( line, 4096, f );
+
+            if (line[0] == '#' || line[0] == '\n')
+                continue;
+
+            val = strchr( line, '=' );
+            if (!val) continue;
+
+            *val++ = '\0';
+
+            if (!strcasecmp( line, "window width" ))
+            {
+                OGL.winWidth = atoi( val );
+            }
+            else if (!strcasecmp( line, "window height" ))
+            {
+                OGL.winHeight = atoi( val );
+            }
+            else if (!strcasecmp( line, "screen width" ))
+            {
+                OGL.scrWidth = atoi( val );
+            }
+            else if (!strcasecmp( line, "screen height" ))
+            {
+                OGL.scrHeight = atoi( val );
+            }
+            else if (!strcasecmp( line, "framebuffer width" ))
+            {
+                OGL.fbWidth = atoi( val );
+            }
+            else if (!strcasecmp( line, "framebuffer height" ))
+            {
+                OGL.fbHeight = atoi( val );
+            }
+            else if (!strcasecmp( line, "window centre" ))
+            {
+                OGL.winCentre = atoi( val );
+            }
+            else if (!strcasecmp( line, "window xpos" ))
+            {
+                OGL.winXpos = atoi(val);
+            }
+            else if (!strcasecmp( line, "window ypos" ))
+            {
+                OGL.winYpos = atoi(val);
+            }
+            else if (!strcasecmp( line, "texture force bilinear" ))
+            {
+                OGL.textureForceBilinear = atoi( val );
+            }
+            else if (!strcasecmp( line, "texture 2xSAI" ))
+            {
+                OGL.texture2xSaI = atoi( val );
+            }
+            else if (!strcasecmp( line, "texture max anisotropy"))
+            {
+                OGL.textureMaxAnisotropy = atoi( val );
+            }
+            else if (!strcasecmp( line, "texture depth" ))
+            {
+                OGL.textureBitDepth = atoi( val );
+            }
+            else if (!strcasecmp( line, "texture mipmap" ))
+            {
+                OGL.textureMipmap = atoi( val );
+            }
+            else if (!strcasecmp( line, "enable fog" ))
+            {
+                OGL.enableFog = atoi( val );
+            }
+            else if (!strcasecmp( line, "enable primitive z" ))
+            {
+                OGL.enablePrimZ = atoi( val );
+            }
+            else if (!strcasecmp( line, "enable clipping" ))
+            {
+                OGL.enableClipping = atoi( val );
+            }
+            else if (!strcasecmp( line, "enable lighting" ))
+            {
+                OGL.enableLighting = atoi( val );
+            }
+            else if (!strcasecmp( line, "enable alpha test" ))
+            {
+                OGL.enableAlphaTest = atoi( val );
+            }
+            else if (!strcasecmp( line, "enable face culling" ))
+            {
+                OGL.enableFaceCulling = atoi( val );
+            }
+            else if (!strcasecmp( line, "cache size" ))
+            {
+                cache.maxBytes = atoi( val ) * 1048576;
+            }
+            else if (!strcasecmp( line, "frame skip" ))
+            {
+                OGL.frameSkip = atoi( val );
+            }
+            else if (!strcasecmp( line, "vertical sync" ))
+            {
+                OGL.vSync = atoi( val );
+            }
+            else if (!strcasecmp( line, "log fps" ))
+            {
+                OGL.logFrameRate = atoi( val );
+            }
+            else if (!strcasecmp( line, "rdp clamp mode" ))
+            {
+                OGL.rdpClampMode = atoi(val);
+            }
+            else if (!strcasecmp( line, "force depth clear" ))
+            {
+                OGL.forceDepthClear = atoi(val);
+            }
+            else if (!strcasecmp( line, "framebuffer enable" ))
+            {
+                OGL.fbEnable = atoi(val);
+            }
+            else if (!strcasecmp( line, "framebuffer bilinear" ))
+            {
+                OGL.fbBilinearScale = atoi(val);
+            }
+            else
+            {
+                printf( "[gles2n64]: Unsupported config option: %s\n", line );
+            }
+        }
     }
 
-    while (!feof( f ))
+    if (OGL.winCentre)
     {
-        char *val;
-        fgets( line, 4096, f );
-
-        if (line[0] == '#' || line[0] == '\n')
-            continue;
-
-        val = strchr( line, '=' );
-        if (!val) continue;
-
-        *val++ = '\0';
-
-        if (!strcasecmp( line, "width" ))
-        {
-            OGL.width = atoi( val );
-        }
-        else if (!strcasecmp( line, "height" ))
-        {
-            OGL.height = atoi( val );
-        }
-        else if (!strcasecmp( line, "screen width" ))
-        {
-            OGL.screenWidth = atoi( val );
-        }
-        else if (!strcasecmp( line, "screen height" ))
-        {
-            OGL.screenHeight = atoi( val );
-        }
-        else if (!strcasecmp( line, "centre" ))
-        {
-            OGL.centre = atoi( val );
-        }
-        else if (!strcasecmp( line, "xpos" ))
-        {
-            OGL.xpos = atoi(val);
-        }
-        else if (!strcasecmp( line, "ypos" ))
-        {
-            OGL.ypos = atoi(val);
-        }
-        else if (!strcasecmp( line, "force bilinear" ))
-        {
-            OGL.forceBilinear = atoi( val );
-        }
-        else if (!strcasecmp( line, "enable 2xSAI" ))
-        {
-            OGL.enable2xSaI = atoi( val );
-        }
-        else if (!strcasecmp( line, "enable anisotropic"))
-        {
-            OGL.enableAnisotropicFiltering = atoi( val );
-        }
-        else if (!strcasecmp( line, "max anisotropy"))
-        {
-            OGL.maxAnisotropy = atoi( val );
-        }
-        else if (!strcasecmp( line, "enable fog" ))
-        {
-            OGL.enableFog = atoi( val );
-        }
-        else if (!strcasecmp( line, "enable clipping" ))
-        {
-            OGL.enableClipping = atoi( val );
-        }
-        else if (!strcasecmp( line, "enable lighting" ))
-        {
-            OGL.enableLighting = atoi( val );
-        }
-        else if (!strcasecmp( line, "enable alpha test" ))
-        {
-            OGL.enableAlphaTest = atoi( val );
-        }
-        else if (!strcasecmp( line, "cache size" ))
-        {
-            cache.maxBytes = atoi( val ) * 1048576;
-        }
-        else if (!strcasecmp( line, "texture depth" ))
-        {
-            OGL.textureBitDepth = atoi( val );
-        }
-        else if (!strcasecmp( line, "texture mipmap" ))
-        {
-            OGL.textureMipmap = atoi( val );
-        }
-        else if (!strcasecmp( line, "frame skip" ))
-        {
-            OGL.frameSkip = atoi( val );
-        }
-        else if (!strcasecmp( line, "vertical sync" ))
-        {
-            OGL.vSync = atoi( val );
-        }
-        else if (!strcasecmp( line, "log fps" ))
-        {
-            OGL.logFrameRate = atoi( val );
-        }
-        else if (!strcasecmp( line, "accurate RDP" ))
-        {
-            OGL.accurateRDP = atoi(val);
-        }
-        else
-        {
-            printf( "[gles2n64]: Unsupported config option: %s\n", line );
-        }
+        OGL.winXpos = (OGL.scrWidth - OGL.winWidth) / 2;
+        OGL.winYpos = (OGL.scrHeight - OGL.winHeight) / 2;
     }
 
-    if (OGL.centre)
+    if (!OGL.fbEnable)
     {
-        OGL.xpos = (OGL.screenWidth - OGL.width) / 2;
-        OGL.ypos = (OGL.screenHeight - OGL.height) / 2;
+        OGL.fbXpos = OGL.winXpos;
+        OGL.fbYpos = OGL.winYpos;
+        OGL.fbWidth = OGL.winWidth;
+        OGL.fbHeight= OGL.winHeight;
     }
 
-    fclose( f );
+    if (f) fclose( f );
 }
 
 void Config_DoConfig(HWND)
 {
-    printf("Please edit the config file gles2n64.conf manually\n");
+    printf("Please edit the config file gles2n64.conf manually.\n");
 }
 

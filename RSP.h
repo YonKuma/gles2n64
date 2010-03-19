@@ -7,7 +7,7 @@
 #include "SDL_thread.h"
 #include "N64.h"
 #include "GBI.h"
-#include "gSP.h"
+//#include "gSP.h"
 #include "Types.h"
 
 #ifndef min

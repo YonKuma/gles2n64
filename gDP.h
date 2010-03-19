@@ -263,7 +263,52 @@ void gDPSetBlendColor( u32 r, u32 g, u32 b, u32 a );
 void gDPSetFogColor( u32 r, u32 g, u32 b, u32 a );
 void gDPSetFillColor( u32 c );
 void gDPSetPrimColor( u32 m, u32 l, u32 r, u32 g, u32 b, u32 a );
-void gDPSetTile( u32 format, u32 size, u32 line, u32 tmem, u32 tile, u32 palette, u32 cmt, u32 cms, u32 maskt, u32 masks, u32 shiftt, u32 shifts );
+
+
+#ifdef INLINE_OPT
+inline void gDPSetTile(u32 format, const u32 size, const u32 line, const u32 tmem, u32 tile,
+                       const u32 palette, const u32 cmt, const u32 cms, const u32 maskt, const u32 masks,
+                       const u32 shiftt, const u32 shifts )
+{
+    if (((size == G_IM_SIZ_4b) || (size == G_IM_SIZ_8b)) && (format == G_IM_FMT_RGBA))
+        format = G_IM_FMT_CI;
+
+    gDP.tiles[tile].format = format;
+    gDP.tiles[tile].size = size;
+    gDP.tiles[tile].line = line;
+    gDP.tiles[tile].tmem = tmem;
+    gDP.tiles[tile].palette = palette;
+    gDP.tiles[tile].cmt = cmt;
+    gDP.tiles[tile].cms = cms;
+    gDP.tiles[tile].maskt = maskt;
+    gDP.tiles[tile].masks = masks;
+    gDP.tiles[tile].shiftt = shiftt;
+    gDP.tiles[tile].shifts = shifts;
+
+    if (!gDP.tiles[tile].masks) gDP.tiles[tile].clamps = 1;
+    if (!gDP.tiles[tile].maskt) gDP.tiles[tile].clampt = 1;
+
+#ifdef DEBUG
+    DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TEXTURE, "gDPSetTile( %s, %s, %i, %i, %i, %i, %s%s, %s%s, %i, %i, %i, %i );\n",
+        ImageFormatText[format],
+        ImageSizeText[size],
+        line,
+        tmem,
+        tile,
+        palette,
+        cmt & G_TX_MIRROR ? "G_TX_MIRROR" : "G_TX_NOMIRROR",
+        cmt & G_TX_CLAMP ? " | G_TX_CLAMP" : "",
+        cms & G_TX_MIRROR ? "G_TX_MIRROR" : "G_TX_NOMIRROR",
+        cms & G_TX_CLAMP ? " | G_TX_CLAMP" : "",
+        maskt,
+        masks,
+        shiftt,
+        shifts );
+#endif
+}
+#endif
+
+
 void gDPSetTileSize( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt );
 void gDPLoadTile( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt );
 void gDPLoadBlock( u32 tile, u32 uls, u32 ult, u32 lrs, u32 dxt );

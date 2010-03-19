@@ -13,12 +13,17 @@
 #define CHANGED_FOGPOSITION     0x20
 #define CHANGED_TEXTURESCALE    0x40
 
+
 struct SPVertex
 {
     f32     x, y, z, w;
     f32     nx, ny, nz, __pad0;
 #ifdef __PACKVERTEX_OPT
-    u8      r, g, b, a;
+    union
+    {
+        struct {u8 r, g, b, a;};
+        u32 col;
+    };
 #else
     f32     r, g, b, a;
 #endif
@@ -120,13 +125,6 @@ void gSPDMADisplayList( u32 dl, u32 n );
 void gSPBranchList( u32 dl );
 void gSPBranchLessZ( u32 branchdl, u32 vtx, f32 zval );
 void gSPSprite2DBase( u32 base );
-void gSP1Triangle( s32 v0, s32 v1, s32 v2, s32 flag );
-void gSP2Triangles( s32 v00, s32 v01, s32 v02, s32 flag0,
-                    s32 v10, s32 v11, s32 v12, s32 flag1 );
-void gSP4Triangles( s32 v00, s32 v01, s32 v02,
-                    s32 v10, s32 v11, s32 v12,
-                    s32 v20, s32 v21, s32 v22,
-                    s32 v30, s32 v31, s32 v32 );
 void gSPDMATriangles( u32 tris, u32 n );
 void gSP1Quadrangle( s32 v0, s32 v1, s32 v2, s32 v4 );
 void gSPCullDisplayList( u32 v0, u32 vn );

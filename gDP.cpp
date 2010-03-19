@@ -255,22 +255,22 @@ void gDPSetCombine( s32 muxs0, s32 muxs1 )
 /*void RSP_UpdateColorImage()
 {
     WORD *colorBuffer = (WORD*)&RDRAM[RDP.colorImage.address];
-    BYTE *frameBuffer = (BYTE*)malloc( OGL.width * OGL.height * 3 );
+    BYTE *frameBuffer = (BYTE*)malloc( OGL.winWidth * OGL.winHeight * 3 );
     BYTE *framePixel;
 
     int x, y, frameX, frameY, i;
 
     glReadBuffer( GL_BACK );
-    glReadPixels( 0, 0, OGL.width - 1, OGL.height - 1, GL_RGB, GL_UNSIGNED_BYTE, frameBuffer );
+    glReadPixels( 0, 0, OGL.winWidth - 1, OGL.winHeight - 1, GL_RGB, GL_UNSIGNED_BYTE, frameBuffer );
 
     i = 0;
     for (y = 0; y < RDP.height; y++)
     {
-        frameY = OGL.height - (y * OGL.scaleY);
+        frameY = OGL.winHeight - (y * OGL.scaleY);
         for (x = 0; x < RDP.width; x++)
         {
             frameX = x * OGL.scaleX;
-            framePixel = &frameBuffer[(OGL.width * frameY + frameX) * 3];
+            framePixel = &frameBuffer[(OGL.winWidth * frameY + frameX) * 3];
             colorBuffer[i^1] =  ((framePixel[0] >> 3) << 11) |
                                 ((framePixel[1] >> 3) <<  6) |
                                 ((framePixel[2] >> 3) <<  1);
@@ -290,7 +290,7 @@ void gDPUpdateColorImage()
         u32 i = 0;
 
         printf("READ PIXELS \n");
-        glReadPixels( OGL.xpos, (int)(OGL.height - gDP.colorImage.height * OGL.scaleY + OGL.ypos), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, frameBuffer );
+        glReadPixels( OGL.winXpos, (int)(OGL.winHeight - gDP.colorImage.height * OGL.scaleY + OGL.winYpos), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, frameBuffer );
 
         for (u32 y = 0; y < gDP.colorImage.height; y++)
         {
@@ -314,7 +314,7 @@ void gDPUpdateColorImage()
         u32 i = 0;
 
         printf("READ PIXELS \n");
-        glReadPixels( 0, (int)(OGL.height - gDP.colorImage.height * OGL.scaleY), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_LUMINANCE, GL_UNSIGNED_BYTE, frameBuffer );
+        glReadPixels( 0, (int)(OGL.winHeight - gDP.colorImage.height * OGL.scaleY), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_LUMINANCE, GL_UNSIGNED_BYTE, frameBuffer );
 
         for (u32 y = 0; y < gDP.colorImage.height; y++)
         {
@@ -483,6 +483,7 @@ void gDPSetPrimColor( u32 m, u32 l, u32 r, u32 g, u32 b, u32 a )
 #endif
 }
 
+#ifndef INLINE_OPT
 void gDPSetTile( u32 format, u32 size, u32 line, u32 tmem, u32 tile, u32 palette, u32 cmt, u32 cms, u32 maskt, u32 masks, u32 shiftt, u32 shifts )
 {
     if (((size == G_IM_SIZ_4b) || (size == G_IM_SIZ_8b)) && (format == G_IM_FMT_RGBA))
@@ -521,7 +522,7 @@ void gDPSetTile( u32 format, u32 size, u32 line, u32 tmem, u32 tile, u32 palette
         shifts );
 #endif
 }
-
+#endif
 
 void gDPSetTileSize( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt )
 {
@@ -761,7 +762,9 @@ void gDPFillRectangle( s32 ulx, s32 uly, s32 lrx, s32 lry )
         }
     }
 
-    OGL_DrawRect( ulx, uly, lrx, lry, (gDP.otherMode.cycleType == G_CYC_FILL) ? &gDP.fillColor.r : &gDP.blendColor.r );
+    //shouldn't this be primitive color?
+    //OGL_DrawRect( ulx, uly, lrx, lry, (gDP.otherMode.cycleType == G_CYC_FILL) ? &gDP.fillColor.r : &gDP.blendColor.r );
+    OGL_DrawRect( ulx, uly, lrx, lry, (gDP.otherMode.cycleType == G_CYC_FILL) ? &gDP.fillColor.r : &gDP.primColor.r);
 
     if (depthBuffer.current) depthBuffer.current->cleared = FALSE;
     gDP.colorImage.changed = TRUE;
@@ -821,20 +824,19 @@ void gDPTextureRectangle( f32 ulx, f32 uly, f32 lrx, f32 lry, s32 tile, f32 s, f
     gDP.texRect.width = (unsigned int)(max( lrs, s ) + dsdx);
     gDP.texRect.height = (unsigned int)(max( lrt, t ) + dtdy);
 
-    if (lrs > s)
+    float tmp;
+    if (lrs < s)
     {
-        if (lrt > t)
-            OGL_DrawTexturedRect( ulx, uly, lrx, lry, s, t, lrs, lrt, (RSP.cmd == G_TEXRECTFLIP) );
-        else
-            OGL_DrawTexturedRect( ulx, lry, lrx, uly, s, lrt, lrs, t, (RSP.cmd == G_TEXRECTFLIP) );
+        tmp = ulx; ulx = lrx; lrx = tmp;
+        tmp = s; s = lrs; lrs = tmp;
     }
-    else
+    if (lrt < t)
     {
-        if (lrt > t)
-            OGL_DrawTexturedRect( lrx, uly, ulx, lry, lrs, t, s, lrt, (RSP.cmd == G_TEXRECTFLIP) );
-        else
-            OGL_DrawTexturedRect( lrx, lry, ulx, uly, lrs, lrt, s, t, (RSP.cmd == G_TEXRECTFLIP) );
+        tmp = uly; uly = lry; lry = tmp;
+        tmp = t; t = lrt; lrt = tmp;
     }
+
+    OGL_DrawTexturedRect( ulx, uly, lrx, lry, s, t, lrs, lrt, (RSP.cmd == G_TEXRECTFLIP));
 
     gSP.textureTile[0] = &gDP.tiles[gSP.texture.tile];
     gSP.textureTile[1] = &gDP.tiles[gSP.texture.tile < 7 ? gSP.texture.tile + 1 : gSP.texture.tile];

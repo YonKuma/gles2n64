@@ -20,10 +20,10 @@
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 # Makefile for glN64 in Mupen64plus.
 
-ARCH = ARM
-OS = LINUX
-#ARCH = X86
-#OS = WIN32
+#ARCH = ARM
+#OS = LINUX
+ARCH = X86
+OS = WIN32
 
 CFLAGS  = -Wall -pipe -O3
 LDFLAGS =
@@ -37,6 +37,7 @@ CFLAGS += -IC:/MinGW/include
 CFLAGS += -IC:/MinGW/include/SDL
 CFLAGS += -IC:/MinGW/include/PVR
 CFLAGS += -IC:/MinGW/include/libpng12
+CFLAGS += -DINLINE_OPT -m32
 
 else
 
@@ -57,12 +58,12 @@ CFLAGS  += -findirect-inlining
 CFLAGS  += -ftree-switch-conversion
 CFLAGS  += -floop-interchange -floop-strip-mine -floop-block
 
-CFLAGS  += -D__NEON_OPT -D__VEC4_OPT -D__PACKVERTEX_OPT
+CFLAGS  += -D__NEON_OPT -D__VEC4_OPT -D__PACKVERTEX_OPT -DARM_ASM -DINLINE_OPT
 endif
 
 ifeq ($(OS), LINUX)
 CFLAGS += -Wall -D__LINUX__ -fPIC
-LDFLAGS += -LC:/Users/jim/Desktop/Lachlan/Pandora/lib
+LDFLAGS += -LC:/Users/jim/Desktop/Lachlan/Pandora/20101302-pandora-xfce/usr/lib
 LDFLAGS += -lEGL -lGLESv2 -lsrv_um -lSDL-1.2 -lpng12 -lz -lIMGegl
 else
 CFLAGS += -Wall
@@ -70,13 +71,13 @@ LDFLAGS +=  -LC:/MinGW/lib/PVR -lSDLmain -lSDL -lpng -lGLESv2
 endif
 
 #CFLAGS += -save-temps
-CFLAGS += -DPROFILE_GBI
+#CFLAGS += -DPROFILE_GBI
 
 OBJECTS =
 
 # list of object files to generate
 OBJECTS = Config.o \
-    gles2N64.o \
+    gles2n64.o \
 	OpenGL.o \
 	N64.o \
 	RSP.o \
