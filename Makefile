@@ -20,10 +20,10 @@
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 # Makefile for glN64 in Mupen64plus.
 
-#ARCH = ARM
-#OS = LINUX
-ARCH = X86
-OS = WIN32
+ARCH = ARM
+OS = LINUX
+#ARCH = X86
+#OS = WIN32
 
 CFLAGS  = -Wall -pipe -O3
 LDFLAGS =
@@ -58,7 +58,8 @@ CFLAGS  += -findirect-inlining
 CFLAGS  += -ftree-switch-conversion
 CFLAGS  += -floop-interchange -floop-strip-mine -floop-block
 
-CFLAGS  += -D__NEON_OPT -D__VEC4_OPT -D__PACKVERTEX_OPT -DARM_ASM -DINLINE_OPT
+CFLAGS  += -D__NEON_OPT -D__VEC4_OPT -DARM_ASM  -DINLINE_OPT
+#CFLAGS += -D__PACKVERTEX_OPT 
 endif
 
 ifeq ($(OS), LINUX)
@@ -70,8 +71,8 @@ CFLAGS += -Wall
 LDFLAGS +=  -LC:/MinGW/lib/PVR -lSDLmain -lSDL -lpng -lGLESv2
 endif
 
-#CFLAGS += -save-temps
 #CFLAGS += -DPROFILE_GBI
+#CFLAGS += -DSHADER_TEST
 
 OBJECTS =
 

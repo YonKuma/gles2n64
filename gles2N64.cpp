@@ -93,6 +93,7 @@ EXPORT BOOL CALL InitiateGFX (GFX_INFO Gfx_Info)
     hWnd = Gfx_Info.hWnd;
 
     Config_LoadConfig();
+
 # ifdef RSPTHREAD
     RSP.thread = NULL;
 # endif
@@ -138,8 +139,8 @@ EXPORT void CALL MoveScreen (int xpos, int ypos)
 
 EXPORT void CALL ProcessDList(void)
 {
-    OGL.frame++;
-    if (OGL.frame % OGL.frameSkip == 0 || OGL.frameSkip == 0)
+    OGL.frame_dl++;
+    if ((OGL.frame_dl % OGL.frameskip) == 0)
     {
 #ifdef RSPTHREAD
         if (RSP.thread)
@@ -205,7 +206,8 @@ EXPORT void CALL RomOpen (void)
 #else
     RSP_Init();
 #endif
-
+    OGL.frame_vsync = 0;
+    OGL.frame_dl = 0;
     OGL_ResizeWindow();
 
 #ifdef DEBUG
@@ -219,6 +221,12 @@ EXPORT void CALL ShowCFB (void)
 
 EXPORT void CALL UpdateScreen (void)
 {
+    OGL.frame_vsync++;
+    if (OGL.enableHalfVBHack && ((OGL.frame_vsync%2) < 1))
+    {
+        return;
+    }
+
 #ifdef RSPTHREAD
     if (RSP.thread)
     {

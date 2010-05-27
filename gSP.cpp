@@ -619,18 +619,33 @@ void gSPProcessVertex4( u32 v )
         }
         else
         {
-            gSP.vertices[v].r = gSP.lights[gSP.numLights].r;
-            gSP.vertices[v].g = gSP.lights[gSP.numLights].g;
-            gSP.vertices[v].b = gSP.lights[gSP.numLights].b;
-            gSP.vertices[v+1].r = gSP.lights[gSP.numLights].r;
-            gSP.vertices[v+1].g = gSP.lights[gSP.numLights].g;
-            gSP.vertices[v+1].b = gSP.lights[gSP.numLights].b;
-            gSP.vertices[v+2].r = gSP.lights[gSP.numLights].r;
-            gSP.vertices[v+2].g = gSP.lights[gSP.numLights].g;
-            gSP.vertices[v+2].b = gSP.lights[gSP.numLights].b;
-            gSP.vertices[v+3].r = gSP.lights[gSP.numLights].r;
-            gSP.vertices[v+3].g = gSP.lights[gSP.numLights].g;
-            gSP.vertices[v+3].b = gSP.lights[gSP.numLights].b;
+#ifdef __PACKVERTEX_OPT
+            gSP.vertices[v].r = 255.0f;
+            gSP.vertices[v].g = 255.0f;
+            gSP.vertices[v].b = 255.0f;
+            gSP.vertices[v+1].r = 255.0f;
+            gSP.vertices[v+1].g = 255.0f;
+            gSP.vertices[v+1].b = 255.0f;
+            gSP.vertices[v+2].r = 255.0f;
+            gSP.vertices[v+2].g = 255.0f;
+            gSP.vertices[v+2].b = 255.0f;
+            gSP.vertices[v+3].r = 255.0f;
+            gSP.vertices[v+3].g = 255.0f;
+            gSP.vertices[v+3].b = 255.0f;
+#else
+            gSP.vertices[v].r = 1.0f;
+            gSP.vertices[v].g = 1.0f;
+            gSP.vertices[v].b = 1.0f;
+            gSP.vertices[v+1].r = 1.0f;
+            gSP.vertices[v+1].g = 1.0f;
+            gSP.vertices[v+1].b = 1.0f;
+            gSP.vertices[v+2].r = 1.0f;
+            gSP.vertices[v+2].g = 1.0f;
+            gSP.vertices[v+2].b = 1.0f;
+            gSP.vertices[v+3].r = 1.0f;
+            gSP.vertices[v+3].g = 1.0f;
+            gSP.vertices[v+3].b = 1.0f;
+#endif
         }
 
         if (gSP.geometryMode & G_TEXTURE_GEN)
@@ -903,9 +918,15 @@ void gSPProcessVertex( u32 v )
         }
         else
         {
-            gSP.vertices[v].r = gSP.lights[gSP.numLights].r;
-            gSP.vertices[v].g = gSP.lights[gSP.numLights].g;
-            gSP.vertices[v].b = gSP.lights[gSP.numLights].b;
+#ifdef __PACKVERTEX_OPT
+            gSP.vertices[v].r = 255.0f;
+            gSP.vertices[v].g = 255.0f;
+            gSP.vertices[v].b = 255.0f;
+#else
+            gSP.vertices[v].r = 1.0f;
+            gSP.vertices[v].g = 1.0f;
+            gSP.vertices[v].b = 1.0f;
+#endif
         }
 
         if (gSP.geometryMode & G_TEXTURE_GEN)
@@ -1200,7 +1221,10 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
                 else
                 {
 #ifdef __PACKVERTEX_OPT
-                    gSP.vertices[i+j].col = vertex->col;
+                    gSP.vertices[i+j].r = vertex->color.r;
+                    gSP.vertices[i+j].g = vertex->color.g;
+                    gSP.vertices[i+j].b = vertex->color.b;
+                    gSP.vertices[i+j].a = vertex->color.a;
 #else
                     gSP.vertices[i+j].r = vertex->color.r * 0.0039215689f;
                     gSP.vertices[i+j].g = vertex->color.g * 0.0039215689f;
@@ -1235,7 +1259,10 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
             else
             {
 #ifdef __PACKVERTEX_OPT
-                gSP.vertices[i].col = vertex->col;
+                gSP.vertices[i].r = vertex->color.r;
+                gSP.vertices[i].g = vertex->color.g;
+                gSP.vertices[i].b = vertex->color.b;
+                gSP.vertices[i].a = vertex->color.a;
 #else
                 gSP.vertices[i].r = vertex->color.r * 0.0039215689f;
                 gSP.vertices[i].g = vertex->color.g * 0.0039215689f;

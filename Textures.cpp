@@ -243,8 +243,8 @@ void TextureCache_Init()
     cache.bottom = NULL;
     cache.numCached = 0;
     cache.cachedBytes = 0;
-    cache.enable2xSaI = OGL.texture2xSaI;
-    cache.bitDepth = OGL.textureBitDepth;
+    cache.enable2xSaI = OGL.texture.SaI2x;
+    cache.bitDepth = OGL.texture.bit_depth;
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glGenTextures( 32, cache.glNoiseNames );
@@ -546,7 +546,7 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
         free( scaledDest );
     }
 
-    if (OGL.textureMipmap)
+    if (OGL.texture.mipmap)
         glGenerateMipmap(GL_TEXTURE_2D);
 }
 
@@ -695,7 +695,7 @@ void TextureCache_Load( CachedTexture *texInfo )
         free( scaledDest );
     }
 
-    if (OGL.textureMipmap)
+    if (OGL.texture.mipmap)
         glGenerateMipmap(GL_TEXTURE_2D);
 
 }
@@ -736,7 +736,7 @@ void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
     glBindTexture( GL_TEXTURE_2D, texture->glName );
 
     // Set filter mode. Almost always bilinear, but check anyways
-    if ((gDP.otherMode.textureFilter == G_TF_BILERP) || (gDP.otherMode.textureFilter == G_TF_AVERAGE) || (OGL.textureForceBilinear))
+    if ((gDP.otherMode.textureFilter == G_TF_BILERP) || (gDP.otherMode.textureFilter == G_TF_AVERAGE) || (OGL.texture.force_bilinear))
     {
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
@@ -751,9 +751,9 @@ void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, (texture->clampS) ? GL_CLAMP_TO_EDGE : GL_REPEAT );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, (texture->clampT) ? GL_CLAMP_TO_EDGE : GL_REPEAT );
 
-    if (OGL.textureMaxAnisotropy > 0)
+    if (OGL.texture.max_anisotropy > 0)
     {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, OGL.textureMaxAnisotropy);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, OGL.texture.max_anisotropy);
     }
 
     texture->lastDList = RSP.DList;
@@ -882,13 +882,13 @@ void TextureCache_Update( u32 t )
     u32 tileWidth, maskWidth, loadWidth, lineWidth, clampWidth, height;
     u32 tileHeight, maskHeight, loadHeight, lineHeight, clampHeight, width;
 
-    if (cache.enable2xSaI != (unsigned int) OGL.texture2xSaI)
+    if (cache.enable2xSaI != (unsigned int) OGL.texture.SaI2x)
     {
         TextureCache_Destroy();
         TextureCache_Init();
     }
 
-    if (cache.bitDepth != (unsigned int)OGL.textureBitDepth)
+    if (cache.bitDepth != (unsigned int)OGL.texture.bit_depth)
     {
         TextureCache_Destroy();
         TextureCache_Init();
@@ -1068,8 +1068,8 @@ void TextureCache_Update( u32 t )
     cache.current[t]->shiftScaleS = 1.0f;
     cache.current[t]->shiftScaleT = 1.0f;
 
-    cache.current[t]->offsetS = OGL.texture2xSaI ? 0.25f : 0.5f;
-    cache.current[t]->offsetT = OGL.texture2xSaI ? 0.25f : 0.5f;
+    cache.current[t]->offsetS = OGL.texture.SaI2x ? 0.25f : 0.5f;
+    cache.current[t]->offsetT = OGL.texture.SaI2x ? 0.25f : 0.5f;
 
     if (gSP.textureTile[t]->shifts > 10)
         cache.current[t]->shiftScaleS = (f32)(1 << (16 - gSP.textureTile[t]->shifts));

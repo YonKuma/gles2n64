@@ -57,6 +57,8 @@ void gDPSetOtherMode( u32 mode0, u32 mode1 )
 
 void gDPSetPrimDepth( u16 z, u16 dz )
 {
+    z = z&0x7FFF;
+
     gDP.primDepth.z = min( 1.0f, max( 0.0f, (_FIXED2FLOAT( z, 15 ) - gSP.viewport.vtrans[2]) / gSP.viewport.vscale[2] ) );
     gDP.primDepth.deltaZ = dz;
     gDP.changed |= CHANGED_PRIMITIVEZ;
@@ -252,105 +254,11 @@ void gDPSetCombine( s32 muxs0, s32 muxs1 )
 #endif
 }
 
-/*void RSP_UpdateColorImage()
-{
-    WORD *colorBuffer = (WORD*)&RDRAM[RDP.colorImage.address];
-    BYTE *frameBuffer = (BYTE*)malloc( OGL.winWidth * OGL.winHeight * 3 );
-    BYTE *framePixel;
-
-    int x, y, frameX, frameY, i;
-
-    glReadBuffer( GL_BACK );
-    glReadPixels( 0, 0, OGL.winWidth - 1, OGL.winHeight - 1, GL_RGB, GL_UNSIGNED_BYTE, frameBuffer );
-
-    i = 0;
-    for (y = 0; y < RDP.height; y++)
-    {
-        frameY = OGL.winHeight - (y * OGL.scaleY);
-        for (x = 0; x < RDP.width; x++)
-        {
-            frameX = x * OGL.scaleX;
-            framePixel = &frameBuffer[(OGL.winWidth * frameY + frameX) * 3];
-            colorBuffer[i^1] =  ((framePixel[0] >> 3) << 11) |
-                                ((framePixel[1] >> 3) <<  6) |
-                                ((framePixel[2] >> 3) <<  1);
-            i++;
-        }
-    }
-    free( frameBuffer );
-}*/
-
-void gDPUpdateColorImage()
-{
-    if ((gDP.colorImage.size == G_IM_SIZ_16b) && (gDP.colorImage.format == G_IM_FMT_RGBA))
-    {
-        u16 *frameBuffer = (u16*)malloc( (unsigned int)(gDP.colorImage.width * OGL.scaleX * gDP.colorImage.height * OGL.scaleY * 2) );
-        u16 *colorImage = (u16*)&RDRAM[gDP.colorImage.address];
-        u32 frameX, frameY;
-        u32 i = 0;
-
-        printf("READ PIXELS \n");
-        glReadPixels( OGL.winXpos, (int)(OGL.winHeight - gDP.colorImage.height * OGL.scaleY + OGL.winYpos), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, frameBuffer );
-
-        for (u32 y = 0; y < gDP.colorImage.height; y++)
-        {
-            frameY = (unsigned int)((gDP.colorImage.height - 1) * OGL.scaleY - y * OGL.scaleY);
-            for (u32 x = 0; x < gDP.colorImage.width; x++)
-            {
-                frameX = (unsigned int)(x * OGL.scaleX);
-                colorImage[i^1] = frameBuffer[(u32)(gDP.colorImage.width * OGL.scaleX) * frameY + frameX];
-
-                i++;
-            }
-        }
-
-        free( frameBuffer );
-    }
-    else if ((gDP.colorImage.size == G_IM_SIZ_8b) && (gDP.colorImage.format == G_IM_FMT_I))
-    {
-        u8 *frameBuffer = (u8*)malloc( (unsigned int)(gDP.colorImage.width * OGL.scaleX * gDP.colorImage.height * OGL.scaleY) );
-        u8 *colorImage = (u8*)&RDRAM[gDP.colorImage.address];
-        u32 frameX, frameY;
-        u32 i = 0;
-
-        printf("READ PIXELS \n");
-        glReadPixels( 0, (int)(OGL.winHeight - gDP.colorImage.height * OGL.scaleY), (int)(gDP.colorImage.width * OGL.scaleX), (int)(gDP.colorImage.height * OGL.scaleY), GL_LUMINANCE, GL_UNSIGNED_BYTE, frameBuffer );
-
-        for (u32 y = 0; y < gDP.colorImage.height; y++)
-        {
-            frameY = (unsigned int)((gDP.colorImage.height - 1) * OGL.scaleY - y * OGL.scaleY);
-            for (u32 x = 0; x < gDP.colorImage.width; x++)
-            {
-                frameX = (unsigned int)(x * OGL.scaleX);
-                colorImage[i^3] = frameBuffer[(u32)(gDP.colorImage.width * OGL.scaleX) * frameY + frameX];
-
-                i++;
-            }
-        }
-
-        free( frameBuffer );
-    }
-}
-
 void gDPSetColorImage( u32 format, u32 size, u32 width, u32 address )
 {
-/*  if (gDP.colorImage.changed &&
-//      (gDP.colorImage.address != gDP.depthImageAddress) &&
-        (gDP.colorImage.address != RSP_SegmentToPhysical( address )))
-    {
-        gDPUpdateColorImage();
-        OGL_ClearDepthBuffer();
-        gDP.colorImage.changed = FALSE;
-        gDP.colorImage.height = 1;
-    }*/
+    u32 addr = RSP_SegmentToPhysical( address );
 
-/*  for (int i = 0; i < (gDP.colorImage.width * gDP.colorImage.height ) << gDP.colorImage.size >> 1; i++)
-    {
-        RDRAM[gDP.colorImage.address + i] = 0;
-    }*/
-    address = RSP_SegmentToPhysical( address );
-
-    if (gDP.colorImage.address != address)
+    if (gDP.colorImage.address != addr)
     {
         gDP.colorImage.changed = FALSE;
 
@@ -363,7 +271,8 @@ void gDPSetColorImage( u32 format, u32 size, u32 width, u32 address )
     gDP.colorImage.format = format;
     gDP.colorImage.size = size;
     gDP.colorImage.width = width;
-    gDP.colorImage.address = RSP_SegmentToPhysical( address );
+    gDP.colorImage.address = addr;
+    //gDP.colorImage.address = RSP_SegmentToPhysical( address );
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gDPSetColorImage( %s, %s, %i, 0x%08X );\n",
@@ -813,10 +722,21 @@ void gDPTextureRectangle( f32 ulx, f32 uly, f32 lrx, f32 lry, s32 tile, f32 s, f
     }
 
     gSP.textureTile[0] = &gDP.tiles[tile];
-    gSP.textureTile[1] = &gDP.tiles[tile < 7 ? (tile + 1) : tile];
+    gSP.textureTile[1] = &gDP.tiles[(tile < 7) ? (tile + 1) : tile];
 
-    f32 lrs = s + (lrx - ulx - 1) * dsdx;
-    f32 lrt = t + (lry - uly - 1) * dtdy;
+
+    f32 lrs;
+    f32 lrt;
+    if (RSP.cmd == G_TEXRECTFLIP)
+    {
+        lrs = s + (lry - uly - 1) * dtdy;
+        lrt = t + (lrx - ulx - 1) * dsdx;
+    }
+    else
+    {
+        lrs = s + (lrx - ulx - 1) * dsdx;
+        lrt = t + (lry - uly - 1) * dtdy;
+    }
 
     if (gDP.textureMode == TEXTUREMODE_NORMAL)
         gDP.textureMode = TEXTUREMODE_TEXRECT;
@@ -839,7 +759,7 @@ void gDPTextureRectangle( f32 ulx, f32 uly, f32 lrx, f32 lry, s32 tile, f32 s, f
     OGL_DrawTexturedRect( ulx, uly, lrx, lry, s, t, lrs, lrt, (RSP.cmd == G_TEXRECTFLIP));
 
     gSP.textureTile[0] = &gDP.tiles[gSP.texture.tile];
-    gSP.textureTile[1] = &gDP.tiles[gSP.texture.tile < 7 ? gSP.texture.tile + 1 : gSP.texture.tile];
+    gSP.textureTile[1] = &gDP.tiles[(gSP.texture.tile < 7) ? (gSP.texture.tile + 1) : gSP.texture.tile];
 
     if (depthBuffer.current) depthBuffer.current->cleared = FALSE;
     gDP.colorImage.changed = TRUE;
@@ -853,8 +773,9 @@ void gDPTextureRectangle( f32 ulx, f32 uly, f32 lrx, f32 lry, s32 tile, f32 s, f
 
 void gDPTextureRectangleFlip( f32 ulx, f32 uly, f32 lrx, f32 lry, s32 tile, f32 s, f32 t, f32 dsdx, f32 dtdy )
 {
-    gDPTextureRectangle( ulx, uly, lrx, lry, tile, s + (lrx - ulx) * dsdx, t + (lry - uly) * dtdy, -dsdx, -dtdy );
+    //gDPTextureRectangle( ulx, uly, lrx, lry, tile, s + (lrx - ulx) * dsdx, t + (lry - uly) * dtdy, -dsdx, -dtdy );
 
+    gDPTextureRectangle( ulx, uly, lrx, lry, tile, s, t, dsdx, dtdy );
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gDPTextureRectangleFlip( %f, %f, %f, %f, %i, %i, %f, %f, %f, %f );\n",
         ulx, uly, lrx, lry, tile, s, t, dsdx, dtdy );

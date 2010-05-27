@@ -49,27 +49,48 @@ struct GLInfo
 #ifdef WIN32
     SDL_Surface *hScreen;
 #endif
-    EGLint		            eglVersionMajor, eglVersionMinor;
-    EGLDisplay              eglDisplay;
-    EGLContext              eglContext;
-    EGLConfig               eglConfig;
-    EGLSurface              eglSurface;
-    EGLNativeDisplayType    eglDevice;
-    EGLNativeWindowType     eglHandle;
 
+    struct
+    {
+        EGLint		            version_major, version_minor;
+        EGLDisplay              display;
+        EGLContext              context;
+        EGLConfig               config;
+        EGLSurface              surface;
+        EGLNativeDisplayType    device;
+        EGLNativeWindowType     handle;
+    } EGL;
 
-    int     scrWidth, scrHeight;
-    int     winWidth, winHeight, winXpos, winYpos, winCentre;
-    int     fbEnable, fbBilinearScale;
-    int     fbWidth, fbHeight, fbXpos, fbYpos;
+    int     updateMode;
 
-    int     textureMaxAnisotropy;
-    int     textureBitDepth;
-    int     textureMipmap;
-    int     textureForceBilinear;
-    int     texture2xSaI;
+    struct
+    {
+        int width, height;
+    } screen;
 
-    int     frameSkip, vSync, frame;
+    struct
+    {
+        int centre, xpos, ypos, width, height;
+    } window;
+
+    struct
+    {
+        GLuint fb,depth_buffer, color_buffer;
+        int enable, bilinear;
+        int xpos, ypos, width, height;
+    } framebuffer;
+
+    struct
+    {
+        int     max_anisotropy;
+        int     bit_depth;
+        int     mipmap;
+        int     force_bilinear;
+        int     SaI2x;
+    } texture;
+
+    int     frameskip, vsync;
+    int     frame_vsync, frame_actual, frame_dl;
     int     logFrameRate;
     int     enableFog;
     int     enablePrimZ;
@@ -77,11 +98,10 @@ struct GLInfo
     int     enableAlphaTest;
     int     enableClipping;
     int     enableFaceCulling;
+    int     enableHalfVBHack;
     int     forceDepthClear;
     int     rdpClampMode;
 
-    GLuint  frameBuffer;
-    GLuint  fbDepthBuffer, fbColorBuffer;
 
     GLint   defaultProgram;
     GLint   defaultVertShader;

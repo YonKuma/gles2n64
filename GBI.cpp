@@ -375,7 +375,7 @@ GBI_GetFuncNum(u32 ucode, u32 cmd)
     return GBI.profileNum[ucode*256+cmd];
 }
 
-void
+u32
 GBI_ProfilePrint(FILE *file)
 {
     int uc, cmd, total=0;
@@ -400,7 +400,7 @@ GBI_ProfilePrint(FILE *file)
             }
         }
     }
-    fprintf(file, "TOTAL TIME = %i ms\n", total);
+    return total;
 }
 
 const char*

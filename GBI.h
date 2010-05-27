@@ -677,8 +677,6 @@ typedef struct
             s8 y;   //g
             s8 x;   //r
         } normal;
-
-        u32 col;
     };
 } Vertex;
 
@@ -751,7 +749,7 @@ void GBI_ProfileReset();
 void GBI_ProfileInit();
 void GBI_ProfileBegin(u32 cmd);
 void GBI_ProfileEnd(u32 cmd);
-void GBI_ProfilePrint(FILE *file);
+u32  GBI_ProfilePrint(FILE *file);
 const char* GBI_GetFuncName(u32 ucode, u32 cmd);
 u32  GBI_GetFuncTime(u32 ucode, u32 cmd);
 #endif

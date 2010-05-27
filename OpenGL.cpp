@@ -156,14 +156,14 @@ void OGL_InitStates()
     glDepthMask(GL_FALSE);
     glEnable(GL_SCISSOR_TEST);
     glDepthRangef(1.0f, 0.0f);
-    glViewport(OGL.fbXpos, OGL.fbYpos, OGL.fbWidth, OGL.fbHeight);
+    glViewport(OGL.framebuffer.xpos, OGL.framebuffer.ypos, OGL.framebuffer.width, OGL.framebuffer.height);
     OGL_SwapBuffers();
 }
 
 void OGL_UpdateScale()
 {
-    OGL.scaleX = (float)OGL.fbWidth / (float)VI.width;
-    OGL.scaleY = (float)OGL.fbHeight / (float)VI.height;
+    OGL.scaleX = (float)OGL.framebuffer.width / (float)VI.width;
+    OGL.scaleY = (float)OGL.framebuffer.height / (float)VI.height;
 }
 
 void OGL_ResizeWindow()
@@ -212,26 +212,29 @@ bool OGL_Start()
 	SDL_SysWMinfo info;
 	SDL_VERSION(&info.version);
 	SDL_GetWMInfo(&info);
-	OGL.eglHandle = (EGLNativeWindowType) info.window;
-	OGL.eglDevice = GetDC(OGL.eglHandle);
+	OGL.EGL.handle = (EGLNativeWindowType) info.window;
+	OGL.EGL.device = GetDC(OGL.EGL.handle);
 #else
-	OGL.eglHandle = NULL;
-    OGL.eglDevice = 0;
+	OGL.EGL.handle = NULL;
+    OGL.EGL.device = 0;
 #endif
 
+    //shut down X11.
+    //exec("sudo /etc/init.d/slim-init stop");
+
     printf( "[gles2n64]: EGL Context Creation\n");
-    OGL.eglDisplay = eglGetDisplay((EGLNativeDisplayType) OGL.eglDevice);
-    if (OGL.eglDisplay == EGL_NO_DISPLAY){
+    OGL.EGL.display = eglGetDisplay((EGLNativeDisplayType) OGL.EGL.device);
+    if (OGL.EGL.display == EGL_NO_DISPLAY){
         printf("[gles2n64]: EGL Display Get failed: %s \n", EGLErrorString());
         return FALSE;
     }
 
-    if (!eglInitialize(OGL.eglDisplay, &OGL.eglVersionMajor, &OGL.eglVersionMinor)){
+    if (!eglInitialize(OGL.EGL.display, &OGL.EGL.version_major, &OGL.EGL.version_minor)){
         printf("[gles2n64]: EGL Display Initialize failed: %s \n", EGLErrorString()); fflush(stdout);
         return FALSE;
     }
 
-    if (!eglChooseConfig(OGL.eglDisplay, ConfigAttribs, &OGL.eglConfig, 1, &nConfigs)){
+    if (!eglChooseConfig(OGL.EGL.display, ConfigAttribs, &OGL.EGL.config, 1, &nConfigs)){
         printf( "[gles2n64]: EGL Configuration failed: %s \n", EGLErrorString()); fflush(stdout);
         return FALSE;
     } else if (nConfigs != 1){
@@ -239,28 +242,28 @@ bool OGL_Start()
         return FALSE;
     }
 
-    OGL.eglSurface = eglCreateWindowSurface(OGL.eglDisplay, OGL.eglConfig, OGL.eglHandle, NULL);
-    if (OGL.eglSurface == EGL_NO_SURFACE){
+    OGL.EGL.surface = eglCreateWindowSurface(OGL.EGL.display, OGL.EGL.config, OGL.EGL.handle, NULL);
+    if (OGL.EGL.surface == EGL_NO_SURFACE){
 		printf("[gles2n64]: EGL Surface Creation failed: %s will attempt without window... \n", EGLErrorString()); fflush(stdout);
-        OGL.eglSurface = eglCreateWindowSurface(OGL.eglDisplay, OGL.eglConfig, NULL, NULL);
-        if (OGL.eglSurface == EGL_NO_SURFACE){
+        OGL.EGL.surface = eglCreateWindowSurface(OGL.EGL.display, OGL.EGL.config, NULL, NULL);
+        if (OGL.EGL.surface == EGL_NO_SURFACE){
             printf("[gles2n64]: EGL Surface Creation failed: %s \n", EGLErrorString()); fflush(stdout);
             return FALSE;
         }
     }
     eglBindAPI(EGL_OPENGL_ES_API);
 
-    OGL.eglContext = eglCreateContext(OGL.eglDisplay, OGL.eglConfig, EGL_NO_CONTEXT, ContextAttribs);
-    if (OGL.eglContext == EGL_NO_CONTEXT){
+    OGL.EGL.context = eglCreateContext(OGL.EGL.display, OGL.EGL.config, EGL_NO_CONTEXT, ContextAttribs);
+    if (OGL.EGL.context == EGL_NO_CONTEXT){
         printf("[gles2n64]: EGL Context Creation failed: %s \n", EGLErrorString()); fflush(stdout);
         return FALSE;
     }
 
-    if (!eglMakeCurrent(OGL.eglDisplay, OGL.eglSurface, OGL.eglSurface, OGL.eglContext)){
+    if (!eglMakeCurrent(OGL.EGL.display, OGL.EGL.surface, OGL.EGL.surface, OGL.EGL.context)){
         printf("[gles2n64]: EGL Make Current failed: %s \n", EGLErrorString()); fflush(stdout);
         return FALSE;
     };
-    eglSwapInterval(OGL.eglDisplay, OGL.vSync);
+    eglSwapInterval(OGL.EGL.display, OGL.vsync);
 
     //create default shader program
     printf("[gles2n64]: Generate Default Shader Program.\n"); fflush(stdout);
@@ -307,26 +310,25 @@ bool OGL_Start()
     glClearColor(0,0,0,0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
     //create framebuffer
-    if (OGL.fbEnable)
+    if (OGL.framebuffer.enable)
     {
         printf("[gles2n64]: Create offscreen framebuffer. \n"); fflush(stdout);
-        if (OGL.fbWidth == OGL.scrWidth && OGL.fbHeight == OGL.scrHeight)
+        if (OGL.framebuffer.width == OGL.screen.width && OGL.framebuffer.height == OGL.screen.height)
         {
             printf("[gles2n64]: Note. There's no point in using a offscreen framebuffer when the window and screen dimensions are the same\n");
         }
 
-        glGenFramebuffers(1, &OGL.frameBuffer);
-        glGenRenderbuffers(1, &OGL.fbDepthBuffer);
-        glGenTextures(1, &OGL.fbColorBuffer);
-        glBindRenderbuffer(GL_RENDERBUFFER, OGL.fbDepthBuffer);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24_OES, OGL.fbWidth, OGL.fbHeight);
-        glBindTexture(GL_TEXTURE_2D, OGL.fbColorBuffer);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, OGL.fbWidth, OGL.fbHeight, 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, NULL);
-        glBindFramebuffer(GL_FRAMEBUFFER, OGL.frameBuffer);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, OGL.fbColorBuffer, 0);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, OGL.fbDepthBuffer);
+        glGenFramebuffers(1, &OGL.framebuffer.fb);
+        glGenRenderbuffers(1, &OGL.framebuffer.depth_buffer);
+        glGenTextures(1, &OGL.framebuffer.color_buffer);
+        glBindRenderbuffer(GL_RENDERBUFFER, OGL.framebuffer.depth_buffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24_OES, OGL.framebuffer.width, OGL.framebuffer.height);
+        glBindTexture(GL_TEXTURE_2D, OGL.framebuffer.color_buffer);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, OGL.framebuffer.width, OGL.framebuffer.height, 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, NULL);
+        glBindFramebuffer(GL_FRAMEBUFFER, OGL.framebuffer.fb);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, OGL.framebuffer.color_buffer, 0);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, OGL.framebuffer.depth_buffer);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -344,32 +346,32 @@ bool OGL_Start()
                 case GL_FRAMEBUFFER_INCOMPLETE_FORMATS:
                     printf("Incomplete Formats. \n"); break;
             }
-            OGL.fbEnable = 0;
+            OGL.framebuffer.enable = 0;
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
     }
 
     //check extensions
-    if ((OGL.textureMaxAnisotropy>0) && !OGL_IsExtSupported("GL_EXT_texture_filter_anistropic"))
+    if ((OGL.texture.max_anisotropy>0) && !OGL_IsExtSupported("GL_EXT_texture_filter_anistropic"))
     {
         printf("[gles2n64]: Anistropic Filtering is not supported.\n");
-        OGL.textureMaxAnisotropy = 0;
+        OGL.texture.max_anisotropy = 0;
     }
 
     float f = 0;
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &f);
-    if (OGL.textureMaxAnisotropy > ((int)f))
+    if (OGL.texture.max_anisotropy > ((int)f))
     {
         printf("[gles2n64]: Clamping max anistropy to %ix.\n", (int)f);
-        OGL.textureMaxAnisotropy = (int)f;
+        OGL.texture.max_anisotropy = (int)f;
     }
 
     //Print some info
     EGLint attrib;
-    printf( "[gles2n64]: Width: %i Height:%i \n", OGL.fbWidth, OGL.fbHeight);
-    eglGetConfigAttrib(OGL.eglDisplay, OGL.eglConfig, EGL_DEPTH_SIZE, &attrib);
+    printf( "[gles2n64]: Width: %i Height:%i \n", OGL.framebuffer.width, OGL.framebuffer.height);
+    eglGetConfigAttrib(OGL.EGL.display, OGL.EGL.config, EGL_DEPTH_SIZE, &attrib);
     printf( "[gles2n64]: Depth Size: %i \n", attrib);
-    eglGetConfigAttrib(OGL.eglDisplay, OGL.eglConfig, EGL_BUFFER_SIZE, &attrib);
+    eglGetConfigAttrib(OGL.EGL.display, OGL.EGL.config, EGL_BUFFER_SIZE, &attrib);
     printf( "[gles2n64]: Color Buffer Size: %i \n", attrib);
 
     printf( "[gles2n64]: Enable Runfast... \n");
@@ -399,11 +401,11 @@ void OGL_Stop()
     SDL_QuitSubSystem( SDL_INIT_VIDEO );
 #endif
 
-    if (OGL.fbEnable)
+    if (OGL.framebuffer.enable)
     {
-        glDeleteFramebuffers(1, &OGL.frameBuffer);
-        glDeleteTextures(1, &OGL.fbColorBuffer);
-        glDeleteRenderbuffers(1, &OGL.fbDepthBuffer);
+        glDeleteFramebuffers(1, &OGL.framebuffer.fb);
+        glDeleteTextures(1, &OGL.framebuffer.color_buffer);
+        glDeleteRenderbuffers(1, &OGL.framebuffer.depth_buffer);
     }
 
     glDeleteShader(OGL.defaultFragShader);
@@ -413,10 +415,10 @@ void OGL_Stop()
     ShaderCombiner_Destroy();
     TextureCache_Destroy();
 
-	eglMakeCurrent(OGL.eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-	eglDestroySurface(OGL.eglDisplay, OGL.eglSurface);
- 	eglDestroyContext(OGL.eglDisplay, OGL.eglContext);
-   	eglTerminate(OGL.eglDisplay);
+	eglMakeCurrent(OGL.EGL.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+	eglDestroySurface(OGL.EGL.display, OGL.EGL.surface);
+ 	eglDestroyContext(OGL.EGL.display, OGL.EGL.context);
+   	eglTerminate(OGL.EGL.display);
 }
 
 void OGL_UpdateCullFace()
@@ -438,8 +440,8 @@ void OGL_UpdateCullFace()
 void OGL_UpdateViewport()
 {
     int x, y, w, h;
-    x = OGL.fbXpos + (int)(gSP.viewport.x * OGL.scaleX);
-    y = OGL.fbYpos + (int)((VI.height - (gSP.viewport.y + gSP.viewport.height)) * OGL.scaleY);
+    x = OGL.framebuffer.xpos + (int)(gSP.viewport.x * OGL.scaleX);
+    y = OGL.framebuffer.ypos + (int)((VI.height - (gSP.viewport.y + gSP.viewport.height)) * OGL.scaleY);
     w = (int)(gSP.viewport.width * OGL.scaleX);
     h = (int)(gSP.viewport.height * OGL.scaleY);
 
@@ -457,8 +459,8 @@ void OGL_UpdateDepthUpdate()
 void OGL_UpdateScissor()
 {
     int x, y, w, h;
-    x = OGL.fbXpos + (int)(gDP.scissor.ulx * OGL.scaleX);
-    y = OGL.fbYpos + (int)((VI.height - gDP.scissor.lry) * OGL.scaleY);
+    x = OGL.framebuffer.xpos + (int)(gDP.scissor.ulx * OGL.scaleX);
+    y = OGL.framebuffer.ypos + (int)((VI.height - gDP.scissor.lry) * OGL.scaleY);
     w = (int)((gDP.scissor.lrx - gDP.scissor.ulx) * OGL.scaleX);
     h = (int)((gDP.scissor.lry - gDP.scissor.uly) * OGL.scaleY);
     glScissor(x, y, w, h);
@@ -745,16 +747,16 @@ void OGL_DrawRect( int ulx, int uly, int lrx, int lry, float *color)
         OGL.renderState = RS_RECT;
     }
 
-    glViewport( OGL.fbXpos, OGL.fbYpos, OGL.fbWidth, OGL.fbHeight );
+    glViewport( OGL.framebuffer.xpos, OGL.framebuffer.ypos, OGL.framebuffer.width, OGL.framebuffer.height );
     //glDisable(GL_SCISSOR_TEST);
     glDisable(GL_CULL_FACE);
 
     OGL.rect[0].x = (float) ulx * (2.0f * VI.rwidth) - 1.0;
     OGL.rect[0].y = (float) uly * (-2.0f * VI.rheight) + 1.0;
-    OGL.rect[1].x = (float) lrx * (2.0f * VI.rwidth) - 1.0;
+    OGL.rect[1].x = (float) (lrx+1) * (2.0f * VI.rwidth) - 1.0;
     OGL.rect[1].y = OGL.rect[0].y;
     OGL.rect[2].x = OGL.rect[0].x;
-    OGL.rect[2].y = (float) lry * (-2.0f * VI.rheight) + 1.0;
+    OGL.rect[2].y = (float) (lry+1) * (-2.0f * VI.rheight) + 1.0;
     OGL.rect[3].x = OGL.rect[1].x;
     OGL.rect[3].y = OGL.rect[2].y;
 
@@ -787,16 +789,16 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
         OGL.renderState = RS_TEXTUREDRECT;
     }
 
-    glViewport( OGL.fbXpos, OGL.fbYpos, OGL.fbWidth, OGL.fbHeight );
+    glViewport( OGL.framebuffer.xpos, OGL.framebuffer.ypos, OGL.framebuffer.width, OGL.framebuffer.height );
     glDisable(GL_CULL_FACE);
     //glDisable(GL_SCISSOR_TEST);
 
     OGL.rect[0].x = (float) ulx * (2.0f * VI.rwidth) - 1.0f;
     OGL.rect[0].y = (float) uly * (-2.0f * VI.rheight) + 1.0f;
-    OGL.rect[1].x = (float) lrx * (2.0f * VI.rwidth) - 1.0f;
+    OGL.rect[1].x = (float) (lrx) * (2.0f * VI.rwidth) - 1.0f;
     OGL.rect[1].y = OGL.rect[0].y;
     OGL.rect[2].x = OGL.rect[0].x;
-    OGL.rect[2].y = (float) lry * (-2.0f * VI.rheight) + 1.0f;
+    OGL.rect[2].y = (float) (lry) * (-2.0f * VI.rheight) + 1.0f;
     OGL.rect[3].x = OGL.rect[1].x;
     OGL.rect[3].y = OGL.rect[2].y;
 
@@ -864,7 +866,7 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
         OGL.rect[3].t1 *= cache.current[1]->scaleT;
     }
 
-    if ((gDP.otherMode.cycleType == G_CYC_COPY) && !OGL.textureForceBilinear)
+    if ((gDP.otherMode.cycleType == G_CYC_COPY) && !OGL.texture.force_bilinear)
     {
         glActiveTexture(GL_TEXTURE0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
@@ -911,10 +913,10 @@ void OGL_ClearDepthBuffer()
 
 void OGL_ClearColorBuffer( float *color )
 {
-    glDisable( GL_SCISSOR_TEST );
+    glScissor(OGL.framebuffer.xpos, OGL.framebuffer.ypos, OGL.framebuffer.width, OGL.framebuffer.height);
     glClearColor( color[0], color[1], color[2], color[3] );
     glClear( GL_COLOR_BUFFER_BIT );
-    glEnable( GL_SCISSOR_TEST );
+    OGL_UpdateScissor();
 }
 
 static void OGL_png_error(png_structp png_write, const char *message)
@@ -1029,14 +1031,13 @@ int OGL_CheckError()
 void
 OGL_SwapBuffers()
 {
-
 #ifdef SHADER_TEST
     static int ProgramSwaps = 0;
     ProgramSwaps += scProgramChanged;
 #endif
     scProgramChanged = 0;
 
-   if (OGL.logFrameRate){
+   if (1){
         static int frames[5] = { 0, 0, 0, 0, 0 };
         static int framesIndex = 0;
         static Uint32 lastTicks = 0;
@@ -1090,14 +1091,14 @@ OGL_SwapBuffers()
     // if emulator defined a render callback function, call it before buffer swap
     if (renderCallback) (*renderCallback)();
 
-    if (OGL.fbEnable)
+    if (OGL.framebuffer.enable)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         glUseProgram(OGL.defaultProgram);
         glDisable(GL_SCISSOR_TEST);
         glDisable(GL_DEPTH_TEST);
-        glViewport(OGL.winXpos, OGL.winYpos, OGL.winWidth, OGL.winHeight);
+        glViewport(OGL.window.xpos, OGL.window.ypos, OGL.window.width, OGL.window.height);
 
         static const float vert[] =
         {
@@ -1108,8 +1109,8 @@ OGL_SwapBuffers()
         };
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, OGL.fbColorBuffer);
-        if (OGL.fbBilinearScale)
+        glBindTexture(GL_TEXTURE_2D, OGL.framebuffer.color_buffer);
+        if (OGL.framebuffer.bilinear)
         {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -1126,15 +1127,15 @@ OGL_SwapBuffers()
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (float*)vert + 2);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-        eglSwapBuffers(OGL.eglDisplay, OGL.eglSurface);
+        eglSwapBuffers(OGL.EGL.display, OGL.EGL.surface);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, OGL.frameBuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, OGL.framebuffer.fb);
         if (scProgramCurrent) glUseProgram(scProgramCurrent->program);
         OGL.renderState = RS_NONE;
     }
     else
     {
-        eglSwapBuffers(OGL.eglDisplay, OGL.eglSurface);
+        eglSwapBuffers(OGL.EGL.display, OGL.EGL.surface);
         //OGL.renderState = RS_NONE;
     }
 
@@ -1176,10 +1177,10 @@ void OGL_ReadScreen( void *dest, int *width, int *height )
 
     free(rgba);
 #else
-    dest = malloc(OGL.winWidth * OGL.winHeight * 3);
-    memset(dest, 0, 3 * OGL.winWidth * OGL.winHeight);
-    *width = OGL.winWidth;
-    *height = OGL.winHeight;
+    dest = malloc(OGL.window.width * OGL.window.height * 3);
+    memset(dest, 0, 3 * OGL.window.width * OGL.window.height);
+    *width = OGL.window.width;
+    *height = OGL.window.height;
 #endif
 }
 

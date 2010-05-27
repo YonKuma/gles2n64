@@ -211,6 +211,14 @@ struct ShaderProgram
     ShaderProgram   *left, *right;
 };
 
+class DecodedMux
+{
+    public:
+        DecodedMux(u64 mux);
+        gDPCombine combine;
+        int decode[4][4];
+};
+
 extern int saRGBExpanded[];
 extern int sbRGBExpanded[];
 extern int mRGBExpanded[];
@@ -237,7 +245,7 @@ extern void ShaderCombiner_Init();
 extern void ShaderCombiner_Destroy();
 extern void ShaderCombiner_DeleteProgram(ShaderProgram *prog);
 extern void ShaderCombiner_Set(u64 mux, int flags=-1);
-extern ShaderProgram *ShaderCombiner_Compile(u64 mux, int flags);
+extern ShaderProgram *ShaderCombiner_Compile(DecodedMux *dmux, int flags);
 
 #endif
 

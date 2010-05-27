@@ -39,10 +39,27 @@ void VI_UpdateSize()
 
 void VI_UpdateScreen()
 {
-    if (gSP.changed & CHANGED_COLORBUFFER)
+
+
+    switch(OGL.updateMode)
     {
-        OGL_SwapBuffers();
-        gSP.changed &= ~CHANGED_COLORBUFFER;
+        case 0:
+            if (gSP.changed & CHANGED_COLORBUFFER)
+            {
+                OGL_SwapBuffers();
+                gSP.changed &= ~CHANGED_COLORBUFFER;
+            }
+            break;
+
+        case 1:
+            if (*REG.VI_ORIGIN != VI.lastOrigin)
+            {
+                OGL_SwapBuffers();
+                VI.lastOrigin = *REG.VI_ORIGIN;
+            }
+            break;
+
     }
+
 }
 
