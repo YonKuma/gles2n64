@@ -45,7 +45,7 @@ COMPILER_DIR = C:/CS2009q3
 SO_EXTENSION = so
 CXX = 	$(COMPILER_DIR)/bin/arm-none-linux-gnueabi-g++
 LD = 	$(COMPILER_DIR)/bin/arm-none-linux-gnueabi-g++
-INCLUDE	= C:/Users/jim/Desktop/Lachlan/Pandora/pnd_libs_081117/include
+INCLUDE	= C:/Users/jim/Desktop/Lachlan/Pandora/include
 CFLAGS 	+= -I$(INCLUDE)/libpng12
 CFLAGS 	+= -I$(INCLUDE)/SDL
 CFLAGS	+= -I$(INCLUDE)
@@ -59,6 +59,8 @@ CFLAGS  += -ftree-switch-conversion
 CFLAGS  += -floop-interchange -floop-strip-mine -floop-block
 
 CFLAGS  += -D__NEON_OPT -D__VEC4_OPT -DARM_ASM  -DINLINE_OPT
+CFLAGS  += -DX11_WINDOW
+
 #CFLAGS += -D__PACKVERTEX_OPT 
 endif
 
@@ -66,6 +68,7 @@ ifeq ($(OS), LINUX)
 CFLAGS += -Wall -D__LINUX__ -fPIC
 LDFLAGS += -LC:/Users/jim/Desktop/Lachlan/Pandora/20101302-pandora-xfce/usr/lib
 LDFLAGS += -lEGL -lGLESv2 -lsrv_um -lSDL-1.2 -lpng12 -lz -lIMGegl
+LDFLAGS += -lX11
 else
 CFLAGS += -Wall
 LDFLAGS +=  -LC:/MinGW/lib/PVR -lSDLmain -lSDL -lpng -lGLESv2

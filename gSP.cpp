@@ -601,6 +601,14 @@ void gSPProcessVertex4( u32 v )
 
     gSPTransformVertex4(v, gSP.matrix.combined );
 
+    if (gDP.otherMode.depthSource)
+    {
+        gSP.vertices[v+0].z = gDP.primDepth.z * gSP.vertices[v+0].w;
+        gSP.vertices[v+1].z = gDP.primDepth.z * gSP.vertices[v+1].w;
+        gSP.vertices[v+2].z = gDP.primDepth.z * gSP.vertices[v+2].w;
+        gSP.vertices[v+3].z = gDP.primDepth.z * gSP.vertices[v+3].w;
+    }
+
     if (gSP.matrix.billboard) gSPBillboardVertex4(v);
 
     if (!(gSP.geometryMode & G_ZBUFFER))
@@ -885,6 +893,11 @@ void gSPProcessVertex( u32 v )
         gSPCombineMatrices();
 
     TransformVertex( &gSP.vertices[v].x, gSP.matrix.combined );
+
+    if (gDP.otherMode.depthSource)
+    {
+        gSP.vertices[v].z = gDP.primDepth.z * gSP.vertices[v].w;
+    }
 
     if (gSP.matrix.billboard)
     {
@@ -1177,7 +1190,7 @@ void gSPLookAt( u32 l )
 void gSPVertex( u32 v, u32 n, u32 v0 )
 {
     //flush batched triangles:
-    OGL_DrawTriangles();
+    //OGL_DrawTriangles();
 
     u32 address = RSP_SegmentToPhysical( v );
 
@@ -2270,33 +2283,6 @@ void gSPBgRect1Cyc( u32 bg )
     }
 
     gDPTextureRectangle( 0, 0, 319, 239, 0, 0, 0, scaleW, scaleH );
-/*  u32 line = (u32)(frameS1 - frameS0 + 1) << objScaleBg->imageSiz >> 4;
-    u16 loadHeight;
-    if (objScaleBg->imageFmt == G_IM_FMT_CI)
-        loadHeight = 256 / line;
-    else
-        loadHeight = 512 / line;
-
-    gDPSetTile( objScaleBg->imageFmt, objScaleBg->imageSiz, line, 0, 7, objScaleBg->imagePal, G_TX_CLAMP, G_TX_CLAMP, 0, 0, 0, 0 );
-    gDPSetTile( objScaleBg->imageFmt, objScaleBg->imageSiz, line, 0, 0, objScaleBg->imagePal, G_TX_CLAMP, G_TX_CLAMP, 0, 0, 0, 0 );
-    gDPSetTileSize( 0, 0, 0, frameS1 * 4, frameT1 * 4 );
-    gDPSetTextureImage( objScaleBg->imageFmt, objScaleBg->imageSiz, imageW, objScaleBg->imagePtr );
-
-    gSPTexture( 1.0f, 1.0f, 0, 0, TRUE );
-
-    for (u32 i = 0; i < frameT1 / loadHeight; i++)
-    {
-        //if (objScaleBg->imageLoad == G_BGLT_LOADTILE)
-            gDPLoadTile( 7, frameS0 * 4, (frameT0 + loadHeight * i) * 4, frameS1 * 4, (frameT1 + loadHeight * (i + 1) * 4 );
-        //else
-        //{
-//          gDPSetTextureImage( objScaleBg->imageFmt, objScaleBg->imageSiz, imageW, objScaleBg->imagePtr + (i + imageY) * (imageW << objScaleBg->imageSiz >> 1) + (imageX << objScaleBg->imageSiz >> 1) );
-//          gDPLoadBlock( 7, 0, 0, (loadHeight * frameW << objScaleBg->imageSiz >> 1) - 1, 0 );
-//      }
-
-        gDPTextureRectangle( frameX0, frameY0 + loadHeight * i,
-            frameX1, frameY0 + loadHeight * (i + 1) - 1, 0, 0, 0, 4, 1 );
-    }*/
 }
 
 void gSPBgRectCopy( u32 bg )

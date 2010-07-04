@@ -235,6 +235,7 @@ extern u32 G_MWO_aLIGHT_8, G_MWO_bLIGHT_8;
 #define G_IM_FMT_CI     2
 #define G_IM_FMT_IA     3
 #define G_IM_FMT_I      4
+#define G_IM_FMT_CI_IA  5   //not real
 
 // Image sizes
 #define G_IM_SIZ_4b     0

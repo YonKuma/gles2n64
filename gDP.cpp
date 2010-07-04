@@ -20,6 +20,106 @@
 #  define max(a,b) ((a) > (b) ? (a) : (b))
 # endif
 
+//thank rice_video for this:
+bool _IsRenderTexture()
+{
+    bool foundSetScissor=false;
+    bool foundFillRect=false;
+    bool foundSetFillColor=false;
+    bool foundSetCImg=false;
+    bool foundTxtRect=false;
+    int height;
+    unsigned int newFillColor = 0;
+    unsigned int dwPC = RSP.PC[RSP.PCi];       // This points to the next instruction
+
+    for(int i=0; i<10; i++ )
+    {
+        unsigned int w0 = *(unsigned int *)(RDRAM + dwPC + i*8);
+        unsigned int w1 = *(unsigned int *)(RDRAM + dwPC + 4 + i*8);
+
+        if ((w0>>24) == G_SETSCISSOR)
+        {
+            height = ((w1>>0 )&0xFFF)/4;
+            foundSetScissor = true;
+            continue;
+        }
+
+        if ((w0>>24) == G_SETFILLCOLOR)
+        {
+            height = ((w1>>0 )&0xFFF)/4;
+            foundSetFillColor = true;
+            newFillColor = w1;
+            continue;
+        }
+
+        if ((w0>>24) == G_FILLRECT)
+        {
+            unsigned int x0 = ((w1>>12)&0xFFF)/4;
+            unsigned int y0 = ((w1>>0 )&0xFFF)/4;
+            unsigned int x1 = ((w0>>12)&0xFFF)/4;
+            unsigned int y1 = ((w0>>0 )&0xFFF)/4;
+
+            if (x0 == 0 && y0 == 0)
+            {
+                if( x1 == gDP.colorImage.width)
+                {
+                    height = y1;
+                    foundFillRect = true;
+                    continue;
+                }
+
+                if(x1 == (unsigned int)(gDP.colorImage.width-1))
+                {
+                    height = y1+1;
+                    foundFillRect = true;
+                    continue;
+                }
+            }
+        }
+
+        if ((w0>>24) == G_TEXRECT)
+        {
+            foundTxtRect = true;
+            break;
+        }
+
+        if ((w0>>24) == G_SETCIMG)
+        {
+            foundSetCImg = true;
+            break;
+        }
+    }
+
+    if (foundFillRect )
+    {
+        if (foundSetFillColor)
+        {
+            if (newFillColor != 0xFFFCFFFC)
+                return true;    // this is a render_texture
+            else
+                return false;
+        }
+
+        if (gDP.fillColor.i == 0x00FFFFF7)
+            return true;    // this is a render_texture
+        else
+            return false;   // this is a normal ZImg
+    }
+    else if (foundSetFillColor && newFillColor == 0xFFFCFFFC && foundSetCImg )
+    {
+        return false;
+    }
+    else
+        return true;
+
+
+    if (!foundSetCImg) return true;
+
+    if (foundSetScissor ) return true;
+
+    return false;
+}
+
 gDPInfo gDP;
 
 void gDPSetOtherMode( u32 mode0, u32 mode1 )
@@ -256,12 +356,17 @@ void gDPSetCombine( s32 muxs0, s32 muxs1 )
 
 void gDPSetColorImage( u32 format, u32 size, u32 width, u32 address )
 {
+    if (OGL.updateMode == SCREEN_UPDATE_AT_CI_CHANGE)
+        OGL_SwapBuffers();
+
+    if (OGL.updateMode == SCREEN_UPDATE_AT_1ST_CI_CHANGE && OGL.screenUpdate)
+        OGL_SwapBuffers();
+
     u32 addr = RSP_SegmentToPhysical( address );
 
     if (gDP.colorImage.address != addr)
     {
         gDP.colorImage.changed = FALSE;
-
         if (width == VI.width)
             gDP.colorImage.height = VI.height;
         else
@@ -272,7 +377,45 @@ void gDPSetColorImage( u32 format, u32 size, u32 width, u32 address )
     gDP.colorImage.size = size;
     gDP.colorImage.width = width;
     gDP.colorImage.address = addr;
-    //gDP.colorImage.address = RSP_SegmentToPhysical( address );
+
+    if (OGL.ignoreOffscreenRendering)
+    {
+        int i;
+
+        //colorimage byte size:
+        int s = 0;
+        switch(size)
+        {
+            case G_IM_SIZ_4b:   s = (gDP.colorImage.width * gDP.colorImage.height) / 2; break;
+            case G_IM_SIZ_8b:   s = (gDP.colorImage.width * gDP.colorImage.height); break;
+            case G_IM_SIZ_16b:  s = (gDP.colorImage.width * gDP.colorImage.height) * 2; break;
+            case G_IM_SIZ_32b:  s = (gDP.colorImage.width * gDP.colorImage.height) * 4; break;
+        }
+        u32 start = addr & 0x00FFFFFF;
+        u32 end = min(start + s, RDRAMSize);
+        for(i = 0; i < VI.displayNum; i++)
+        {
+            if (VI.display[i].start <= end && VI.display[i].start >= start) break;
+            if (start <= VI.display[i].end && start >= VI.display[i].start) break;
+        }
+
+        OGL.renderingToTexture = (i == VI.displayNum);
+
+#if 0
+        if (OGL.renderingToTexture)
+        {
+            printf("start=%i end=%i\n", start, end);
+            printf("display=");
+            for(int i=0; i< VI.displayNum; i++) printf("%i,%i:", VI.display[i].start, VI.display[i].end);
+            printf("\n");
+        }
+#endif
+    }
+    else
+    {
+        OGL.renderingToTexture = false;
+    }
+
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gDPSetColorImage( %s, %s, %i, 0x%08X );\n",
@@ -338,6 +481,7 @@ void gDPSetBlendColor( u32 r, u32 g, u32 b, u32 a )
     gDP.blendColor.g = g * 0.0039215689f;
     gDP.blendColor.b = b * 0.0039215689f;
     gDP.blendColor.a = a * 0.0039215689f;
+    gDP.changed |= CHANGED_BLENDCOLOR;
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gDPSetBlendColor( %i, %i, %i, %i );\n",
@@ -362,6 +506,8 @@ void gDPSetFogColor( u32 r, u32 g, u32 b, u32 a )
 
 void gDPSetFillColor( u32 c )
 {
+
+    gDP.fillColor.i = c;
     gDP.fillColor.r = _SHIFTR( c, 11, 5 ) * 0.032258064f;
     gDP.fillColor.g = _SHIFTR( c,  6, 5 ) * 0.032258064f;
     gDP.fillColor.b = _SHIFTR( c,  1, 5 ) * 0.032258064f;
@@ -714,6 +860,11 @@ void gDPSetKeyGB(u32 cG, u32 sG, u32 wG, u32 cB, u32 sB, u32 wB )
 
 void gDPTextureRectangle( f32 ulx, f32 uly, f32 lrx, f32 lry, s32 tile, f32 s, f32 t, f32 dsdx, f32 dtdy )
 {
+    if (gDP.colorImage.address == gDP.depthImageAddress)
+    {
+        return;
+    }
+
     if (gDP.otherMode.cycleType == G_CYC_COPY)
     {
         dsdx = 1.0f;

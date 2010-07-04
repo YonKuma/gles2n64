@@ -7,7 +7,6 @@
 #include <GLES2/gl2extimg.h>
 #include "winlnxdefs.h"
 #include "SDL.h"
-
 #include "gSP.h"
 
 #if 0
@@ -28,6 +27,18 @@
 #define RS_RECT         2
 #define RS_TEXTUREDRECT 3
 #define RS_LINE         4
+
+
+#define SCREEN_UPDATE_AT_VI_UPDATE              1
+#define SCREEN_UPDATE_AT_VI_CHANGE              2
+#define SCREEN_UPDATE_AT_CI_CHANGE              3
+#define SCREEN_UPDATE_AT_1ST_CI_CHANGE          4
+#define SCREEN_UPDATE_AT_1ST_PRIMITIVE          5
+#define SCREEN_UPDATE_BEFORE_SCREEN_CLEAR       6
+#define SCREEN_UPDATE_AT_VI_UPDATE_AND_DRAWN    7
+
+
+
 
 struct GLVertex
 {
@@ -62,6 +73,7 @@ struct GLInfo
     } EGL;
 
     int     updateMode;
+    bool    screenUpdate;
 
     struct
     {
@@ -70,7 +82,8 @@ struct GLInfo
 
     struct
     {
-        int centre, xpos, ypos, width, height;
+        int enablex11;
+        int fullscreen, centre, xpos, ypos, width, height;
     } window;
 
     struct
@@ -98,9 +111,12 @@ struct GLInfo
     int     enableAlphaTest;
     int     enableClipping;
     int     enableFaceCulling;
-    int     enableHalfVBHack;
-    int     forceDepthClear;
+
+    int     forceClear;
     int     rdpClampMode;
+    int     ignoreOffscreenRendering;
+
+    int     renderingToTexture;
 
 
     GLint   defaultProgram;

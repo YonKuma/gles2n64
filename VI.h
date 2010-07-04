@@ -7,6 +7,15 @@ struct VIInfo
     u32 width, height;
     f32 rwidth, rheight;
     u32 lastOrigin;
+
+    u32 realWidth, realHeight;
+
+    struct{
+        u32 start, end;
+    } display[16];
+
+    u32 displayNum;
+
 };
 
 extern VIInfo VI;

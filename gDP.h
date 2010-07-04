@@ -17,6 +17,7 @@
 #define CHANGED_PRIMITIVEZ      0x0400
 #define CHANGED_ENV_COLOR       0x0800
 #define CHANGED_PRIM_COLOR      0x1000
+#define CHANGED_BLENDCOLOR      0x2000
 
 #define TEXTUREMODE_NORMAL      0
 #define TEXTUREMODE_TEXRECT     1
@@ -172,6 +173,7 @@ struct gDPInfo
 
     struct
     {
+        unsigned int i;
         f32 r, g, b, a;
         f32 z, dz;
     } fillColor;

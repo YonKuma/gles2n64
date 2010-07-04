@@ -25,25 +25,47 @@ void VI_UpdateSize()
 	u32 vEnd = _SHIFTR( *REG.VI_V_START, 1, 9 );
 	u32 vStart = _SHIFTR( *REG.VI_V_START, 17, 9 );
 
-	VI.width = (hEnd - hStart) * xScale;
-	VI.height = (vEnd - vStart) * yScale * 1.0126582f;
+    VI.realWidth = hEnd - hStart;
+    VI.realHeight = vEnd - vStart;
 
-	VI.rwidth = 1.0f / VI.width;
-	VI.rheight = 1.0f / VI.height;
+	VI.width = VI.realWidth * xScale;
+	VI.height = VI.realHeight * yScale * 1.0126582f;
 
 	if (VI.width == 0.0f) VI.width = 320.0f;
 	if (VI.height == 0.0f) VI.height = 240.0f;
 
+	VI.rwidth = 1.0f / VI.width;
+	VI.rheight = 1.0f / VI.height;
+
+    //add display buffer if doesn't exist
+    if (OGL.ignoreOffscreenRendering)
+    {
+        int i;
+        //int start = *REG.VI_ORIGIN;
+        u32 start = RSP_SegmentToPhysical(*REG.VI_ORIGIN) & 0x00FFFFFF;
+        u32 end = min(start + VI.width * VI.height * 4, RDRAMSize);
+        for(i = 0; i < VI.displayNum; i++)
+        {
+            if (VI.display[i].start <= end && VI.display[i].start >= start) break;
+            if (start <= VI.display[i].end && start >= VI.display[i].start) break;
+        }
+        if (i == VI.displayNum)
+        {
+            //printf("VI IMAGE=%i\n", o);
+            VI.display[i%16].start = start;
+            VI.display[i%16].end = end;
+            VI.displayNum = (VI.displayNum < 16) ? (VI.displayNum+1) : 16;
+        }
+    }
 
 }
 
 void VI_UpdateScreen()
 {
 
-
     switch(OGL.updateMode)
     {
-        case 0:
+        case SCREEN_UPDATE_AT_VI_UPDATE:
             if (gSP.changed & CHANGED_COLORBUFFER)
             {
                 OGL_SwapBuffers();
@@ -51,10 +73,12 @@ void VI_UpdateScreen()
             }
             break;
 
-        case 1:
+        case SCREEN_UPDATE_AT_VI_CHANGE:
             if (*REG.VI_ORIGIN != VI.lastOrigin)
             {
-                OGL_SwapBuffers();
+                if (*REG.VI_ORIGIN < VI.lastOrigin || *REG.VI_ORIGIN > VI.lastOrigin+0x2000  )
+                    OGL_SwapBuffers();
+
                 VI.lastOrigin = *REG.VI_ORIGIN;
             }
             break;

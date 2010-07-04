@@ -365,22 +365,25 @@ void F3D_Quad( u32 w0, u32 w1 )
 
 void F3D_RDPHalf_1( u32 w0, u32 w1 )
 {
-/*  if (_SHIFTR( w1, 24, 8 ) == 0xCE)
-    {
-        u32 w2 = *(u32*)&RDRAM[RSP.PC[RSP.PCi] + 4];
-        RSP.PC[RSP.PCi] += 8;
-
-        gDPTextureRectangle( gDP.scissor.ulx,                                   // ulx
-                            _FIXED2FLOAT( _SHIFTR( w2,  0, 16 ), 2 ),           // uly
-                            gDP.scissor.lrx,            // lrx
-                            _FIXED2FLOAT( _SHIFTR( w2,  16, 16 ), 2 ),          // lry
-                            0,                                                  // tile
-                            0,      // s
-                            0,      // t
-                            1,      // dsdx
-                            1 );        // dsdy
-    }*/
     gDP.half_1 = w1;
+
+    //implement triangle command for GE/PD/KI, thanks to glide64.
+    if (w1 >= 0xC8 && w1 <=0xCF)
+    {
+        u32 pc, cmd_w0, cmd_w1;
+
+        do
+        {
+            pc = RSP.PC[RSP.PCi];
+            cmd_w0 = *(u32*)&RDRAM[pc];
+            cmd_w1 = *(u32*)&RDRAM[pc+4];
+            RSP.nextCmd = _SHIFTR( *(u32*)&RDRAM[pc+8], 24, 8 );
+            RSP.cmd = _SHIFTR( w0, 24, 8 );
+            RSP.PC[RSP.PCi] += 8;
+        } while ((w0 >> 24) != 0xB3);
+
+        GBI.cmd[RSP.cmd](cmd_w0, cmd_w1);
+    }
 }
 
 void F3D_RDPHalf_2( u32 w0, u32 w1 )

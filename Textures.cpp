@@ -20,215 +20,303 @@
 #include "2xSAI.h"
 #include "FrameBuffer.h"
 
-//defines for autoformat (not used in actual texture upload)
-#define GL_RGBA8                          GL_RGBA
-#define GL_RGBA4                          0x8056
-#define GL_RGB5_A1                        0x8057
-#define GL_RGB565                         0x8D62
+#define FORMAT_NONE     0
+#define FORMAT_I8       1
+#define FORMAT_IA88     2
+#define FORMAT_RGBA4444 3
+#define FORMAT_RGBA5551 4
+#define FORMAT_RGBA8888 5
 
 TextureCache    cache;
 
 typedef u32 (*GetTexelFunc)( u64 *src, u16 x, u16 i, u8 palette );
 
-inline u32 GetNone( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetNone( u64 *src, u16 x, u16 i, u8 palette )
 {
     return 0x00000000;
 }
 
-inline u32 GetCI4IA_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI4IA_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
 {
-    u8 color4B;
-
-    color4B = ((u8*)src)[(x>>1)^(i<<1)];
-
+    u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     if (x & 1)
         return IA88_RGBA4444( *(u16*)&TMEM[256 + (palette << 4) + (color4B & 0x0F)] );
     else
         return IA88_RGBA4444( *(u16*)&TMEM[256 + (palette << 4) + (color4B >> 4)] );
 }
 
-inline u32 GetCI4IA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI4IA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 {
-    u8 color4B;
-
-    color4B = ((u8*)src)[(x>>1)^(i<<1)];
-
+    u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     if (x & 1)
         return IA88_RGBA8888( *(u16*)&TMEM[256 + (palette << 4) + (color4B & 0x0F)] );
     else
         return IA88_RGBA8888( *(u16*)&TMEM[256 + (palette << 4) + (color4B >> 4)] );
 }
 
-inline u32 GetCI4RGBA_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI4RGBA_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
 {
-    u8 color4B;
-
-    color4B = ((u8*)src)[(x>>1)^(i<<1)];
-
+    u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     if (x & 1)
         return RGBA5551_RGBA5551( *(u16*)&TMEM[256 + (palette << 4) + (color4B & 0x0F)] );
     else
         return RGBA5551_RGBA5551( *(u16*)&TMEM[256 + (palette << 4) + (color4B >> 4)] );
 }
 
-inline u32 GetCI4RGBA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI4RGBA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 {
-    u8 color4B;
-
-    color4B = ((u8*)src)[(x>>1)^(i<<1)];
-
+    u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     if (x & 1)
         return RGBA5551_RGBA8888( *(u16*)&TMEM[256 + (palette << 4) + (color4B & 0x0F)] );
     else
         return RGBA5551_RGBA8888( *(u16*)&TMEM[256 + (palette << 4) + (color4B >> 4)] );
 }
 
-inline u32 GetIA31_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA31_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 {
-    u8 color4B;
-
-    color4B = ((u8*)src)[(x>>1)^(i<<1)];
-
+    u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     return IA31_RGBA8888( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
-inline u32 GetIA31_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA31_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
 {
-    u8 color4B;
-
-    color4B = ((u8*)src)[(x>>1)^(i<<1)];
-
+    u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     return IA31_RGBA4444( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
-inline u32 GetI4_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA31_IA88( u64 *src, u16 x, u16 i, u8 palette )
 {
-    u8 color4B;
+    u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
+    return IA31_IA88( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
+}
 
-    color4B = ((u8*)src)[(x>>1)^(i<<1)];
-
+u32 GetI4_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+{
+    u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     return I4_RGBA8888( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
-inline u32 GetI4_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetI4_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
 {
-    u8 color4B;
-
-    color4B = ((u8*)src)[(x>>1)^(i<<1)];
-
+    u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     return I4_RGBA4444( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
-inline u32 GetCI8IA_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetI4_I8( u64 *src, u16 x, u16 i, u8 palette )
+{
+    u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
+    return I4_I8( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
+}
+
+u32 GetCI8IA_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
 {
     return IA88_RGBA4444( *(u16*)&TMEM[256 + ((u8*)src)[x^(i<<1)]] );
 }
 
-inline u32 GetCI8IA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI8IA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 {
     return IA88_RGBA8888( *(u16*)&TMEM[256 + ((u8*)src)[x^(i<<1)]] );
 }
 
-inline u32 GetCI8RGBA_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI8RGBA_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
 {
     return RGBA5551_RGBA5551( *(u16*)&TMEM[256 + ((u8*)src)[x^(i<<1)]] );
 }
 
-inline u32 GetCI8RGBA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI8RGBA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 {
     return RGBA5551_RGBA8888( *(u16*)&TMEM[256 + ((u8*)src)[x^(i<<1)]] );
 }
 
-inline u32 GetIA44_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA44_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 {
     return IA44_RGBA8888(((u8*)src)[x^(i<<1)]);
 }
 
-inline u32 GetIA44_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA44_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
 {
     return IA44_RGBA4444(((u8*)src)[x^(i<<1)]);
 }
 
-inline u32 GetI8_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA44_IA88( u64 *src, u16 x, u16 i, u8 palette )
+{
+    return IA44_IA88(((u8*)src)[x^(i<<1)]);
+}
+
+u32 GetI8_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 {
     return I8_RGBA8888(((u8*)src)[x^(i<<1)]);
 }
 
-inline u32 GetI8_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetI8_I8( u64 *src, u16 x, u16 i, u8 palette )
+{
+    return ((u8*)src)[x^(i<<1)];
+}
+
+u32 GetI8_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
 {
     return I8_RGBA4444(((u8*)src)[x^(i<<1)]);
 }
 
-inline u32 GetRGBA5551_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetRGBA5551_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 {
     return RGBA5551_RGBA8888( ((u16*)src)[x^i] );
 }
 
-inline u32 GetRGBA5551_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetRGBA5551_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
 {
     return RGBA5551_RGBA5551( ((u16*)src)[x^i] );
 }
 
-inline u32 GetIA88_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA88_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 {
     return IA88_RGBA8888(((u16*)src)[x^i]);
 }
 
-inline u32 GetIA88_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA88_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
 {
     return IA88_RGBA4444(((u16*)src)[x^i]);
 }
 
-inline u32 GetRGBA8888_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA88_IA88( u64 *src, u16 x, u16 i, u8 palette )
+{
+    return ((u8*)src)[x^(i<<1)];
+}
+
+u32 GetRGBA8888_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 {
     return ((u32*)src)[x^i];
 }
 
-inline u32 GetRGBA8888_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetRGBA8888_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
 {
     return RGBA8888_RGBA4444(((u32*)src)[x^i]);
 }
 
-const struct
+
+struct TextureFormat
 {
-    GetTexelFunc    Get16;
-    GLenum          glType16;
-    GLint           glInternalFormat16;
-    GetTexelFunc    Get32;
-    GLenum          glType32;
-    GLint           glInternalFormat32;
-    u32             autoFormat, lineShift, maxTexels;
-} imageFormat[4][5] =
-{ //        Get16                   glType16                        glInternalFormat16  Get32                   glType32                        glInternalFormat32  autoFormat
+    int format;
+    GetTexelFunc getTexel;
+    int lineShift, maxTexels;
+};
+
+const TextureFormat textureFormat[4][6] =
+{
     { // 4-bit
-        {   GetCI4RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1,      GL_RGBA,    GetCI4RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGB5_A1, 4, 4096 }, // CI (Banjo-Kazooie uses this, doesn't make sense, but it works...)
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 4, 8192 }, // YUV
-        {   GetCI4RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1,      GL_RGBA,    GetCI4RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGB5_A1, 4, 4096 }, // CI
-        {   GetIA31_RGBA4444,       GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetIA31_RGBA8888,       GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 4, 8192 }, // IA
-        {   GetI4_RGBA4444,         GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetI4_RGBA8888,         GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 4, 8192 }, // I
+        {   FORMAT_NONE,        GetNone,                4,  4096 }, // RGBA (SELECT)
+        {   FORMAT_NONE,        GetNone,                4,  8192 }, // YUV
+        {   FORMAT_RGBA5551,    GetCI4RGBA_RGBA5551,    4,  4096 }, // CI
+        //{   FORMAT_IA88,        GetIA31_IA88,           4,  8192 }, // IA
+        {   FORMAT_RGBA4444,    GetIA31_RGBA4444,       4,  8192 }, // IA
+        //{   FORMAT_I8,          GetI4_I8,               4,  8192 }, // I
+        {   FORMAT_RGBA4444,    GetI4_RGBA4444,         4,  8192 }, // IA
+        {   FORMAT_RGBA8888,    GetCI4IA_RGBA8888,      4,  4096 }, // IA Palette
     },
     { // 8-bit
-        {   GetCI8RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1,      GL_RGBA,    GetCI8RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGB5_A1, 3, 2048 }, // RGBA
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 4096 }, // YUV
-        {   GetCI8RGBA_RGBA5551,    GL_UNSIGNED_SHORT_5_5_5_1,      GL_RGBA,    GetCI8RGBA_RGBA8888,    GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGB5_A1, 3, 2048 }, // CI
-        {   GetIA44_RGBA4444,       GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetIA44_RGBA8888,       GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 3, 4096 }, // IA
-        {   GetI8_RGBA4444,         GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetI8_RGBA8888,         GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA8, 3, 4096 }, // I
+        {   FORMAT_NONE,        GetNone,                3,  2048 }, // RGBA (SELECT)
+        {   FORMAT_NONE,        GetNone,                3,  4096 }, // YUV
+        {   FORMAT_RGBA5551,    GetCI8RGBA_RGBA5551,    3,  2048 }, // CI
+        //{   FORMAT_IA88,        GetIA44_IA88,           3,  4096 }, // IA
+        {   FORMAT_RGBA4444,    GetIA44_RGBA4444,       3,  4096 }, // IA
+        //{   FORMAT_I8,          GetI8_I8,               3,  4096 }, // I
+        {   FORMAT_RGBA8888,    GetI8_RGBA8888,         3,  4096 }, // I
+        {   FORMAT_RGBA8888,    GetCI8IA_RGBA8888,      3,  2048 }, // IA Palette
     },
     { // 16-bit
-        {   GetRGBA5551_RGBA5551,   GL_UNSIGNED_SHORT_5_5_5_1,      GL_RGBA,    GetRGBA5551_RGBA8888,   GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGB5_A1, 2, 2048 }, // RGBA
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 2, 2048 }, // YUV
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 2048 }, // CI
-        {   GetIA88_RGBA4444,       GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetIA88_RGBA8888,       GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA8, 2, 2048 }, // IA
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 2048 }, // I
+        {   FORMAT_RGBA5551,    GetRGBA5551_RGBA5551,   2,  2048 }, // RGBA
+        {   FORMAT_NONE,        GetNone,                2,  2048 }, // YUV
+        {   FORMAT_NONE,        GetNone,                2,  2048 }, // CI
+        //{   FORMAT_IA88,        GetIA88_IA88,           2,  2048 }, // IA
+        {   FORMAT_RGBA8888,    GetIA88_RGBA8888,           2,  2048 }, // IA
+        {   FORMAT_I8,          GetNone,                2,  2048 }, // I
+        {   FORMAT_NONE,        GetNone,                2,  2048 }, // IA Palette
     },
     { // 32-bit
-        {   GetRGBA8888_RGBA4444,   GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetRGBA8888_RGBA8888,   GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA8, 2, 1024 }, // RGBA
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 1024 }, // YUV
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 1024 }, // CI
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 1024 }, // IA
-        {   GetNone,                GL_UNSIGNED_SHORT_4_4_4_4,      GL_RGBA,    GetNone,                GL_UNSIGNED_BYTE,               GL_RGBA,           GL_RGBA4, 0, 1024 }, // I
+        {   FORMAT_RGBA8888,    GetRGBA8888_RGBA8888,   2,  1024 }, // RGBA
+        {   FORMAT_NONE,        GetNone,                2,  1024 }, // YUV
+        {   FORMAT_NONE,        GetNone,                2,  1024 }, // CI
+        {   FORMAT_NONE,        GetNone,                2,  1024 }, // IA
+        {   FORMAT_NONE,        GetNone,                2,  1024 }, // I
+        {   FORMAT_NONE,        GetNone,                2,  1024 }, // IA Palette
     }
 };
+
+
+void __texture_format_rgba(int size, int format, TextureFormat *texFormat)
+{
+    if (size < G_IM_SIZ_16b)
+    {
+        if (gDP.otherMode.textureLUT == G_TT_NONE)
+            *texFormat = textureFormat[size][G_IM_FMT_I];
+        else if (gDP.otherMode.textureLUT == G_TT_RGBA16)
+            *texFormat = textureFormat[size][G_IM_FMT_CI];
+        else
+            *texFormat = textureFormat[size][G_IM_FMT_IA];
+    }
+    else
+    {
+        *texFormat = textureFormat[size][G_IM_FMT_RGBA];
+    }
+}
+
+void __texture_format_ci(int size, int format, TextureFormat *texFormat)
+{
+    switch(size)
+    {
+        case G_IM_SIZ_4b:
+            if (gDP.otherMode.textureLUT == G_TT_IA16)
+                *texFormat = textureFormat[G_IM_SIZ_4b][G_IM_FMT_CI_IA];
+            else
+                *texFormat = textureFormat[G_IM_SIZ_4b][G_IM_FMT_CI];
+            break;
+
+        case G_IM_SIZ_8b:
+            if (gDP.otherMode.textureLUT == G_TT_NONE)
+                *texFormat = textureFormat[G_IM_SIZ_8b][G_IM_FMT_I];
+            else if (gDP.otherMode.textureLUT == G_TT_IA16)
+                *texFormat = textureFormat[G_IM_SIZ_8b][G_IM_FMT_CI_IA];
+            else
+                *texFormat = textureFormat[G_IM_SIZ_8b][G_IM_FMT_CI];
+            break;
+
+        default:
+            *texFormat = textureFormat[size][format];
+    }
+}
+
+void __texture_format(int size, int format, TextureFormat *texFormat)
+{
+    if (format == G_IM_FMT_RGBA)
+    {
+        __texture_format_rgba(size, format, texFormat);
+    }
+    else if (format == G_IM_FMT_YUV)
+    {
+        *texFormat = textureFormat[size][G_IM_FMT_YUV];
+    }
+    else if (format == G_IM_FMT_CI)
+    {
+        __texture_format_ci(size, format, texFormat);
+    }
+    else if (format == G_IM_FMT_IA)
+    {
+        if (gDP.otherMode.textureLUT != G_TT_NONE)
+            __texture_format_ci(size, format, texFormat);
+        else
+            *texFormat = textureFormat[size][G_IM_FMT_IA];
+    }
+    else if (format == G_IM_FMT_I)
+    {
+        if (gDP.otherMode.textureLUT == G_TT_NONE)
+            *texFormat = textureFormat[size][G_IM_FMT_I];
+        else
+            __texture_format_ci(size, format, texFormat);
+    }
+
+
+}
+
 
 int isTexCacheInit = 0;
 
@@ -442,96 +530,103 @@ void TextureCache_Destroy()
     cache.bottom = NULL;
 }
 
+
+
 void TextureCache_LoadBackground( CachedTexture *texInfo )
 {
     u32 *dest, *scaledDest;
-
     u8 *swapped, *src;
     u32 numBytes, bpl;
-    u32 x, y, /*i,*/ j, tx, ty;
-    u16 clampSClamp;
-    u16 clampTClamp;
-    GetTexelFunc    GetTexel;
-    GLenum          glType;
+    u32 x, y, j, tx, ty;
+    u16 clampSClamp,  clampTClamp;
 
-    if (((imageFormat[texInfo->size][texInfo->format].autoFormat == GL_RGBA) ||
-        ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16)) ||
-         (cache.bitDepth == 2)) && (cache.bitDepth != 0))
+    int bytePerPixel=0;
+    TextureFormat   texFormat;
+    GetTexelFunc    getTexel;
+    GLint glWidth, glHeight;
+    GLenum glType;
+    GLenum glFormat;
+
+    __texture_format(texInfo->size, texInfo->format, &texFormat);
+
+#if 1
+    printf("LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format);
+#endif
+
+    if (texFormat.format == FORMAT_NONE)
     {
-        texInfo->textureBytes = (texInfo->realWidth * texInfo->realHeight) << 2;
-        if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
-        {
-            if (texInfo->size == G_IM_SIZ_4b)
-                GetTexel = GetCI4IA_RGBA8888;
-            else
-                GetTexel = GetCI8IA_RGBA8888;
+        printf("No Texture Conversion function available, format=%i", texInfo->format);
+    }
 
+    switch(texFormat.format)
+    {
+        case FORMAT_I8:
+            glFormat = GL_LUMINANCE;
             glType = GL_UNSIGNED_BYTE;
-        }
-        else
-        {
-            GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
-            glType = imageFormat[texInfo->size][texInfo->format].glType32;
-        }
-    }
-    else
-    {
-        texInfo->textureBytes = (texInfo->realWidth * texInfo->realHeight) << 1;
-        if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
-        {
-            if (texInfo->size == G_IM_SIZ_4b)
-                GetTexel = GetCI4IA_RGBA4444;
-            else
-                GetTexel = GetCI8IA_RGBA4444;
-
+            bytePerPixel = 1;
+            break;
+        case FORMAT_IA88:
+            glFormat = GL_LUMINANCE_ALPHA;
+            glType = GL_UNSIGNED_BYTE;
+            bytePerPixel = 2;
+            break;
+        case FORMAT_RGBA4444:
+            glFormat = GL_RGBA;
             glType = GL_UNSIGNED_SHORT_4_4_4_4;
-        }
-        else
-        {
-            GetTexel = imageFormat[texInfo->size][texInfo->format].Get16;
-            glType = imageFormat[texInfo->size][texInfo->format].glType16;
-        }
+            bytePerPixel = 2;
+            break;
+        case FORMAT_RGBA5551:
+            glFormat = GL_RGBA;
+            glType = GL_UNSIGNED_SHORT_5_5_5_1;
+            bytePerPixel = 2;
+            break;
+        case FORMAT_RGBA8888:
+            glFormat = GL_RGBA;
+            glType = GL_UNSIGNED_BYTE;
+            bytePerPixel = 4;
+            break;
     }
+
+    glWidth = texInfo->realWidth;
+    glHeight = texInfo->realHeight;
+    texInfo->textureBytes = (glWidth * glHeight) * bytePerPixel;
+    getTexel = texFormat.getTexel;
 
     bpl = gSP.bgImage.width << gSP.bgImage.size >> 1;
     numBytes = bpl * gSP.bgImage.height;
-    swapped = (u8*) malloc( numBytes );
-    UnswapCopy( &RDRAM[gSP.bgImage.address], swapped, numBytes );
-    dest = (u32*) malloc( texInfo->textureBytes );
+    swapped = (u8*) malloc(numBytes);
+    UnswapCopy(&RDRAM[gSP.bgImage.address], swapped, numBytes);
+    dest = (u32*) malloc(texInfo->textureBytes);
 
     clampSClamp = texInfo->width - 1;
     clampTClamp = texInfo->height - 1;
-
-    if (GetTexel == GetNone)
-        printf("[gles2n64]: Trying to retrieve texture data of unknown format \n");
 
     j = 0;
     for (y = 0; y < texInfo->realHeight; y++)
     {
         ty = min(y, clampTClamp);
         src = &swapped[bpl * ty];
-
         for (x = 0; x < texInfo->realWidth; x++)
         {
             tx = min(x, clampSClamp);
-
-            if (glType == GL_UNSIGNED_BYTE)
-                ((u32*)dest)[j++] = GetTexel( (u64*)src, tx, 0, texInfo->palette );
-            else
-                ((u16*)dest)[j++] = GetTexel( (u64*)src, tx, 0, texInfo->palette );
+            if (bytePerPixel == 4)
+                ((u32*)dest)[j++] = getTexel( (u64*)src, tx, 0, texInfo->palette );
+            else if (bytePerPixel == 2)
+                ((u16*)dest)[j++] = getTexel( (u64*)src, tx, 0, texInfo->palette );
+            else if (bytePerPixel == 1)
+                ((u8*)dest)[j++] = getTexel( (u64*)src, tx, 0, texInfo->palette );
         }
     }
 
-    if (!cache.enable2xSaI)
+    if (!cache.enable2xSaI || (texFormat.format == FORMAT_I8 || texFormat.format == FORMAT_IA88))
     {
-        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, texInfo->realWidth, texInfo->realHeight, 0, GL_RGBA, glType, dest );
-        free( dest );
+        glTexImage2D( GL_TEXTURE_2D, 0, glFormat, glWidth, glHeight, 0, glFormat, glType, dest);
     }
     else
     {
         texInfo->textureBytes <<= 2;
 
-        scaledDest = (u32*)malloc( texInfo->textureBytes );
+        scaledDest = (u32*) malloc( texInfo->textureBytes );
 
         if (glType == GL_UNSIGNED_BYTE)
             _2xSaI8888( (u32*)dest, (u32*)scaledDest, texInfo->realWidth, texInfo->realHeight, texInfo->clampS, texInfo->clampT );
@@ -542,9 +637,9 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 
         glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, texInfo->realWidth << 1, texInfo->realHeight << 1, 0, GL_RGBA, glType, scaledDest );
 
-        free( dest );
         free( scaledDest );
     }
+    free(dest);
 
     if (OGL.texture.mipmap)
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -558,47 +653,58 @@ void TextureCache_Load( CachedTexture *texInfo )
     u16 x, y, i, j, tx, ty, line;
     u16 mirrorSBit, maskSMask, clampSClamp;
     u16 mirrorTBit, maskTMask, clampTClamp;
-    GetTexelFunc    GetTexel;
-    GLenum          glType;
 
-    if (((imageFormat[texInfo->size][texInfo->format].autoFormat == GL_RGBA8) ||
-        ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16)) ||
-        (cache.bitDepth == 2)) && (cache.bitDepth != 0))
+    int bytePerPixel=0;
+    TextureFormat   texFormat;
+    GetTexelFunc    getTexel;
+    GLint glWidth, glHeight;
+    GLenum glType;
+    GLenum glFormat;
+
+    __texture_format(texInfo->size, texInfo->format, &texFormat);
+
+#if 1
+    printf("LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format);
+#endif
+
+    if (texFormat.format == FORMAT_NONE)
     {
-        texInfo->textureBytes = (texInfo->realWidth * texInfo->realHeight) << 2;
-        if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
-        {
-            if (texInfo->size == G_IM_SIZ_4b)
-                GetTexel = GetCI4IA_RGBA8888;
-            else
-                GetTexel = GetCI8IA_RGBA8888;
+        printf("No Texture Conversion function available, format=%i", texInfo->format);
+    }
 
+    switch(texFormat.format)
+    {
+        case FORMAT_I8:
+            glFormat = GL_LUMINANCE;
             glType = GL_UNSIGNED_BYTE;
-        }
-        else
-        {
-            GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
-            glType = imageFormat[texInfo->size][texInfo->format].glType32;
-        }
-    }
-    else
-    {
-        texInfo->textureBytes = (texInfo->realWidth * texInfo->realHeight) << 1;
-        if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
-        {
-            if (texInfo->size == G_IM_SIZ_4b)
-                GetTexel = GetCI4IA_RGBA4444;
-            else
-                GetTexel = GetCI8IA_RGBA4444;
-
+            bytePerPixel = 1;
+            break;
+        case FORMAT_IA88:
+            glFormat = GL_LUMINANCE_ALPHA;
+            glType = GL_UNSIGNED_BYTE;
+            bytePerPixel = 2;
+            break;
+        case FORMAT_RGBA4444:
+            glFormat = GL_RGBA;
             glType = GL_UNSIGNED_SHORT_4_4_4_4;
-        }
-        else
-        {
-            GetTexel = imageFormat[texInfo->size][texInfo->format].Get16;
-            glType = imageFormat[texInfo->size][texInfo->format].glType16;
-        }
+            bytePerPixel = 2;
+            break;
+        case FORMAT_RGBA5551:
+            glFormat = GL_RGBA;
+            glType = GL_UNSIGNED_SHORT_5_5_5_1;
+            bytePerPixel = 2;
+            break;
+        case FORMAT_RGBA8888:
+            glFormat = GL_RGBA;
+            glType = GL_UNSIGNED_BYTE;
+            bytePerPixel = 4;
+            break;
     }
+
+    glWidth = texInfo->realWidth;
+    glHeight = texInfo->realHeight;
+    texInfo->textureBytes = (glWidth * glHeight) * bytePerPixel;
+    getTexel = texFormat.getTexel;
 
     dest = (u32*)malloc( texInfo->textureBytes );
 
@@ -638,21 +744,15 @@ void TextureCache_Load( CachedTexture *texInfo )
         texInfo->tMem = 0;
 
     // limit clamp values to min-0 (Perfect Dark has height=0 textures, making negative clamps)
-    if (clampTClamp & 0x8000)
-        clampTClamp = 0;
-    if (clampSClamp & 0x8000)
-        clampSClamp = 0;
-
-    if (GetTexel == GetNone)
-        printf("[gles2n64]: Trying to retrieve texture data of unknown format \n");
+    if (clampTClamp & 0x8000) clampTClamp = 0;
+    if (clampSClamp & 0x8000) clampSClamp = 0;
 
     j = 0;
     for (y = 0; y < texInfo->realHeight; y++)
     {
         ty = min(y, clampTClamp) & maskTMask;
 
-        if (y & mirrorTBit)
-            ty ^= maskTMask;
+        if (y & mirrorTBit) ty ^= maskTMask;
 
         src = &TMEM[(texInfo->tMem + line * ty) & 511];
 
@@ -661,20 +761,20 @@ void TextureCache_Load( CachedTexture *texInfo )
         {
             tx = min(x, clampSClamp) & maskSMask;
 
-            if (x & mirrorSBit)
-                tx ^= maskSMask;
+            if (x & mirrorSBit) tx ^= maskSMask;
 
-            if (glType == GL_UNSIGNED_BYTE)
-                ((u32*)dest)[j++] = GetTexel( src, tx, i, texInfo->palette );
-            else
-                ((u16*)dest)[j++] = GetTexel( src, tx, i, texInfo->palette );
+            if (bytePerPixel == 4)
+                ((u32*)dest)[j++] = getTexel( (u64*)src, tx, i, texInfo->palette );
+            else if (bytePerPixel == 2)
+                ((u16*)dest)[j++] = getTexel( (u64*)src, tx, i, texInfo->palette );
+            else if (bytePerPixel == 1)
+                ((u8*)dest)[j++] = getTexel( (u64*)src, tx, i, texInfo->palette );
         }
     }
 
-    if (!cache.enable2xSaI)
+    if (!cache.enable2xSaI || (texFormat.format == FORMAT_I8 || texFormat.format == FORMAT_IA88))
     {
         glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, texInfo->realWidth, texInfo->realHeight, 0, GL_RGBA, glType, dest );
-        free( dest );
     }
     else
     {
@@ -691,9 +791,9 @@ void TextureCache_Load( CachedTexture *texInfo )
 
         glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, texInfo->realWidth << 1, texInfo->realHeight << 1, 0, GL_RGBA, glType, scaledDest );
 
-        free( dest );
         free( scaledDest );
     }
+    free( dest );
 
     if (OGL.texture.mipmap)
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -900,7 +1000,11 @@ void TextureCache_Update( u32 t )
         return;
     }
 
-    maxTexels = imageFormat[gSP.textureTile[t]->size][gSP.textureTile[t]->format].maxTexels;
+    TextureFormat texFormat;
+    __texture_format(gSP.textureTile[t]->size, gSP.textureTile[t]->format, &texFormat);
+
+//    maxTexels = texFormat.maxTexels;
+    maxTexels = textureFormat[gSP.textureTile[t]->size][gSP.textureTile[t]->format].maxTexels;
 
     // Here comes a bunch of code that just calculates the texture size...I wish there was an easier way...
     tileWidth = gSP.textureTile[t]->lrs - gSP.textureTile[t]->uls + 1;
@@ -912,7 +1016,8 @@ void TextureCache_Update( u32 t )
     loadWidth = gDP.loadTile->lrs - gDP.loadTile->uls + 1;
     loadHeight = gDP.loadTile->lrt - gDP.loadTile->ult + 1;
 
-    lineWidth = gSP.textureTile[t]->line << imageFormat[gSP.textureTile[t]->size][gSP.textureTile[t]->format].lineShift;
+    //lineWidth = gSP.textureTile[t]->line << texFormat.lineShift;
+    lineWidth = gSP.textureTile[t]->line << textureFormat[gSP.textureTile[t]->size][gSP.textureTile[t]->format].lineShift;
 
     if (lineWidth) // Don't allow division by zero
         lineHeight = min( maxTexels / lineWidth, tileHeight );

@@ -188,9 +188,8 @@
 struct UniformLocation
 {
     struct {GLint loc; int val;} uTex0, uTex1;
-    struct {GLint loc; int val;} uEnableFog, uEnablePrimitiveZ;
-    struct {GLint loc; float val;} uFogMultiplier, uFogOffset, uPrimitiveZ,
-        uAlphaRef, uPrimLODFrac, uRenderState;
+    struct {GLint loc; int val;} uEnableFog;
+    struct {GLint loc; float val;} uFogMultiplier, uFogOffset, uAlphaRef, uPrimLODFrac, uRenderState;
     struct {GLint loc; float val[4];} uEnvColor, uPrimColor, uFogColor;
     struct {GLint loc; float val[2];}  uTexScale, uTexOffset[2], uCacheShiftScale[2],
         uCacheScale[2], uCacheOffset[2];
@@ -215,6 +214,9 @@ class DecodedMux
 {
     public:
         DecodedMux(u64 mux);
+
+        void swap(int cycle, int src0, int src1);
+        void replace(int cycle, int src, int dest);
         gDPCombine combine;
         int decode[4][4];
 };

@@ -255,11 +255,25 @@ inline u32 IA44_RGBA8888( u8 color )
     return (a << 24) | (i << 16) | (i << 8) | i;
 }
 
+inline u16 IA44_IA88( u8 color )
+{
+    u8 i = Four2Eight[color >> 4];
+    u8 a = Four2Eight[color & 0x0F];
+    return (a << 8) | i;
+}
+
 inline u16 IA31_RGBA4444( u8 color )
 {
     u8 i = Three2Four[color >> 1];
     u8 a = One2Four[color & 0x01];
     return (i << 12) | (i << 8) | (i << 4) | a;
+}
+
+inline u16 IA31_IA88( u8 color )
+{
+    u8 i = Three2Eight[color >> 1];
+    u8 a = One2Eight[color & 0x01];
+    return (i << 8) | a;
 }
 
 inline u32 IA31_RGBA8888( u8 color )
@@ -286,6 +300,16 @@ inline u16 I4_RGBA4444( u8 color )
     ret |= ret << 4;
     ret |= ret << 8;
     return ret;
+}
+
+inline u8 I4_I8( u8 color )
+{
+    return Four2Eight[color & 0x0f];
+}
+
+inline u16 I4_IA8( u8 color )
+{
+    return Four2Eight[color & 0x0f];
 }
 
 inline u32 I4_RGBA8888( u8 color )

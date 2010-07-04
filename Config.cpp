@@ -44,7 +44,7 @@ struct Option
 Option config_options[] =
 {
     {"#gles2n64 Graphics Plugin for N64", NULL, 0},
-    {"#by Orkin / glN64 developers and Adventus", NULL, 0},
+    {"#by Orkin / glN64 developers and Adventus.", NULL, 0},
 
     {"#These values are the physical pixel dimensions of", NULL, 0},
     {"#your screen. They are only used for centering the", NULL, 0},
@@ -58,6 +58,8 @@ Option config_options[] =
     {"#Centre will ensure that the window is centered", NULL, 0},
     {"#within the screen (overriding xpos/ypos).", NULL, 0},
 
+    {"window enable x11", &OGL.window.enablex11, 1},
+    {"window fullscreen", &OGL.window.fullscreen, 1},
     {"window centre", &OGL.window.centre, 1},
     {"window xpos", &OGL.window.xpos, 0},
     {"window ypos", &OGL.window.ypos, 0},
@@ -69,7 +71,7 @@ Option config_options[] =
     {"#framebuffer dimensions specify the resolution which",NULL,0},
     {"#gles2n64 will render to.",NULL,0},
 
-    {"framebuffer enable", &OGL.framebuffer.enable, 0},
+    {"framebuffer enable", &OGL.framebuffer.enable, 1},
     {"framebuffer bilinear", &OGL.framebuffer.bilinear, 0},
     {"framebuffer width", &OGL.framebuffer.width, 400},
     {"framebuffer height", &OGL.framebuffer.height, 240},
@@ -101,16 +103,11 @@ Option config_options[] =
     {"texture force bilinear", &OGL.texture.force_bilinear, 0},
     {"texture max anisotropy", &OGL.texture.max_anisotropy, 0},
 
+    {"#", NULL, 0},
+    {"update mode", &OGL.updateMode, 1},
+    {"ignore offscreen rendering", &OGL.ignoreOffscreenRendering, 0},
+    {"force screen clear", &OGL.forceClear, 0},
 
-    {"#RDP Clamping Mode (2=Fully Accurate, 1=Hack, 0=Default)", NULL, 0},
-    {"rdp clamp mode", &OGL.rdpClampMode, 0},
-
-    {"#Force Depthbuffer clear after Buffer swap", NULL, 0},
-    {"force depth clear", &OGL.forceDepthClear, 0},
-
-    {"#Use for paper mario and other flickering games", NULL, 0},
-    {"enable half buffer swap", &OGL.enableHalfVBHack, 0},
-    {"update mode", &OGL.updateMode, 0},
 };
 
 const int config_options_size = sizeof(config_options) / sizeof(Option);
@@ -161,7 +158,6 @@ void Config_LoadConfig()
 
     const char *pluginDir = GetPluginDir();
 
-
     // default configuration
     for(int i=0; i < config_options_size; i++)
     {
@@ -211,31 +207,24 @@ void Config_LoadConfig()
         }
     }
     if (f) fclose(f);
-
-
-    if (OGL.enableHalfVBHack)
-    {
-        printf("ENABLE HALF BUFFER SWAP HACK\n");
-    }
-
-    if (OGL.window.centre)
-    {
-        OGL.window.xpos = (OGL.screen.width - OGL.window.width) / 2;
-        OGL.window.ypos = (OGL.screen.height - OGL.window.height) / 2;
-    }
-
-    if (!OGL.framebuffer.enable)
-    {
-        OGL.framebuffer.xpos = OGL.window.xpos;
-        OGL.framebuffer.ypos = OGL.window.ypos;
-        OGL.framebuffer.width = OGL.window.width;
-        OGL.framebuffer.height= OGL.window.height;
-    }
-
 }
 
 void Config_DoConfig(HWND)
 {
-    printf("Please edit the config file gles2n64.conf manually.\n");
+    FILE *f = fopen("./config/gles2n64.conf", "r" );
+    if (!f)
+    {
+        // default configuration
+        for(int i=0; i < config_options_size; i++)
+        {
+            Option *o = &config_options[i];
+            if (o->data) *(o->data) = o->initial;
+        }
+        Config_WriteConfig("./config/gles2n64.conf");
+    }
+    else
+        fclose(f);
+
+    system("mousepad ./config/gles2n64.conf");
 }
 

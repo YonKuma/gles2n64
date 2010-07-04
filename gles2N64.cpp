@@ -140,24 +140,22 @@ EXPORT void CALL MoveScreen (int xpos, int ypos)
 EXPORT void CALL ProcessDList(void)
 {
     OGL.frame_dl++;
-    if ((OGL.frame_dl % OGL.frameskip) == 0)
-    {
-#ifdef RSPTHREAD
-        if (RSP.thread)
-        {
-            RSP.threadIdle = 0;
-            RSP.threadEvents.push(RSPMSG_PROCESSDLIST);
-            //while(!RSP.threadIdle){SDL_Delay(1);};
-        }
-#else
-        RSP_ProcessDList();
-#endif
-    }
-    else
+    if ((OGL.frame_dl % OGL.frameskip) != 0)
     {
         RSP.busy = FALSE;
         RSP.DList++;
+        return;
     }
+#ifdef RSPTHREAD
+    if (RSP.thread)
+    {
+        RSP.threadIdle = 0;
+        RSP.threadEvents.push(RSPMSG_PROCESSDLIST);
+        //while(!RSP.threadIdle){SDL_Delay(1);};
+    }
+#else
+    RSP_ProcessDList();
+#endif
 }
 
 EXPORT void CALL ProcessRDPList(void)
@@ -222,10 +220,8 @@ EXPORT void CALL ShowCFB (void)
 EXPORT void CALL UpdateScreen (void)
 {
     OGL.frame_vsync++;
-    if (OGL.enableHalfVBHack && ((OGL.frame_vsync%2) < 1))
-    {
-        return;
-    }
+    OGL.screenUpdate=true;
+
 
 #ifdef RSPTHREAD
     if (RSP.thread)
@@ -235,7 +231,7 @@ EXPORT void CALL UpdateScreen (void)
 //        while(!RSP.threadIdle){SDL_Delay(1);};
     }
 #else
-    VI_UpdateScreen();
+    if ((OGL.frame_dl % OGL.frameskip) == 0) VI_UpdateScreen();
 #endif
 }
 

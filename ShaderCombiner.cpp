@@ -78,9 +78,7 @@ const char *_vert = "                                       \n"\
 "                                                           \n"\
 "uniform bool		    uEnableFog;                         \n"\
 "uniform float			uFogMultiplier, uFogOffset;         \n"\
-"uniform bool 			uEnablePrimitiveZ;                  \n"\
 "uniform float 			uRenderState;                       \n"\
-"uniform float 			uPrimitiveZ;                        \n"\
 "                                                           \n"\
 "uniform mediump vec2 	uTexScale;                          \n"\
 "uniform mediump vec2 	uTexOffset[2];                      \n"\
@@ -113,13 +111,6 @@ const char *_vert = "                                       \n"\
 "vTexCoord1 = aTexCoord1;                                   \n"\
 "}                                                          \n"\
 "                                                           \n";
-
-const char * _vertprimz = "                                 \n"\
-"if (uEnablePrimitiveZ)                                     \n"\
-"{                                                          \n"\
-"	gl_Position.z = uPrimitiveZ;                            \n"\
-"}                                                          \n";
-
 
 const char * _vertfog = "                                   \n"\
 "if (uEnableFog)                                            \n"\
@@ -234,6 +225,33 @@ DecodedMux::DecodedMux(u64 mux)
     }
 }
 
+void DecodedMux::replace(int cycle, int src, int dest)
+{
+    for(int i=0;i<2;i++)
+    {
+        int ii = (cycle == 0) ? i : (2+i);
+        for(int j=0;j<4;j++)
+        {
+            if (decode[ii][j] == src) decode[ii][j] = dest;
+        }
+    }
+}
+
+
+void DecodedMux::swap(int cycle, int src0, int src1)
+{
+    for(int i=0;i<2;i++)
+    {
+        int ii = (cycle == 0) ? i : (2+i);
+        for(int j=0;j<4;j++)
+        {
+            if (decode[ii][j] == src0) decode[ii][j] = src1;
+            else if (decode[ii][j] == src1) decode[ii][j] = src0;
+        }
+    }
+}
+
+
 int _program_compare(ShaderProgram *prog, DecodedMux *dmux, u32 flags)
 {
     if (prog)
@@ -288,11 +306,9 @@ void _locate_uniforms(ShaderProgram *p)
     LocateUniform(uPrimLODFrac);
     LocateUniform(uFogColor);
     LocateUniform(uEnableFog);
-    LocateUniform(uEnablePrimitiveZ);
     LocateUniform(uRenderState);
     LocateUniform(uFogMultiplier);
     LocateUniform(uFogOffset);
-    LocateUniform(uPrimitiveZ);
     LocateUniform(uAlphaRef);
     LocateUniform(uTexScale);
     LocateUniform(uTexOffset[0]);
@@ -314,12 +330,10 @@ void _force_uniforms()
     SC_ForceUniform1f(uPrimLODFrac, gDP.primColor.l);
     SC_ForceUniform4fv(uFogColor, &gDP.fogColor.r);
     SC_ForceUniform1i(uEnableFog, (OGL.enableFog && (gSP.geometryMode & G_FOG)));
-    SC_ForceUniform1i(uEnablePrimitiveZ, (gDP.otherMode.depthSource == G_ZS_PRIM));
     SC_ForceUniform1f(uRenderState, OGL.renderState);
     SC_ForceUniform1f(uFogMultiplier, (float) gSP.fog.multiplier / 255.0f);
     SC_ForceUniform1f(uFogOffset, (float) gSP.fog.offset / 255.0f);
     SC_ForceUniform1f(uAlphaRef, (gDP.otherMode.cvgXAlpha) ? 0.5 : gDP.blendColor.a);
-    SC_ForceUniform1f(uPrimitiveZ, gDP.primDepth.z);
     SC_ForceUniform2f(uTexScale, gSP.texture.scales, gSP.texture.scalet);
 
     if (gSP.textureTile[0]){
@@ -372,12 +386,10 @@ void _update_uniforms()
     SC_SetUniform1f(uPrimLODFrac, gDP.primColor.l);
     SC_SetUniform4fv(uFogColor, &gDP.fogColor.r);
     SC_SetUniform1i(uEnableFog, (OGL.enableFog && (gSP.geometryMode & G_FOG)));
-    SC_SetUniform1i(uEnablePrimitiveZ, (gDP.otherMode.depthSource == G_ZS_PRIM));
     SC_SetUniform1f(uRenderState, OGL.renderState);
     SC_SetUniform1f(uFogMultiplier, (float) gSP.fog.multiplier / 255.0f);
     SC_SetUniform1f(uFogOffset, (float) gSP.fog.offset / 255.0f);
     SC_SetUniform1f(uAlphaRef, (gDP.otherMode.cvgXAlpha) ? 0.5 : gDP.blendColor.a);
-    SC_SetUniform1f(uPrimitiveZ, gDP.primDepth.z);
 
     //for some reason i must force these...
     SC_ForceUniform2f(uTexScale, gSP.texture.scales, gSP.texture.scalet);
@@ -419,10 +431,6 @@ void ShaderCombiner_Init()
     char *str = buff;
 
     str += sprintf(str, "%s", _vert);
-    if (OGL.enablePrimZ)
-    {
-        str += sprintf(str, "%s", _vertprimz);
-    }
     if (OGL.enableFog)
     {
         str += sprintf(str, "%s", _vertfog);
@@ -479,17 +487,25 @@ void ShaderCombiner_Set(u64 mux, int flags)
                                  0, 0, 0, 0, TEXEL0, 0, PRIMITIVE, 0 );
     }
 
-    // Hack for Mario Golf
-#if 0
-    if (OGL.hack_mariogolf && mux == 0xf1ffca7e00115407LL)
-    {
-        mux = EncodeCombineMode(0, 0, 0, 0, TEXEL0, 0, PRIMITIVE, 0,
-            0, 0, 0, 0, TEXEL0, 0, PRIMITIVE, 0 );
-    }
-#endif
-
 
     DecodedMux dmux(mux);
+
+    // Hack for Mario Golf
+    #if 0
+    if (OGL.enableMarioGolfHack && mux == 0x00115407f1ffca7eLL)
+    {
+        dmux.replace(TEXEL0, TEXEL1);
+        dmux.replace(TEXEL0_ALPHA, TEXEL1_ALPHA);
+    }
+    if (OGL.enableTonyHawkHack)// && (gSP.texture.tile == 1))
+    {
+        dmux.replace(TEXEL1, TEXEL0);
+        dmux.replace(TEXEL1_ALPHA, TEXEL0_ALPHA);
+    }
+    #endif
+
+    dmux.swap(1, TEXEL0, TEXEL1);
+    dmux.swap(1, TEXEL0_ALPHA, TEXEL1_ALPHA);
 
     //determine flags
     if (flags == -1)
@@ -498,14 +514,17 @@ void ShaderCombiner_Set(u64 mux, int flags)
         if ((OGL.enableFog) &&(gSP.geometryMode & G_FOG))
             flags |= SC_FOGENABLED;
 
-        if ((OGL.enableAlphaTest) &&
-            (((gDP.otherMode.alphaCompare == G_AC_THRESHOLD) && !(gDP.otherMode.alphaCvgSel)) ||
-             gDP.otherMode.cvgXAlpha))
+        if (OGL.enableAlphaTest)
         {
-            flags |= SC_ALPHAENABLED;
-            if (gDP.otherMode.cvgXAlpha || gDP.blendColor.a > 0.0f)
+            if ((gDP.otherMode.alphaCompare == G_AC_THRESHOLD) && !(gDP.otherMode.alphaCvgSel)){
+                flags |= SC_ALPHAENABLED;
+                if (gDP.blendColor.a > 0.0f) flags |= SC_ALPHAGREATER;
+            } else if (gDP.otherMode.cvgXAlpha){
+                flags |= SC_ALPHAENABLED;
                 flags |= SC_ALPHAGREATER;
+            }
         }
+
         if (gDP.otherMode.cycleType == G_CYC_2CYCLE)
             flags |= SC_2CYCLE;
     }
