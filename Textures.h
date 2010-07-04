@@ -10,8 +10,6 @@ struct CachedTexture
     GLuint  glName;
     u32     address;
     u32     crc;
-//  float   fulS, fulT;
-//  WORD    ulS, ulT, lrS, lrT;
     float   offsetS, offsetT;
     u32     maskS, maskT;
     u32     clampS, clampT;

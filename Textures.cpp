@@ -207,28 +207,24 @@ const TextureFormat textureFormat[4][6] =
         {   FORMAT_NONE,        GetNone,                4,  4096 }, // RGBA (SELECT)
         {   FORMAT_NONE,        GetNone,                4,  8192 }, // YUV
         {   FORMAT_RGBA5551,    GetCI4RGBA_RGBA5551,    4,  4096 }, // CI
-        //{   FORMAT_IA88,        GetIA31_IA88,           4,  8192 }, // IA
-        {   FORMAT_RGBA4444,    GetIA31_RGBA4444,       4,  8192 }, // IA
-        //{   FORMAT_I8,          GetI4_I8,               4,  8192 }, // I
-        {   FORMAT_RGBA4444,    GetI4_RGBA4444,         4,  8192 }, // IA
+        {   FORMAT_IA88,        GetIA31_IA88,           4,  8192 }, // IA
+        {   FORMAT_I8,          GetI4_I8,               4,  8192 }, // I
         {   FORMAT_RGBA8888,    GetCI4IA_RGBA8888,      4,  4096 }, // IA Palette
     },
     { // 8-bit
         {   FORMAT_NONE,        GetNone,                3,  2048 }, // RGBA (SELECT)
         {   FORMAT_NONE,        GetNone,                3,  4096 }, // YUV
         {   FORMAT_RGBA5551,    GetCI8RGBA_RGBA5551,    3,  2048 }, // CI
-        //{   FORMAT_IA88,        GetIA44_IA88,           3,  4096 }, // IA
-        {   FORMAT_RGBA4444,    GetIA44_RGBA4444,       3,  4096 }, // IA
-        //{   FORMAT_I8,          GetI8_I8,               3,  4096 }, // I
-        {   FORMAT_RGBA8888,    GetI8_RGBA8888,         3,  4096 }, // I
+        {   FORMAT_IA88,        GetIA44_IA88,           3,  4096 }, // IA
+        {   FORMAT_I8,          GetI8_I8,               3,  4096 }, // I
         {   FORMAT_RGBA8888,    GetCI8IA_RGBA8888,      3,  2048 }, // IA Palette
     },
     { // 16-bit
         {   FORMAT_RGBA5551,    GetRGBA5551_RGBA5551,   2,  2048 }, // RGBA
         {   FORMAT_NONE,        GetNone,                2,  2048 }, // YUV
         {   FORMAT_NONE,        GetNone,                2,  2048 }, // CI
-        //{   FORMAT_IA88,        GetIA88_IA88,           2,  2048 }, // IA
-        {   FORMAT_RGBA8888,    GetIA88_RGBA8888,           2,  2048 }, // IA
+        {   FORMAT_IA88,        GetIA88_IA88,           2,  2048 }, // IA
+        //{   FORMAT_RGBA8888,    GetIA88_RGBA8888,           2,  2048 }, // IA
         {   FORMAT_I8,          GetNone,                2,  2048 }, // I
         {   FORMAT_NONE,        GetNone,                2,  2048 }, // IA Palette
     },
@@ -549,7 +545,7 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 
     __texture_format(texInfo->size, texInfo->format, &texFormat);
 
-#if 1
+#ifdef PRINT_TEXTUREFORMAT
     printf("LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format);
 #endif
 
@@ -663,7 +659,7 @@ void TextureCache_Load( CachedTexture *texInfo )
 
     __texture_format(texInfo->size, texInfo->format, &texFormat);
 
-#if 1
+#ifdef PRINT_TEXTUREFORMAT
     printf("LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format);
 #endif
 
@@ -774,7 +770,7 @@ void TextureCache_Load( CachedTexture *texInfo )
 
     if (!cache.enable2xSaI || (texFormat.format == FORMAT_I8 || texFormat.format == FORMAT_IA88))
     {
-        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, texInfo->realWidth, texInfo->realHeight, 0, GL_RGBA, glType, dest );
+        glTexImage2D( GL_TEXTURE_2D, 0, glFormat, glWidth, glHeight, 0, glFormat, glType, dest);
     }
     else
     {
@@ -1003,8 +999,8 @@ void TextureCache_Update( u32 t )
     TextureFormat texFormat;
     __texture_format(gSP.textureTile[t]->size, gSP.textureTile[t]->format, &texFormat);
 
-//    maxTexels = texFormat.maxTexels;
-    maxTexels = textureFormat[gSP.textureTile[t]->size][gSP.textureTile[t]->format].maxTexels;
+    maxTexels = texFormat.maxTexels;
+    //maxTexels = textureFormat[gSP.textureTile[t]->size][gSP.textureTile[t]->format].maxTexels;
 
     // Here comes a bunch of code that just calculates the texture size...I wish there was an easier way...
     tileWidth = gSP.textureTile[t]->lrs - gSP.textureTile[t]->uls + 1;
@@ -1016,8 +1012,8 @@ void TextureCache_Update( u32 t )
     loadWidth = gDP.loadTile->lrs - gDP.loadTile->uls + 1;
     loadHeight = gDP.loadTile->lrt - gDP.loadTile->ult + 1;
 
-    //lineWidth = gSP.textureTile[t]->line << texFormat.lineShift;
-    lineWidth = gSP.textureTile[t]->line << textureFormat[gSP.textureTile[t]->size][gSP.textureTile[t]->format].lineShift;
+    lineWidth = gSP.textureTile[t]->line << texFormat.lineShift;
+    //lineWidth = gSP.textureTile[t]->line << textureFormat[gSP.textureTile[t]->size][gSP.textureTile[t]->format].lineShift;
 
     if (lineWidth) // Don't allow division by zero
         lineHeight = min( maxTexels / lineWidth, tileHeight );
