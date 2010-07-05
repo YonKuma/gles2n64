@@ -104,6 +104,9 @@ struct GLInfo
 
     int     frameskip, vsync;
     int     frame_vsync, frame_actual, frame_dl;
+    int     frame_prevdl;
+    int     mustRenderDlist;
+
     int     logFrameRate;
     int     enableFog;
     int     enablePrimZ;

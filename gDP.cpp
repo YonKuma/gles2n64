@@ -383,6 +383,8 @@ void gDPSetColorImage( u32 format, u32 size, u32 width, u32 address )
         int i;
 
         //colorimage byte size:
+        //color image height is not the best thing to base this on, its normally set
+        //later on in the code
         int s = 0;
         switch(size)
         {

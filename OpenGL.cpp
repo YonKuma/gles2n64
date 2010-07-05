@@ -666,7 +666,9 @@ void OGL_UpdateStates()
             SC_ForceUniform2f(uCacheScale[0], cache.current[0]->scaleS, cache.current[0]->scaleT);
             SC_ForceUniform2f(uCacheOffset[0], cache.current[0]->offsetS, cache.current[0]->offsetT);
         }
-        else TextureCache_ActivateDummy(0);
+        //else TextureCache_ActivateDummy(0);
+
+        //Note: enabling dummies makes some F-zero X textures flicker.... strange.
 
         if (scProgramCurrent->usesT1)
         {
@@ -676,7 +678,7 @@ void OGL_UpdateStates()
             SC_ForceUniform2f(uCacheScale[1], cache.current[1]->scaleS, cache.current[1]->scaleT);
             SC_ForceUniform2f(uCacheOffset[1], cache.current[1]->offsetS, cache.current[1]->offsetT);
         }
-        else TextureCache_ActivateDummy(1);
+        //else TextureCache_ActivateDummy(1);
     }
 
     if ((gDP.changed & CHANGED_FOGCOLOR) && OGL.enableFog)
@@ -1257,6 +1259,8 @@ OGL_SwapBuffers()
     if (OGL.framebuffer.enable)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClearColor(0,0,0,0);
+        glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(OGL.defaultProgram);
         glDisable(GL_SCISSOR_TEST);
@@ -1293,13 +1297,15 @@ OGL_SwapBuffers()
         eglSwapBuffers(OGL.EGL.display, OGL.EGL.surface);
 
         glBindFramebuffer(GL_FRAMEBUFFER, OGL.framebuffer.fb);
-        if (scProgramCurrent) glUseProgram(scProgramCurrent->program);
+        OGL_UpdateViewport();
+        gDP.changed |= CHANGED_COMBINE;
         OGL.renderState = RS_NONE;
     }
     else
     {
         eglSwapBuffers(OGL.EGL.display, OGL.EGL.surface);
     }
+
     OGL.screenUpdate = false;
 
     if (OGL.forceClear)

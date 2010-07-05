@@ -139,13 +139,7 @@ EXPORT void CALL MoveScreen (int xpos, int ypos)
 
 EXPORT void CALL ProcessDList(void)
 {
-    OGL.frame_dl++;
-    if ((OGL.frame_dl % OGL.frameskip) != 0)
-    {
-        RSP.busy = FALSE;
-        RSP.DList++;
-        return;
-    }
+    printf("PROCESS DLIST dl=%i vysnc=%i \n", OGL.frame_dl, OGL.frame_vsync);
 #ifdef RSPTHREAD
     if (RSP.thread)
     {
@@ -154,7 +148,17 @@ EXPORT void CALL ProcessDList(void)
         //while(!RSP.threadIdle){SDL_Delay(1);};
     }
 #else
+
+    OGL.frame_dl++;
+    if ((OGL.frame_vsync % OGL.frameskip) != 0)
+    {
+        RSP.busy = FALSE;
+        RSP.DList++;
+        return;
+    }
+
     RSP_ProcessDList();
+    OGL.mustRenderDlist = true;
 #endif
 }
 
@@ -206,6 +210,9 @@ EXPORT void CALL RomOpen (void)
 #endif
     OGL.frame_vsync = 0;
     OGL.frame_dl = 0;
+    OGL.frame_prevdl = -1;
+    OGL.mustRenderDlist = false;
+
     OGL_ResizeWindow();
 
 #ifdef DEBUG
@@ -219,9 +226,7 @@ EXPORT void CALL ShowCFB (void)
 
 EXPORT void CALL UpdateScreen (void)
 {
-    OGL.frame_vsync++;
-    OGL.screenUpdate=true;
-
+    printf("UPDATE SCREEN dl=%i prevdl=%i vysnc=%i must=%i\n", OGL.frame_dl, OGL.frame_prevdl, OGL.frame_vsync, OGL.mustRenderDlist);
 
 #ifdef RSPTHREAD
     if (RSP.thread)
@@ -231,7 +236,21 @@ EXPORT void CALL UpdateScreen (void)
 //        while(!RSP.threadIdle){SDL_Delay(1);};
     }
 #else
-    if ((OGL.frame_dl % OGL.frameskip) == 0) VI_UpdateScreen();
+
+    //has there been any display lists since last update
+    if (OGL.frame_prevdl == OGL.frame_dl) return;
+
+    OGL.frame_prevdl = OGL.frame_dl;
+
+    //only  update if we have encountered > 10 DLIST.
+    if (OGL.frame_dl > 0) OGL.frame_vsync++;
+
+    if (OGL.mustRenderDlist)
+    {
+        OGL.screenUpdate=true;
+        VI_UpdateScreen();
+        OGL.mustRenderDlist = false;
+    }
 #endif
 }
 

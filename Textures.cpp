@@ -27,7 +27,7 @@
 #define FORMAT_RGBA5551 4
 #define FORMAT_RGBA8888 5
 
-#define PRINT_TEXTUREFORMAT
+//#define PRINT_TEXTUREFORMAT
 
 
 TextureCache    cache;
