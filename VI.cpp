@@ -65,13 +65,6 @@ void VI_UpdateScreen()
 
     switch(OGL.updateMode)
     {
-        case SCREEN_UPDATE_AT_VI_UPDATE:
-            if (gSP.changed & CHANGED_COLORBUFFER)
-            {
-                OGL_SwapBuffers();
-                gSP.changed &= ~CHANGED_COLORBUFFER;
-            }
-            break;
 
         case SCREEN_UPDATE_AT_VI_CHANGE:
             if (*REG.VI_ORIGIN != VI.lastOrigin)
@@ -83,6 +76,13 @@ void VI_UpdateScreen()
             }
             break;
 
+        default: //SCREEN_UPDATE_AT_VI_UPDATE
+            if (gSP.changed & CHANGED_COLORBUFFER)
+            {
+                OGL_SwapBuffers();
+                gSP.changed &= ~CHANGED_COLORBUFFER;
+            }
+            break;
     }
 
 }

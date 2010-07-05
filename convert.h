@@ -307,9 +307,15 @@ inline u8 I4_I8( u8 color )
     return Four2Eight[color & 0x0f];
 }
 
-inline u16 I4_IA8( u8 color )
+inline u16 I4_IA88( u8 color )
 {
-    return Four2Eight[color & 0x0f];
+    u32 c = Four2Eight[color & 0x0f];
+    return (c << 8) | c;
+}
+
+inline u16 I8_IA88( u8 color )
+{
+    return (color << 8) | color;
 }
 
 inline u32 I4_RGBA8888( u8 color )

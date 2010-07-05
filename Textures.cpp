@@ -27,6 +27,9 @@
 #define FORMAT_RGBA5551 4
 #define FORMAT_RGBA8888 5
 
+#define PRINT_TEXTUREFORMAT
+
+
 TextureCache    cache;
 
 typedef u32 (*GetTexelFunc)( u64 *src, u16 x, u16 i, u8 palette );
@@ -102,10 +105,10 @@ u32 GetI4_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
     return I4_RGBA4444( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
-u32 GetI4_I8( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetI4_IA88( u64 *src, u16 x, u16 i, u8 palette )
 {
     u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
-    return I4_I8( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
+    return I4_IA88( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
 u32 GetCI8IA_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
@@ -151,6 +154,12 @@ u32 GetI8_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 u32 GetI8_I8( u64 *src, u16 x, u16 i, u8 palette )
 {
     return ((u8*)src)[x^(i<<1)];
+}
+
+u32 GetI8_IA88( u64 *src, u16 x, u16 i, u8 palette )
+{
+    u32 c = ((u8*)src)[x^(i<<1)];
+    return (c << 8) | c;
 }
 
 u32 GetI8_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
@@ -201,31 +210,40 @@ struct TextureFormat
     int lineShift, maxTexels;
 };
 
+//NOTE: N64 Intensity (+ alpha) Textures have to be mapped to OGL RGBA textures because in
+//OGL an IA texture maps to [I, 0, 0, A] in the shader, on N64 its [I, I, I, A]. Maybe I
+//should include an option to use IA textures since some games don't have problems with
+//them.
+
 const TextureFormat textureFormat[4][6] =
 {
     { // 4-bit
-        {   FORMAT_NONE,        GetNone,                4,  4096 }, // RGBA (SELECT)
+        {   FORMAT_RGBA5551,    GetCI4RGBA_RGBA5551,    4,  4096 }, // RGBA (SELECT)
         {   FORMAT_NONE,        GetNone,                4,  8192 }, // YUV
         {   FORMAT_RGBA5551,    GetCI4RGBA_RGBA5551,    4,  4096 }, // CI
-        {   FORMAT_IA88,        GetIA31_IA88,           4,  8192 }, // IA
-        {   FORMAT_I8,          GetI4_I8,               4,  8192 }, // I
+        //{   FORMAT_IA88,        GetIA31_IA88,           4,  8192 }, // IA
+        {   FORMAT_RGBA4444,    GetIA31_RGBA4444,       4,  8192 }, // IA
+        //{   FORMAT_IA88,        GetI4_IA88,             4,  8192 }, // I
+        {   FORMAT_RGBA4444,    GetI4_RGBA4444,         4,  8192 }, // I
         {   FORMAT_RGBA8888,    GetCI4IA_RGBA8888,      4,  4096 }, // IA Palette
     },
     { // 8-bit
-        {   FORMAT_NONE,        GetNone,                3,  2048 }, // RGBA (SELECT)
+        {   FORMAT_RGBA5551,    GetCI8RGBA_RGBA5551,    3,  2048 }, // RGBA (SELECT)
         {   FORMAT_NONE,        GetNone,                3,  4096 }, // YUV
         {   FORMAT_RGBA5551,    GetCI8RGBA_RGBA5551,    3,  2048 }, // CI
-        {   FORMAT_IA88,        GetIA44_IA88,           3,  4096 }, // IA
-        {   FORMAT_I8,          GetI8_I8,               3,  4096 }, // I
+        //{   FORMAT_IA88,        GetIA44_IA88,           3,  4096 }, // IA
+        {   FORMAT_RGBA4444,    GetIA44_RGBA4444,           3,  4096 }, // IA
+        //{   FORMAT_IA88,          GetI8_IA88,           3,  4096 }, // I
+        {   FORMAT_RGBA8888,    GetI8_RGBA8888,         3,  4096 }, // I
         {   FORMAT_RGBA8888,    GetCI8IA_RGBA8888,      3,  2048 }, // IA Palette
     },
     { // 16-bit
         {   FORMAT_RGBA5551,    GetRGBA5551_RGBA5551,   2,  2048 }, // RGBA
         {   FORMAT_NONE,        GetNone,                2,  2048 }, // YUV
         {   FORMAT_NONE,        GetNone,                2,  2048 }, // CI
-        {   FORMAT_IA88,        GetIA88_IA88,           2,  2048 }, // IA
-        //{   FORMAT_RGBA8888,    GetIA88_RGBA8888,           2,  2048 }, // IA
-        {   FORMAT_I8,          GetNone,                2,  2048 }, // I
+        //{   FORMAT_IA88,        GetIA88_IA88,           2,  2048 }, // IA
+        {   FORMAT_RGBA8888,    GetIA88_RGBA8888,       2,  2048 }, // IA
+        {   FORMAT_NONE,        GetNone,                2,  2048 }, // I
         {   FORMAT_NONE,        GetNone,                2,  2048 }, // IA Palette
     },
     { // 32-bit
@@ -309,8 +327,6 @@ void __texture_format(int size, int format, TextureFormat *texFormat)
         else
             __texture_format_ci(size, format, texFormat);
     }
-
-
 }
 
 
@@ -546,7 +562,7 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
     __texture_format(texInfo->size, texInfo->format, &texFormat);
 
 #ifdef PRINT_TEXTUREFORMAT
-    printf("LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format);
+    printf("BG LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format);
 #endif
 
     if (texFormat.format == FORMAT_NONE)
@@ -660,7 +676,7 @@ void TextureCache_Load( CachedTexture *texInfo )
     __texture_format(texInfo->size, texInfo->format, &texFormat);
 
 #ifdef PRINT_TEXTUREFORMAT
-    printf("LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format);
+    printf("TEX LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format);
 #endif
 
     if (texFormat.format == FORMAT_NONE)
@@ -737,7 +753,9 @@ void TextureCache_Load( CachedTexture *texInfo )
 
     // Hack for Zelda warp texture
     if (((texInfo->tMem << 3) + (texInfo->width * texInfo->height << texInfo->size >> 1)) > 4096)
+    {
         texInfo->tMem = 0;
+    }
 
     // limit clamp values to min-0 (Perfect Dark has height=0 textures, making negative clamps)
     if (clampTClamp & 0x8000) clampTClamp = 0;
@@ -760,11 +778,17 @@ void TextureCache_Load( CachedTexture *texInfo )
             if (x & mirrorSBit) tx ^= maskSMask;
 
             if (bytePerPixel == 4)
+            {
                 ((u32*)dest)[j++] = getTexel( (u64*)src, tx, i, texInfo->palette );
+            }
             else if (bytePerPixel == 2)
+            {
                 ((u16*)dest)[j++] = getTexel( (u64*)src, tx, i, texInfo->palette );
+            }
             else if (bytePerPixel == 1)
+            {
                 ((u8*)dest)[j++] = getTexel( (u64*)src, tx, i, texInfo->palette );
+            }
         }
     }
 
@@ -790,6 +814,7 @@ void TextureCache_Load( CachedTexture *texInfo )
         free( scaledDest );
     }
     free( dest );
+
 
     if (OGL.texture.mipmap)
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -1121,7 +1146,6 @@ void TextureCache_Update( u32 t )
 
     cache.misses++;
 
-    // If multitexturing, set the appropriate texture
     glActiveTexture( GL_TEXTURE0 + t);
 
     cache.current[t] = TextureCache_AddTop();
@@ -1181,6 +1205,7 @@ void TextureCache_Update( u32 t )
         cache.current[t]->shiftScaleT = (f32)(1 << (16 - gSP.textureTile[t]->shiftt));
     else if (gSP.textureTile[t]->shiftt > 0)
         cache.current[t]->shiftScaleT /= (f32)(1 << gSP.textureTile[t]->shiftt);
+
 
     TextureCache_Load( cache.current[t] );
     TextureCache_ActivateTexture( t, cache.current[t] );

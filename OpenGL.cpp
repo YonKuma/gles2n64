@@ -161,7 +161,7 @@ void OGL_InitStates()
 {
     glEnable(GL_CULL_FACE);
     glEnableVertexAttribArray(SC_POSITION);
-    glPolygonOffset(-1.0f, -1.0f);
+    glPolygonOffset(-0.2f, -0.2f);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_ALWAYS);
     glDepthMask(GL_FALSE);
@@ -319,7 +319,8 @@ bool OGL_Start()
     EGLint nConfigs;
     GLint   success;
 
-    SDL_Init(SDL_INIT_TIMER);
+    // Already done in mupen:
+    //SDL_Init(SDL_INIT_TIMER);
 
 #ifdef SDL_WINDOW
 	if (!OGL_SDL_Start()) return false;
@@ -665,7 +666,7 @@ void OGL_UpdateStates()
             SC_ForceUniform2f(uCacheScale[0], cache.current[0]->scaleS, cache.current[0]->scaleT);
             SC_ForceUniform2f(uCacheOffset[0], cache.current[0]->offsetS, cache.current[0]->offsetT);
         }
-        //else TextureCache_ActivateDummy(0);
+        else TextureCache_ActivateDummy(0);
 
         if (scProgramCurrent->usesT1)
         {
@@ -675,7 +676,7 @@ void OGL_UpdateStates()
             SC_ForceUniform2f(uCacheScale[1], cache.current[1]->scaleS, cache.current[1]->scaleT);
             SC_ForceUniform2f(uCacheOffset[1], cache.current[1]->offsetS, cache.current[1]->offsetT);
         }
-        //else TextureCache_ActivateDummy(1);
+        else TextureCache_ActivateDummy(1);
     }
 
     if ((gDP.changed & CHANGED_FOGCOLOR) && OGL.enableFog)
