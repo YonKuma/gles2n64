@@ -8,6 +8,7 @@
 #endif
 #define timeGetTime() time(NULL)
 
+#include "Common.h"
 #include "OpenGL.h"
 #include "Textures.h"
 #include "GBI.h"
@@ -18,7 +19,7 @@
 #include "CRC.h"
 #include "convert.h"
 #include "2xSAI.h"
-#include "FrameBuffer.h"
+//#include "FrameBuffer.h"
 
 #define FORMAT_NONE     0
 #define FORMAT_I8       1
@@ -32,14 +33,14 @@
 
 TextureCache    cache;
 
-typedef u32 (*GetTexelFunc)( u64 *src, u16 x, u16 i, u8 palette );
+typedef u32 (*GetTexelFunc)( void *src, u16 x, u16 i, u8 palette );
 
-u32 GetNone( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetNone( void *src, u16 x, u16 i, u8 palette )
 {
     return 0x00000000;
 }
 
-u32 GetCI4IA_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI4IA_RGBA4444( void *src, u16 x, u16 i, u8 palette )
 {
     u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     if (x & 1)
@@ -48,7 +49,7 @@ u32 GetCI4IA_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
         return IA88_RGBA4444( *(u16*)&TMEM[256 + (palette << 4) + (color4B >> 4)] );
 }
 
-u32 GetCI4IA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI4IA_RGBA8888( void *src, u16 x, u16 i, u8 palette )
 {
     u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     if (x & 1)
@@ -57,7 +58,7 @@ u32 GetCI4IA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
         return IA88_RGBA8888( *(u16*)&TMEM[256 + (palette << 4) + (color4B >> 4)] );
 }
 
-u32 GetCI4RGBA_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI4RGBA_RGBA5551( void *src, u16 x, u16 i, u8 palette )
 {
     u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     if (x & 1)
@@ -66,7 +67,7 @@ u32 GetCI4RGBA_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
         return RGBA5551_RGBA5551( *(u16*)&TMEM[256 + (palette << 4) + (color4B >> 4)] );
 }
 
-u32 GetCI4RGBA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI4RGBA_RGBA8888( void *src, u16 x, u16 i, u8 palette )
 {
     u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     if (x & 1)
@@ -75,129 +76,135 @@ u32 GetCI4RGBA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
         return RGBA5551_RGBA8888( *(u16*)&TMEM[256 + (palette << 4) + (color4B >> 4)] );
 }
 
-u32 GetIA31_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA31_RGBA8888( void *src, u16 x, u16 i, u8 palette )
 {
     u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     return IA31_RGBA8888( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
-u32 GetIA31_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA31_RGBA4444( void *src, u16 x, u16 i, u8 palette )
 {
     u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     return IA31_RGBA4444( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
-u32 GetIA31_IA88( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA31_IA88( void *src, u16 x, u16 i, u8 palette )
 {
     u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     return IA31_IA88( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
-u32 GetI4_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetI4_RGBA8888( void *src, u16 x, u16 i, u8 palette )
 {
     u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     return I4_RGBA8888( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
-u32 GetI4_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetI4_RGBA4444( void *src, u16 x, u16 i, u8 palette )
 {
     u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     return I4_RGBA4444( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
-u32 GetI4_IA88( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetI4_I8( void *src, u16 x, u16 i, u8 palette )
+{
+    u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
+    return I4_I8( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
+}
+
+
+u32 GetI4_IA88( void *src, u16 x, u16 i, u8 palette )
 {
     u8 color4B = ((u8*)src)[(x>>1)^(i<<1)];
     return I4_IA88( (x & 1) ? (color4B & 0x0F) : (color4B >> 4) );
 }
 
-u32 GetCI8IA_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI8IA_RGBA4444( void *src, u16 x, u16 i, u8 palette )
 {
     return IA88_RGBA4444( *(u16*)&TMEM[256 + ((u8*)src)[x^(i<<1)]] );
 }
 
-u32 GetCI8IA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI8IA_RGBA8888( void *src, u16 x, u16 i, u8 palette )
 {
     return IA88_RGBA8888( *(u16*)&TMEM[256 + ((u8*)src)[x^(i<<1)]] );
 }
 
-u32 GetCI8RGBA_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI8RGBA_RGBA5551( void *src, u16 x, u16 i, u8 palette )
 {
     return RGBA5551_RGBA5551( *(u16*)&TMEM[256 + ((u8*)src)[x^(i<<1)]] );
 }
 
-u32 GetCI8RGBA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetCI8RGBA_RGBA8888( void *src, u16 x, u16 i, u8 palette )
 {
     return RGBA5551_RGBA8888( *(u16*)&TMEM[256 + ((u8*)src)[x^(i<<1)]] );
 }
 
-u32 GetIA44_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA44_RGBA8888( void *src, u16 x, u16 i, u8 palette )
 {
     return IA44_RGBA8888(((u8*)src)[x^(i<<1)]);
 }
 
-u32 GetIA44_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA44_RGBA4444( void *src, u16 x, u16 i, u8 palette )
 {
     return IA44_RGBA4444(((u8*)src)[x^(i<<1)]);
 }
 
-u32 GetIA44_IA88( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA44_IA88( void *src, u16 x, u16 i, u8 palette )
 {
     return IA44_IA88(((u8*)src)[x^(i<<1)]);
 }
 
-u32 GetI8_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetI8_RGBA8888( void *src, u16 x, u16 i, u8 palette )
 {
     return I8_RGBA8888(((u8*)src)[x^(i<<1)]);
 }
 
-u32 GetI8_I8( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetI8_I8( void *src, u16 x, u16 i, u8 palette )
 {
     return ((u8*)src)[x^(i<<1)];
 }
 
-u32 GetI8_IA88( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetI8_IA88( void *src, u16 x, u16 i, u8 palette )
 {
-    u32 c = ((u8*)src)[x^(i<<1)];
-    return (c << 8) | c;
+    return I8_IA88(((u8*)src)[x^(i<<1)]);
 }
 
-u32 GetI8_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetI8_RGBA4444( void *src, u16 x, u16 i, u8 palette )
 {
     return I8_RGBA4444(((u8*)src)[x^(i<<1)]);
 }
 
-u32 GetRGBA5551_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetRGBA5551_RGBA8888( void *src, u16 x, u16 i, u8 palette )
 {
     return RGBA5551_RGBA8888( ((u16*)src)[x^i] );
 }
 
-u32 GetRGBA5551_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetRGBA5551_RGBA5551( void *src, u16 x, u16 i, u8 palette )
 {
     return RGBA5551_RGBA5551( ((u16*)src)[x^i] );
 }
 
-u32 GetIA88_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA88_RGBA8888( void *src, u16 x, u16 i, u8 palette )
 {
     return IA88_RGBA8888(((u16*)src)[x^i]);
 }
 
-u32 GetIA88_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA88_RGBA4444( void *src, u16 x, u16 i, u8 palette )
 {
     return IA88_RGBA4444(((u16*)src)[x^i]);
 }
 
-u32 GetIA88_IA88( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetIA88_IA88( void *src, u16 x, u16 i, u8 palette )
 {
-    return ((u8*)src)[x^(i<<1)];
+    return IA88_IA88(((u16*)src)[x^i]);
 }
 
-u32 GetRGBA8888_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetRGBA8888_RGBA8888( void *src, u16 x, u16 i, u8 palette )
 {
     return ((u32*)src)[x^i];
 }
 
-u32 GetRGBA8888_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
+u32 GetRGBA8888_RGBA4444( void *src, u16 x, u16 i, u8 palette )
 {
     return RGBA8888_RGBA4444(((u32*)src)[x^i]);
 }
@@ -210,67 +217,88 @@ struct TextureFormat
     int lineShift, maxTexels;
 };
 
-//NOTE: N64 Intensity (+ alpha) Textures have to be mapped to OGL RGBA textures because in
-//OGL an IA texture maps to [I, 0, 0, A] in the shader, on N64 its [I, I, I, A]. Maybe I
-//should include an option to use IA textures since some games don't have problems with
-//them.
 
-const TextureFormat textureFormat[4][6] =
+TextureFormat textureFormatIA[4*6] =
 {
-    { // 4-bit
-        {   FORMAT_RGBA5551,    GetCI4RGBA_RGBA5551,    4,  4096 }, // RGBA (SELECT)
-        {   FORMAT_NONE,        GetNone,                4,  8192 }, // YUV
-        {   FORMAT_RGBA5551,    GetCI4RGBA_RGBA5551,    4,  4096 }, // CI
-        //{   FORMAT_IA88,        GetIA31_IA88,           4,  8192 }, // IA
-        {   FORMAT_RGBA4444,    GetIA31_RGBA4444,       4,  8192 }, // IA
-        //{   FORMAT_IA88,        GetI4_IA88,             4,  8192 }, // I
-        {   FORMAT_RGBA4444,    GetI4_RGBA4444,         4,  8192 }, // I
-        {   FORMAT_RGBA8888,    GetCI4IA_RGBA8888,      4,  4096 }, // IA Palette
-    },
-    { // 8-bit
-        {   FORMAT_RGBA5551,    GetCI8RGBA_RGBA5551,    3,  2048 }, // RGBA (SELECT)
-        {   FORMAT_NONE,        GetNone,                3,  4096 }, // YUV
-        {   FORMAT_RGBA5551,    GetCI8RGBA_RGBA5551,    3,  2048 }, // CI
-        //{   FORMAT_IA88,        GetIA44_IA88,           3,  4096 }, // IA
-        {   FORMAT_RGBA4444,    GetIA44_RGBA4444,           3,  4096 }, // IA
-        //{   FORMAT_IA88,          GetI8_IA88,           3,  4096 }, // I
-        {   FORMAT_RGBA8888,    GetI8_RGBA8888,         3,  4096 }, // I
-        {   FORMAT_RGBA8888,    GetCI8IA_RGBA8888,      3,  2048 }, // IA Palette
-    },
-    { // 16-bit
-        {   FORMAT_RGBA5551,    GetRGBA5551_RGBA5551,   2,  2048 }, // RGBA
-        {   FORMAT_NONE,        GetNone,                2,  2048 }, // YUV
-        {   FORMAT_NONE,        GetNone,                2,  2048 }, // CI
-        //{   FORMAT_IA88,        GetIA88_IA88,           2,  2048 }, // IA
-        {   FORMAT_RGBA8888,    GetIA88_RGBA8888,       2,  2048 }, // IA
-        {   FORMAT_NONE,        GetNone,                2,  2048 }, // I
-        {   FORMAT_NONE,        GetNone,                2,  2048 }, // IA Palette
-    },
-    { // 32-bit
-        {   FORMAT_RGBA8888,    GetRGBA8888_RGBA8888,   2,  1024 }, // RGBA
-        {   FORMAT_NONE,        GetNone,                2,  1024 }, // YUV
-        {   FORMAT_NONE,        GetNone,                2,  1024 }, // CI
-        {   FORMAT_NONE,        GetNone,                2,  1024 }, // IA
-        {   FORMAT_NONE,        GetNone,                2,  1024 }, // I
-        {   FORMAT_NONE,        GetNone,                2,  1024 }, // IA Palette
-    }
+    // 4-bit
+    {   FORMAT_RGBA5551,    GetCI4RGBA_RGBA5551,    4,  4096 }, // RGBA (SELECT)
+    {   FORMAT_NONE,        GetNone,                4,  8192 }, // YUV
+    {   FORMAT_RGBA5551,    GetCI4RGBA_RGBA5551,    4,  4096 }, // CI
+    {   FORMAT_IA88,        GetIA31_IA88,           4,  8192 }, // IA
+    {   FORMAT_IA88,        GetI4_IA88,             4,  8192 }, // I
+    {   FORMAT_RGBA8888,    GetCI4IA_RGBA8888,      4,  4096 }, // IA Palette
+    // 8-bit
+    {   FORMAT_RGBA5551,    GetCI8RGBA_RGBA5551,    3,  2048 }, // RGBA (SELECT)
+    {   FORMAT_NONE,        GetNone,                3,  4096 }, // YUV
+    {   FORMAT_RGBA5551,    GetCI8RGBA_RGBA5551,    3,  2048 }, // CI
+    {   FORMAT_IA88,        GetIA44_IA88,           3,  4096 }, // IA
+    {   FORMAT_IA88,        GetI8_IA88,             3,  4096 }, // I
+    {   FORMAT_RGBA8888,    GetCI8IA_RGBA8888,      3,  2048 }, // IA Palette
+    // 16-bit
+    {   FORMAT_RGBA5551,    GetRGBA5551_RGBA5551,   2,  2048 }, // RGBA
+    {   FORMAT_NONE,        GetNone,                2,  2048 }, // YUV
+    {   FORMAT_NONE,        GetNone,                2,  2048 }, // CI
+    {   FORMAT_IA88,        GetIA88_IA88,           2,  2048 }, // IA
+    {   FORMAT_NONE,        GetNone,                2,  2048 }, // I
+    {   FORMAT_NONE,        GetNone,                2,  2048 }, // IA Palette
+    // 32-bit
+    {   FORMAT_RGBA8888,    GetRGBA8888_RGBA8888,   2,  1024 }, // RGBA
+    {   FORMAT_NONE,        GetNone,                2,  1024 }, // YUV
+    {   FORMAT_NONE,        GetNone,                2,  1024 }, // CI
+    {   FORMAT_NONE,        GetNone,                2,  1024 }, // IA
+    {   FORMAT_NONE,        GetNone,                2,  1024 }, // I
+    {   FORMAT_NONE,        GetNone,                2,  1024 }, // IA Palette
 };
 
+TextureFormat textureFormatRGBA[4*6] =
+{
+    // 4-bit
+    {   FORMAT_RGBA5551,    GetCI4RGBA_RGBA5551,    4,  4096 }, // RGBA (SELECT)
+    {   FORMAT_NONE,        GetNone,                4,  8192 }, // YUV
+    {   FORMAT_RGBA5551,    GetCI4RGBA_RGBA5551,    4,  4096 }, // CI
+    {   FORMAT_RGBA4444,    GetIA31_RGBA4444,       4,  8192 }, // IA
+    {   FORMAT_RGBA4444,    GetI4_RGBA4444,         4,  8192 }, // I
+    {   FORMAT_RGBA8888,    GetCI4IA_RGBA8888,      4,  4096 }, // IA Palette
+    // 8-bit
+    {   FORMAT_RGBA5551,    GetCI8RGBA_RGBA5551,    3,  2048 }, // RGBA (SELECT)
+    {   FORMAT_NONE,        GetNone,                3,  4096 }, // YUV
+    {   FORMAT_RGBA5551,    GetCI8RGBA_RGBA5551,    3,  2048 }, // CI
+    {   FORMAT_RGBA4444,    GetIA44_RGBA4444,       3,  4096 }, // IA
+    {   FORMAT_RGBA8888,    GetI8_RGBA8888,         3,  4096 }, // I
+    {   FORMAT_RGBA8888,    GetCI8IA_RGBA8888,      3,  2048 }, // IA Palette
+    // 16-bit
+    {   FORMAT_RGBA5551,    GetRGBA5551_RGBA5551,   2,  2048 }, // RGBA
+    {   FORMAT_NONE,        GetNone,                2,  2048 }, // YUV
+    {   FORMAT_NONE,        GetNone,                2,  2048 }, // CI
+    {   FORMAT_RGBA8888,    GetIA88_RGBA8888,       2,  2048 }, // IA
+    {   FORMAT_NONE,        GetNone,                2,  2048 }, // I
+    {   FORMAT_NONE,        GetNone,                2,  2048 }, // IA Palette
+    // 32-bit
+    {   FORMAT_RGBA8888,    GetRGBA8888_RGBA8888,   2,  1024 }, // RGBA
+    {   FORMAT_NONE,        GetNone,                2,  1024 }, // YUV
+    {   FORMAT_NONE,        GetNone,                2,  1024 }, // CI
+    {   FORMAT_NONE,        GetNone,                2,  1024 }, // IA
+    {   FORMAT_NONE,        GetNone,                2,  1024 }, // I
+    {   FORMAT_NONE,        GetNone,                2,  1024 }, // IA Palette
+};
+
+
+TextureFormat *textureFormat = textureFormatIA;
 
 void __texture_format_rgba(int size, int format, TextureFormat *texFormat)
 {
     if (size < G_IM_SIZ_16b)
     {
         if (gDP.otherMode.textureLUT == G_TT_NONE)
-            *texFormat = textureFormat[size][G_IM_FMT_I];
+            *texFormat = textureFormat[size*6 + G_IM_FMT_I];
         else if (gDP.otherMode.textureLUT == G_TT_RGBA16)
-            *texFormat = textureFormat[size][G_IM_FMT_CI];
+            *texFormat = textureFormat[size*6 + G_IM_FMT_CI];
         else
-            *texFormat = textureFormat[size][G_IM_FMT_IA];
+            *texFormat = textureFormat[size*6 + G_IM_FMT_IA];
     }
     else
     {
-        *texFormat = textureFormat[size][G_IM_FMT_RGBA];
+        *texFormat = textureFormat[size*6 + G_IM_FMT_RGBA];
     }
 }
 
@@ -280,22 +308,22 @@ void __texture_format_ci(int size, int format, TextureFormat *texFormat)
     {
         case G_IM_SIZ_4b:
             if (gDP.otherMode.textureLUT == G_TT_IA16)
-                *texFormat = textureFormat[G_IM_SIZ_4b][G_IM_FMT_CI_IA];
+                *texFormat = textureFormat[G_IM_SIZ_4b*6 + G_IM_FMT_CI_IA];
             else
-                *texFormat = textureFormat[G_IM_SIZ_4b][G_IM_FMT_CI];
+                *texFormat = textureFormat[G_IM_SIZ_4b*6 + G_IM_FMT_CI];
             break;
 
         case G_IM_SIZ_8b:
             if (gDP.otherMode.textureLUT == G_TT_NONE)
-                *texFormat = textureFormat[G_IM_SIZ_8b][G_IM_FMT_I];
+                *texFormat = textureFormat[G_IM_SIZ_8b*6 + G_IM_FMT_I];
             else if (gDP.otherMode.textureLUT == G_TT_IA16)
-                *texFormat = textureFormat[G_IM_SIZ_8b][G_IM_FMT_CI_IA];
+                *texFormat = textureFormat[G_IM_SIZ_8b*6 + G_IM_FMT_CI_IA];
             else
-                *texFormat = textureFormat[G_IM_SIZ_8b][G_IM_FMT_CI];
+                *texFormat = textureFormat[G_IM_SIZ_8b*6 + G_IM_FMT_CI];
             break;
 
         default:
-            *texFormat = textureFormat[size][format];
+            *texFormat = textureFormat[size*6 + format];
     }
 }
 
@@ -307,7 +335,7 @@ void __texture_format(int size, int format, TextureFormat *texFormat)
     }
     else if (format == G_IM_FMT_YUV)
     {
-        *texFormat = textureFormat[size][G_IM_FMT_YUV];
+        *texFormat = textureFormat[size*6 + G_IM_FMT_YUV];
     }
     else if (format == G_IM_FMT_CI)
     {
@@ -318,12 +346,12 @@ void __texture_format(int size, int format, TextureFormat *texFormat)
         if (gDP.otherMode.textureLUT != G_TT_NONE)
             __texture_format_ci(size, format, texFormat);
         else
-            *texFormat = textureFormat[size][G_IM_FMT_IA];
+            *texFormat = textureFormat[size*6 + G_IM_FMT_IA];
     }
     else if (format == G_IM_FMT_I)
     {
         if (gDP.otherMode.textureLUT == G_TT_NONE)
-            *texFormat = textureFormat[size][G_IM_FMT_I];
+            *texFormat = textureFormat[size*6 + G_IM_FMT_I];
         else
             __texture_format_ci(size, format, texFormat);
     }
@@ -346,26 +374,28 @@ void TextureCache_Init()
     cache.enable2xSaI = OGL.texture.SaI2x;
     cache.bitDepth = OGL.texture.bit_depth;
 
+    if (OGL.texture.useIA) textureFormat = textureFormatIA;
+    else textureFormat = textureFormatRGBA;
+
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glGenTextures( 32, cache.glNoiseNames );
 
-    u8 noise[64*64*4];
+    srand(time(NULL));
+    u8 noise[64*64*2];
     for (u32 i = 0; i < 32; i++)
     {
         glBindTexture( GL_TEXTURE_2D, cache.glNoiseNames[i] );
-        srand( timeGetTime() );
         for (u32 y = 0; y < 64; y++)
         {
             for (u32 x = 0; x < 64; x++)
             {
-                u8 random = rand();
-                noise[y*64*4+x*4] = random;
-                noise[y*64*4+x*4+1] = random;
-                noise[y*64*4+x*4+2] = random;
-                noise[y*64*4+x*4+3] = random;
+                u32 r = (rand()&0xFF);
+                noise[y*64*2+x*2] = r;
+                noise[y*64*2+x*2+1] = r;
             }
         }
-        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, 64, 64, 0, GL_RGBA, GL_UNSIGNED_BYTE, noise );
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA, 64, 64, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, noise);
     }
 
     cache.dummy = TextureCache_AddTop();
@@ -555,19 +585,19 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
     int bytePerPixel=0;
     TextureFormat   texFormat;
     GetTexelFunc    getTexel;
-    GLint glWidth, glHeight;
-    GLenum glType;
-    GLenum glFormat;
+    GLint glWidth=0, glHeight=0;
+    GLenum glType=0;
+    GLenum glFormat=0;
 
     __texture_format(texInfo->size, texInfo->format, &texFormat);
 
 #ifdef PRINT_TEXTUREFORMAT
-    printf("BG LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format);
+    printf("BG LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format); fflush(stdout);
 #endif
 
     if (texFormat.format == FORMAT_NONE)
     {
-        printf("No Texture Conversion function available, format=%i", texInfo->format);
+        LOG(LOG_WARNING, "No Texture Conversion function available, size=%i format=%i\n", texInfo->size, texInfo->format);
     }
 
     switch(texFormat.format)
@@ -608,7 +638,7 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
     numBytes = bpl * gSP.bgImage.height;
     swapped = (u8*) malloc(numBytes);
     UnswapCopy(&RDRAM[gSP.bgImage.address], swapped, numBytes);
-    dest = (u32*) malloc(texInfo->textureBytes);
+    dest = (u32*)cache.textureBuffer;
 
     clampSClamp = texInfo->width - 1;
     clampTClamp = texInfo->height - 1;
@@ -622,20 +652,21 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
         {
             tx = min(x, clampSClamp);
             if (bytePerPixel == 4)
-                ((u32*)dest)[j++] = getTexel( (u64*)src, tx, 0, texInfo->palette );
+                ((u32*)dest)[j++] = getTexel(src, tx, 0, texInfo->palette);
             else if (bytePerPixel == 2)
-                ((u16*)dest)[j++] = getTexel( (u64*)src, tx, 0, texInfo->palette );
+                ((u16*)dest)[j++] = getTexel(src, tx, 0, texInfo->palette);
             else if (bytePerPixel == 1)
-                ((u8*)dest)[j++] = getTexel( (u64*)src, tx, 0, texInfo->palette );
+                ((u8*)dest)[j++] = getTexel(src, tx, 0, texInfo->palette);
         }
     }
 
     if (!cache.enable2xSaI || (texFormat.format == FORMAT_I8 || texFormat.format == FORMAT_IA88))
     {
-        glTexImage2D( GL_TEXTURE_2D, 0, glFormat, glWidth, glHeight, 0, glFormat, glType, dest);
+        glTexImage2D( GL_TEXTURE_2D, 0, glFormat, glWidth, glHeight, 0, glFormat, glType, cache.textureBuffer);
     }
     else
     {
+        LOG(LOG_VERBOSE, "Using 2xSAI Filter on Texture\n");
         texInfo->textureBytes <<= 2;
 
         scaledDest = (u32*) malloc( texInfo->textureBytes );
@@ -651,7 +682,9 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 
         free( scaledDest );
     }
-    free(dest);
+
+    free(swapped);
+
 
     if (OGL.texture.mipmap)
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -661,7 +694,7 @@ void TextureCache_Load( CachedTexture *texInfo )
 {
     u32 *dest, *scaledDest;
 
-    u64 *src;
+    void *src;
     u16 x, y, i, j, tx, ty, line;
     u16 mirrorSBit, maskSMask, clampSClamp;
     u16 mirrorTBit, maskTMask, clampTClamp;
@@ -669,19 +702,19 @@ void TextureCache_Load( CachedTexture *texInfo )
     int bytePerPixel=0;
     TextureFormat   texFormat;
     GetTexelFunc    getTexel;
-    GLint glWidth, glHeight;
-    GLenum glType;
-    GLenum glFormat;
+    GLint glWidth=0, glHeight=0;
+    GLenum glType=0;
+    GLenum glFormat=0;
 
     __texture_format(texInfo->size, texInfo->format, &texFormat);
 
 #ifdef PRINT_TEXTUREFORMAT
-    printf("TEX LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format);
+    printf("TEX LUT=%i, TEXTURE SIZE=%i, FORMAT=%i -> GL FORMAT=%i\n", gDP.otherMode.textureLUT, texInfo->size, texInfo->format, texFormat.format); fflush(stdout);
 #endif
 
     if (texFormat.format == FORMAT_NONE)
     {
-        printf("No Texture Conversion function available, format=%i", texInfo->format);
+        LOG(LOG_WARNING, "No Texture Conversion function available, size=%i format=%i\n", texInfo->size, texInfo->format);
     }
 
     switch(texFormat.format)
@@ -718,7 +751,12 @@ void TextureCache_Load( CachedTexture *texInfo )
     texInfo->textureBytes = (glWidth * glHeight) * bytePerPixel;
     getTexel = texFormat.getTexel;
 
-    dest = (u32*)malloc( texInfo->textureBytes );
+    if (texInfo->textureBytes > TEXTUREBUFFER_SIZE)
+    {
+        LOG(LOG_ERROR, "Texture Exceeds texture buffer dimensions: w=%i h=%i bpp=%i", glWidth, glHeight, bytePerPixel);
+    }
+
+    dest = (u32*)cache.textureBuffer;
 
     line = texInfo->line;
 
@@ -729,7 +767,7 @@ void TextureCache_Load( CachedTexture *texInfo )
     {
         clampSClamp = texInfo->clampS ? texInfo->clampWidth - 1 : (texInfo->mirrorS ? (texInfo->width << 1) - 1 : texInfo->width - 1);
         maskSMask = (1 << texInfo->maskS) - 1;
-        mirrorSBit = texInfo->mirrorS ? 1 << texInfo->maskS : 0;
+        mirrorSBit = texInfo->mirrorS ? (1 << texInfo->maskS) : 0;
     }
     else
     {
@@ -742,7 +780,7 @@ void TextureCache_Load( CachedTexture *texInfo )
     {
         clampTClamp = texInfo->clampT ? texInfo->clampHeight - 1 : (texInfo->mirrorT ? (texInfo->height << 1) - 1: texInfo->height - 1);
         maskTMask = (1 << texInfo->maskT) - 1;
-        mirrorTBit = texInfo->mirrorT ? 1 << texInfo->maskT : 0;
+        mirrorTBit = texInfo->mirrorT ? (1 << texInfo->maskT) : 0;
     }
     else
     {
@@ -765,11 +803,8 @@ void TextureCache_Load( CachedTexture *texInfo )
     for (y = 0; y < texInfo->realHeight; y++)
     {
         ty = min(y, clampTClamp) & maskTMask;
-
         if (y & mirrorTBit) ty ^= maskTMask;
-
         src = &TMEM[(texInfo->tMem + line * ty) & 511];
-
         i = (ty & 1) << 1;
         for (x = 0; x < texInfo->realWidth; x++)
         {
@@ -779,42 +814,47 @@ void TextureCache_Load( CachedTexture *texInfo )
 
             if (bytePerPixel == 4)
             {
-                ((u32*)dest)[j++] = getTexel( (u64*)src, tx, i, texInfo->palette );
+                ((u32*)dest)[j] = getTexel(src, tx, i, texInfo->palette);
             }
             else if (bytePerPixel == 2)
             {
-                ((u16*)dest)[j++] = getTexel( (u64*)src, tx, i, texInfo->palette );
+                ((u16*)dest)[j] = getTexel(src, tx, i, texInfo->palette);
             }
             else if (bytePerPixel == 1)
             {
-                ((u8*)dest)[j++] = getTexel( (u64*)src, tx, i, texInfo->palette );
+                ((u8*)dest)[j] = getTexel(src, tx, i, texInfo->palette);
             }
+            j++;
         }
     }
 
-    if (!cache.enable2xSaI || (texFormat.format == FORMAT_I8 || texFormat.format == FORMAT_IA88))
+    if (!cache.enable2xSaI || (texFormat.format == FORMAT_I8) || (texFormat.format == FORMAT_IA88))
     {
-        glTexImage2D( GL_TEXTURE_2D, 0, glFormat, glWidth, glHeight, 0, glFormat, glType, dest);
+#ifdef PRINT_TEXTUREFORMAT
+        printf("j=%i DEST=0x%x SIZE=%i F=0x%x, W=%i, H=%i, T=0x%x\n", j, dest, texInfo->textureBytes,glFormat, glWidth, glHeight, glType); fflush(stdout);
+#endif
+        glTexImage2D( GL_TEXTURE_2D, 0, glFormat, glWidth, glHeight, 0, glFormat, glType, cache.textureBuffer);
     }
     else
     {
+        LOG(LOG_VERBOSE, "Using 2xSAI Filter on Texture\n");
+
         texInfo->textureBytes <<= 2;
 
         scaledDest = (u32*)malloc( texInfo->textureBytes );
 
         if (glType == GL_UNSIGNED_BYTE)
-            _2xSaI8888( (u32*)dest, (u32*)scaledDest, texInfo->realWidth, texInfo->realHeight, 1, 1 );//texInfo->clampS, texInfo->clampT );
+            _2xSaI8888( (u32*)dest, (u32*)scaledDest, texInfo->realWidth, texInfo->realHeight, 1, 1 );
         else if (glType == GL_UNSIGNED_SHORT_4_4_4_4)
-            _2xSaI4444( (u16*)dest, (u16*)scaledDest, texInfo->realWidth, texInfo->realHeight, 1, 1 );//texInfo->clampS, texInfo->clampT );
+            _2xSaI4444( (u16*)dest, (u16*)scaledDest, texInfo->realWidth, texInfo->realHeight, 1, 1 );
         else
-            _2xSaI5551( (u16*)dest, (u16*)scaledDest, texInfo->realWidth, texInfo->realHeight, 1, 1 );//texInfo->clampS, texInfo->clampT );
+            _2xSaI5551( (u16*)dest, (u16*)scaledDest, texInfo->realWidth, texInfo->realHeight, 1, 1 );
 
         glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, texInfo->realWidth << 1, texInfo->realHeight << 1, 0, GL_RGBA, glType, scaledDest );
 
         free( scaledDest );
+        free( dest );
     }
-    free( dest );
-
 
     if (OGL.texture.mipmap)
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -825,7 +865,7 @@ u32 TextureCache_CalculateCRC( u32 t, u32 width, u32 height )
 {
     u32 crc;
     u32 y, /*i,*/ bpl, lineBytes, line;
-    u64 *src;
+    void *src;
 
     bpl = width << gSP.textureTile[t]->size >> 1;
     lineBytes = gSP.textureTile[t]->line << 3;
@@ -837,7 +877,7 @@ u32 TextureCache_CalculateCRC( u32 t, u32 width, u32 height )
     crc = 0xFFFFFFFF;
     for (y = 0; y < height; y++)
     {
-        src = (u64*) &TMEM[(gSP.textureTile[t]->tmem + (y * line)) & 511];
+        src = (void*) &TMEM[(gSP.textureTile[t]->tmem + (y * line)) & 511];
         crc = CRC_Calculate( crc, src, bpl );
     }
 
@@ -1003,6 +1043,7 @@ void TextureCache_Update( u32 t )
     u32 tileWidth, maskWidth, loadWidth, lineWidth, clampWidth, height;
     u32 tileHeight, maskHeight, loadHeight, lineHeight, clampHeight, width;
 
+#if 0
     if (cache.enable2xSaI != (unsigned int) OGL.texture.SaI2x)
     {
         TextureCache_Destroy();
@@ -1014,6 +1055,7 @@ void TextureCache_Update( u32 t )
         TextureCache_Destroy();
         TextureCache_Init();
     }
+#endif
 
     if (gDP.textureMode == TEXTUREMODE_BGIMAGE)
     {
@@ -1136,7 +1178,6 @@ void TextureCache_Update( u32 t )
         if  (_texture_compare(t, current, crc, width, height, clampWidth, clampHeight))
         {
             TextureCache_ActivateTexture( t, current );
-
             cache.hits++;
             return;
         }
@@ -1149,6 +1190,11 @@ void TextureCache_Update( u32 t )
     glActiveTexture( GL_TEXTURE0 + t);
 
     cache.current[t] = TextureCache_AddTop();
+
+    if (cache.current[t] == NULL)
+    {
+        LOG(LOG_ERROR, "Texture Cache Failure\n");
+    }
 
     glBindTexture( GL_TEXTURE_2D, cache.current[t]->glName );
 
@@ -1215,9 +1261,9 @@ void TextureCache_Update( u32 t )
 
 void TextureCache_ActivateNoise( u32 t )
 {
-    glActiveTexture( GL_TEXTURE0 + t );
-    glBindTexture( GL_TEXTURE_2D, cache.glNoiseNames[RSP.DList & 0x1F] );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+    glActiveTexture(GL_TEXTURE0 + t);
+    glBindTexture(GL_TEXTURE_2D, cache.glNoiseNames[RSP.DList & 0x1F]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
 }
 

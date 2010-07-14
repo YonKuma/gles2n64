@@ -2,7 +2,6 @@
 #define GDP_H
 
 #include "Types.h"
-#include "FrameBuffer.h"
 
 #define CHANGED_RENDERMODE      0x0001
 #define CHANGED_CYCLETYPE       0x0002
@@ -18,6 +17,7 @@
 #define CHANGED_ENV_COLOR       0x0800
 #define CHANGED_PRIM_COLOR      0x1000
 #define CHANGED_BLENDCOLOR      0x2000
+#define CHANGED_CONVERT         0x4000
 
 #define TEXTUREMODE_NORMAL      0
 #define TEXTUREMODE_TEXRECT     1
@@ -86,7 +86,7 @@ struct gDPTile
         };
     };
 
-    FrameBuffer *frameBuffer;
+    //FrameBuffer *frameBuffer;
     u32 maskt, masks;
     u32 shiftt, shifts;
     f32 fuls, fult, flrs, flrt;
@@ -212,7 +212,7 @@ struct gDPInfo
 
     struct
     {
-        s32 k0, k1, k2, k3, k4, k5;
+        f32 k0, k1, k2, k3, k4, k5;
     } convert;
 
     struct
@@ -265,52 +265,9 @@ void gDPSetBlendColor( u32 r, u32 g, u32 b, u32 a );
 void gDPSetFogColor( u32 r, u32 g, u32 b, u32 a );
 void gDPSetFillColor( u32 c );
 void gDPSetPrimColor( u32 m, u32 l, u32 r, u32 g, u32 b, u32 a );
-
-
-#ifdef INLINE_OPT
-inline void gDPSetTile(u32 format, const u32 size, const u32 line, const u32 tmem, u32 tile,
-                       const u32 palette, const u32 cmt, const u32 cms, const u32 maskt, const u32 masks,
-                       const u32 shiftt, const u32 shifts )
-{
-    if (((size == G_IM_SIZ_4b) || (size == G_IM_SIZ_8b)) && (format == G_IM_FMT_RGBA))
-        format = G_IM_FMT_CI;
-
-    gDP.tiles[tile].format = format;
-    gDP.tiles[tile].size = size;
-    gDP.tiles[tile].line = line;
-    gDP.tiles[tile].tmem = tmem;
-    gDP.tiles[tile].palette = palette;
-    gDP.tiles[tile].cmt = cmt;
-    gDP.tiles[tile].cms = cms;
-    gDP.tiles[tile].maskt = maskt;
-    gDP.tiles[tile].masks = masks;
-    gDP.tiles[tile].shiftt = shiftt;
-    gDP.tiles[tile].shifts = shifts;
-
-    if (!gDP.tiles[tile].masks) gDP.tiles[tile].clamps = 1;
-    if (!gDP.tiles[tile].maskt) gDP.tiles[tile].clampt = 1;
-
-#ifdef DEBUG
-    DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TEXTURE, "gDPSetTile( %s, %s, %i, %i, %i, %i, %s%s, %s%s, %i, %i, %i, %i );\n",
-        ImageFormatText[format],
-        ImageSizeText[size],
-        line,
-        tmem,
-        tile,
-        palette,
-        cmt & G_TX_MIRROR ? "G_TX_MIRROR" : "G_TX_NOMIRROR",
-        cmt & G_TX_CLAMP ? " | G_TX_CLAMP" : "",
-        cms & G_TX_MIRROR ? "G_TX_MIRROR" : "G_TX_NOMIRROR",
-        cms & G_TX_CLAMP ? " | G_TX_CLAMP" : "",
-        maskt,
-        masks,
-        shiftt,
-        shifts );
-#endif
-}
-#endif
-
-
+void gDPSetTile(u32 format, const u32 size, const u32 line, const u32 tmem, u32 tile,
+               const u32 palette, const u32 cmt, const u32 cms, const u32 maskt, const u32 masks,
+               const u32 shiftt, const u32 shifts );
 void gDPSetTileSize( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt );
 void gDPLoadTile( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt );
 void gDPLoadBlock( u32 tile, u32 uls, u32 ult, u32 lrs, u32 dxt );

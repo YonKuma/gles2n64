@@ -22,7 +22,7 @@ HWND        hToolBar;
 HINSTANCE   hInstance;
 #endif // !__LINUX__
 
-char        pluginName[] = "gles2n64 v0.0.3";
+char        pluginName[] = "gles2n64 v0.0.4";
 char        *screenDirectory;
 u32         last_good_ucode = (u32) -1;
 void        (*CheckInterrupts)( void );
@@ -139,7 +139,7 @@ EXPORT void CALL MoveScreen (int xpos, int ypos)
 
 EXPORT void CALL ProcessDList(void)
 {
-    printf("PROCESS DLIST dl=%i vysnc=%i \n", OGL.frame_dl, OGL.frame_vsync);
+    //printf("PROCESS DLIST dl=%i vysnc=%i \n", OGL.frame_dl, OGL.frame_vsync);
 #ifdef RSPTHREAD
     if (RSP.thread)
     {
@@ -226,7 +226,7 @@ EXPORT void CALL ShowCFB (void)
 
 EXPORT void CALL UpdateScreen (void)
 {
-    printf("UPDATE SCREEN dl=%i prevdl=%i vysnc=%i must=%i\n", OGL.frame_dl, OGL.frame_prevdl, OGL.frame_vsync, OGL.mustRenderDlist);
+    //printf("UPDATE SCREEN dl=%i prevdl=%i vysnc=%i must=%i\n", OGL.frame_dl, OGL.frame_prevdl, OGL.frame_vsync, OGL.mustRenderDlist);
 
 #ifdef RSPTHREAD
     if (RSP.thread)

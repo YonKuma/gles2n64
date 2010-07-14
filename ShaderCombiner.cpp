@@ -3,46 +3,82 @@
 #include "winlnxdefs.h"
 #include "OpenGL.h"
 #include "ShaderCombiner.h"
+#include "Common.h"
+#include "Textures.h"
 
 #ifndef max
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #endif
 
-static const int sc_Mux32[32] =
+
+//(sa - sb) * m + a
+
+static const u32 saRGBExpanded[] =
 {
-    COMBINED, TEXEL0, TEXEL1, PRIMITIVE,
-    SHADE, ENVIRONMENT, ONE, COMBINED_ALPHA,
-    TEXEL0_ALPHA, TEXEL1_ALPHA, PRIMITIVE_ALPHA, SHADE_ALPHA,
-    ENV_ALPHA, LOD_FRACTION, PRIM_LOD_FRAC, K5,
-    UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
-    UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
-    UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
-    UNKNOWN, UNKNOWN, UNKNOWN, ZERO
+    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,
+    SHADE,              ENVIRONMENT,        ONE,                NOISE,
+    ZERO,               ZERO,               ZERO,               ZERO,
+    ZERO,               ZERO,               ZERO,               ZERO
 };
 
-static const int sc_Mux16[16] =
+static const u32 sbRGBExpanded[] =
 {
-    COMBINED, TEXEL0, TEXEL1, PRIMITIVE,
-    SHADE, ENVIRONMENT, ONE, COMBINED_ALPHA,
-    TEXEL0_ALPHA, TEXEL1_ALPHA, PRIMITIVE_ALPHA, SHADE_ALPHA,
-    ENV_ALPHA, LOD_FRACTION, PRIM_LOD_FRAC, ZERO
+    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,
+    SHADE,              ENVIRONMENT,        CENTER,             K4,
+    ZERO,               ZERO,               ZERO,               ZERO,
+    ZERO,               ZERO,               ZERO,               ZERO
 };
 
-static const int sc_Mux8[8] =
+static const u32 mRGBExpanded[] =
 {
-    COMBINED, TEXEL0, TEXEL1, PRIMITIVE,
-    SHADE, ENVIRONMENT, ONE, ZERO
+    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,
+    SHADE,              ENVIRONMENT,        SCALE,              COMBINED_ALPHA,
+    TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,    SHADE_ALPHA,
+    ENV_ALPHA,          LOD_FRACTION,       PRIM_LOD_FRAC,      K5,
+    ZERO,               ZERO,               ZERO,               ZERO,
+    ZERO,               ZERO,               ZERO,               ZERO,
+    ZERO,               ZERO,               ZERO,               ZERO,
+    ZERO,               ZERO,               ZERO,               ZERO
 };
 
+static const u32 aRGBExpanded[] =
+{
+    COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,
+    SHADE,              ENVIRONMENT,        ONE,                ZERO
+};
+
+static const u32 saAExpanded[] =
+{
+    COMBINED,           TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,
+    SHADE_ALPHA,        ENV_ALPHA,          ONE,                ZERO
+};
+
+static const u32 sbAExpanded[] =
+{
+    COMBINED,           TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,
+    SHADE_ALPHA,        ENV_ALPHA,          ONE,                ZERO
+};
+
+static const u32 mAExpanded[] =
+{
+    LOD_FRACTION,       TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,
+    SHADE_ALPHA,        ENV_ALPHA,          PRIM_LOD_FRAC,      ZERO,
+};
+
+static const u32 aAExpanded[] =
+{
+    COMBINED,           TEXEL0_ALPHA,       TEXEL1_ALPHA,       PRIMITIVE_ALPHA,
+    SHADE_ALPHA,        ENV_ALPHA,          ONE,                ZERO
+};
 
 int CCEncodeA[] = {0, 1, 2, 3, 4, 5, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 7, 15, 15, 6, 15 };
 int CCEncodeB[] = {0, 1, 2, 3, 4, 5, 6, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 7, 15, 15, 15 };
 int CCEncodeC[] = {0, 1, 2, 3, 4, 5, 31, 6, 7, 8, 9, 10, 11, 12, 13, 14, 31, 31, 15, 31, 31};
 int CCEncodeD[] = {0, 1, 2, 3, 4, 5, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 6, 15};
-DWORD64 ACEncodeA[] = {7, 7, 7, 7, 7, 7, 7, 7, 0, 1, 2, 3, 4, 5, 7, 7, 7, 7, 7, 6, 7};
-DWORD64 ACEncodeB[] = {7, 7, 7, 7, 7, 7, 7, 7, 0, 1, 2, 3, 4, 5, 7, 7, 7, 7, 7, 6, 7};
-DWORD64 ACEncodeC[] = {7, 7, 7, 7, 7, 7, 7, 7, 0, 1, 2, 3, 4, 5, 7, 6, 7, 7, 7, 7, 7};
-DWORD64 ACEncodeD[] = {7, 7, 7, 7, 7, 7, 7, 7, 0, 1, 2, 3, 4, 5, 7, 7, 7, 7, 7, 6, 7};
+int ACEncodeA[] = {7, 7, 7, 7, 7, 7, 7, 7, 0, 1, 2, 3, 4, 5, 7, 7, 7, 7, 7, 6, 7};
+int ACEncodeB[] = {7, 7, 7, 7, 7, 7, 7, 7, 0, 1, 2, 3, 4, 5, 7, 7, 7, 7, 7, 6, 7};
+int ACEncodeC[] = {7, 7, 7, 7, 7, 7, 7, 7, 0, 1, 2, 3, 4, 5, 7, 6, 7, 7, 7, 7, 7};
+int ACEncodeD[] = {7, 7, 7, 7, 7, 7, 7, 7, 0, 1, 2, 3, 4, 5, 7, 7, 7, 7, 7, 6, 7};
 
 ShaderProgram *scProgramRoot = NULL;
 ShaderProgram *scProgramCurrent = NULL;
@@ -54,11 +90,14 @@ GLint _vertex_shader = 0;
 const char *_frag_header = "                                \n"\
 "uniform sampler2D uTex0;                                   \n"\
 "uniform sampler2D uTex1;                                   \n"\
+"uniform sampler2D uNoise;                                  \n"\
 "uniform lowp vec4 uEnvColor;                               \n"\
 "uniform lowp vec4 uPrimColor;                              \n"\
 "uniform lowp vec4 uFogColor;                               \n"\
 "uniform highp float uAlphaRef;                             \n"\
 "uniform lowp float uPrimLODFrac;                           \n"\
+"uniform lowp float uK4;                                    \n"\
+"uniform lowp float uK5;                                    \n"\
 "                                                           \n"\
 "varying lowp float vFactor;                                \n"\
 "varying lowp vec4 vShadeColor;                             \n"\
@@ -141,9 +180,9 @@ const char * _color_param_str(int param)
         case ENV_ALPHA:         return "vec3(uEnvColor.a)";
         case LOD_FRACTION:      return "vec3(0.0)";
         case PRIM_LOD_FRAC:     return "vec3(uPrimLODFrac)";
-        case NOISE:             return "vec3(0.0)";
-        case K4:                return "vec3(0.0)";
-        case K5:                return "vec3(0.0)";
+        case NOISE:             return "lNoise.rgb";
+        case K4:                return "vec3(uK4)";
+        case K5:                return "vec3(uK5)";
         case ONE:               return "vec3(1.0)";
         case ZERO:              return "vec3(0.0)";
         default:
@@ -171,9 +210,9 @@ const char * _alpha_param_str(int param)
         case ENV_ALPHA:         return "uEnvColor.a";
         case LOD_FRACTION:      return "0.0";
         case PRIM_LOD_FRAC:     return "uPrimLODFrac";
-        case NOISE:             return "0.0";
-        case K4:                return "0.0";
-        case K5:                return "0.0";
+        case NOISE:             return "lNoise.a";
+        case K4:                return "uK4";
+        case K5:                return "uK5";
         case ONE:               return "1.0";
         case ZERO:              return "0.0";
         default:
@@ -181,40 +220,67 @@ const char * _alpha_param_str(int param)
     }
 }
 
-DecodedMux::DecodedMux(u64 mux)
+DecodedMux::DecodedMux(u64 mux, bool cycle2)
 {
     combine.mux = mux;
-    decode[0][0] = sc_Mux16[(combine.muxs0>>20)&0x0F];
-    decode[0][1] = sc_Mux16[(combine.muxs1>>28)&0x0F];
-    decode[0][2] = sc_Mux32[(combine.muxs0>>15)&0x1F];
-    decode[0][3] = sc_Mux8[(combine.muxs1>>15)&0x07];
-    decode[1][0] = sc_Mux8[(combine.muxs0>>12)&0x07];
-    decode[1][1] = sc_Mux8[(combine.muxs1>>12)&0x07];
-    decode[1][2] = sc_Mux8[(combine.muxs0>>9)&0x07];
-    decode[1][3] = sc_Mux8[(combine.muxs1>>9)&0x07];
-    decode[2][0] = sc_Mux16[(combine.muxs0>>5)&0x0F];
-    decode[2][1] = sc_Mux16[(combine.muxs1>>24)&0x0F];
-    decode[2][2] = sc_Mux32[(combine.muxs0)&0x1F];
-    decode[2][3] = sc_Mux8[(combine.muxs1>>6)&0x07];
-    decode[3][0] = sc_Mux8[(combine.muxs1>>21)&0x07];
-    decode[3][1] = sc_Mux8[(combine.muxs1>>3)&0x07];
-    decode[3][2] = sc_Mux8[(combine.muxs1>>18)&0x07];
-    decode[3][3] = sc_Mux8[(combine.muxs1)&0x07];
+    this->flags = 0;
 
-    for(int i=0; i<4; i++)
+    //set to ZERO.
+    for(int i=0;i<4;i++)
+        for(int j=0; j< 4; j++)
+            decode[i][j] = ZERO;
+
+    //rgb cycle 0
+    decode[0][0] = saRGBExpanded[combine.saRGB0];
+    decode[0][1] = sbRGBExpanded[combine.sbRGB0];
+    decode[0][2] = mRGBExpanded[combine.mRGB0];
+    decode[0][3] = aRGBExpanded[combine.aRGB0];
+    decode[1][0] = saAExpanded[combine.saA0];
+    decode[1][1] = sbAExpanded[combine.sbA0];
+    decode[1][2] = mAExpanded[combine.mA0];
+    decode[1][3] = aAExpanded[combine.aA0];
+    if (cycle2)
     {
-        for(int j=0; j<4; j++)
-        {
-            int d = decode[i][j];
-            if (d == LOD_FRACTION || d == K5 || d == K4 ||
-                d == NOISE || d == CENTER || d == SCALE)
-            {
-                decode[i][j] = ZERO;
-            }
-        }
+        //rgb cycle 1
+        decode[2][0] = saRGBExpanded[combine.saRGB1];
+        decode[2][1] = sbRGBExpanded[combine.sbRGB1];
+        decode[2][2] = mRGBExpanded[combine.mRGB1];
+        decode[2][3] = aRGBExpanded[combine.aRGB1];
+        decode[3][0] = saAExpanded[combine.saA1];
+        decode[3][1] = sbAExpanded[combine.sbA1];
+        decode[3][2] = mAExpanded[combine.mA1];
+        decode[3][3] = aAExpanded[combine.aA1];
+
+        swap(1, TEXEL0, TEXEL1);
+        swap(1, TEXEL0_ALPHA, TEXEL1_ALPHA);
     }
 
+    //simplifying mux:
+    #if 0
+    if (replace(G_CYC_1CYCLE, LOD_FRACTION, ZERO) || replace(G_CYC_2CYCLE, LOD_FRACTION, ZERO))
+        LOG(LOG_WARNING, "SC Replacing LOD_FRACTION with ZERO\n");
 
+    if (replace(G_CYC_1CYCLE, K4, ZERO) || replace(G_CYC_2CYCLE, K4, ZERO))
+        LOG(LOG_WARNING, "SC Replacing K4 with ZERO\n");
+
+    if (replace(G_CYC_1CYCLE, K5, ZERO) || replace(G_CYC_2CYCLE, K5, ZERO))
+        LOG(LOG_WARNING, "SC Replacing K5 with ZERO\n");
+    #endif
+
+    if (replace(G_CYC_1CYCLE, CENTER, ZERO) || replace(G_CYC_2CYCLE, CENTER, ZERO))
+        LOG(LOG_WARNING, "SC Replacing CENTER with ZERO\n");
+
+    if (replace(G_CYC_1CYCLE, SCALE, ZERO) || replace(G_CYC_2CYCLE, SCALE, ZERO))
+        LOG(LOG_WARNING, "SC Replacing SCALE with ZERO\n");
+
+    //Combiner has initial value of zero in cycle 0
+    if (replace(G_CYC_1CYCLE, COMBINED, ZERO))
+        LOG(LOG_WARNING, "SC Setting CYCLE1 COMBINED to ZERO\n");
+
+    if (replace(G_CYC_1CYCLE, COMBINED_ALPHA, ZERO))
+        LOG(LOG_WARNING, "SC Setting CYCLE1 COMBINED_ALPHA to ZERO\n");
+
+    //mutiplying by zero: (A-B)*0 + C = C
     for(int i=0 ; i<4; i++)
     {
         if (decode[i][2] == ZERO)
@@ -223,32 +289,65 @@ DecodedMux::DecodedMux(u64 mux)
             decode[i][1] = ZERO;
         }
     }
+
+    if (cycle2)
+    {
+
+        if (!find(2, COMBINED))
+            this->flags |= SC_IGNORE_RGB0;
+
+        if (!(find(2, COMBINED_ALPHA) || find(3, COMBINED_ALPHA) || find(3, COMBINED)))
+            this->flags |= SC_IGNORE_ALPHA0;
+
+        if (decode[2][0] == ZERO && decode[2][1] == ZERO && decode[2][2] == ZERO && decode[2][3] == COMBINED)
+        {
+            this->flags |= SC_IGNORE_RGB1;
+        }
+        if (decode[3][0] == ZERO && decode[3][1] == ZERO && decode[3][2] == ZERO &&
+            (decode[3][3] == COMBINED_ALPHA || decode[3][3] == COMBINED))
+        {
+            this->flags |= SC_IGNORE_ALPHA1;
+        }
+
+    }
 }
 
-void DecodedMux::replace(int cycle, int src, int dest)
+bool DecodedMux::find(int index, int src)
 {
+    for(int j=0;j<4;j++)
+    {
+        if (decode[index][j] == src) return true;
+    }
+    return false;
+}
+
+bool DecodedMux::replace(int cycle, int src, int dest)
+{
+    int r = false;
     for(int i=0;i<2;i++)
     {
         int ii = (cycle == 0) ? i : (2+i);
         for(int j=0;j<4;j++)
         {
-            if (decode[ii][j] == src) decode[ii][j] = dest;
+            if (decode[ii][j] == src) {decode[ii][j] = dest; r=true;}
         }
     }
+    return r;
 }
 
-
-void DecodedMux::swap(int cycle, int src0, int src1)
+bool DecodedMux::swap(int cycle, int src0, int src1)
 {
+    int r = false;
     for(int i=0;i<2;i++)
     {
         int ii = (cycle == 0) ? i : (2+i);
         for(int j=0;j<4;j++)
         {
-            if (decode[ii][j] == src0) decode[ii][j] = src1;
-            else if (decode[ii][j] == src1) decode[ii][j] = src0;
+            if (decode[ii][j] == src0) {decode[ii][j] = src1; r=true;}
+            else if (decode[ii][j] == src1) {decode[ii][j] = src0; r=true;}
         }
     }
+    return r;
 }
 
 
@@ -269,7 +368,7 @@ void _glcompiler_error(GLint shader)
     log = (char*) malloc(len + 1);
     glGetShaderInfoLog(shader, len, &i, log);
     log[len] = 0;
-    printf("COMPILE ERROR: %s \n", log);
+    LOG(LOG_ERROR, "COMPILE ERROR: %s \n", log);
     free(log);
 }
 
@@ -282,7 +381,7 @@ void _gllinker_error(GLint program)
     log = (char*) malloc(len + 1);
     glGetProgramInfoLog(program, len, &i, log);
     log[len] = 0;
-    printf("LINK ERROR: %s \n", log);
+    LOG(LOG_ERROR, "LINK ERROR: %s \n", log);
     free(log);
 };
 
@@ -301,9 +400,12 @@ void _locate_uniforms(ShaderProgram *p)
 {
     LocateUniform(uTex0);
     LocateUniform(uTex1);
+    LocateUniform(uNoise);
     LocateUniform(uEnvColor);
     LocateUniform(uPrimColor);
     LocateUniform(uPrimLODFrac);
+    LocateUniform(uK4);
+    LocateUniform(uK5);
     LocateUniform(uFogColor);
     LocateUniform(uEnableFog);
     LocateUniform(uRenderState);
@@ -325,11 +427,14 @@ void _force_uniforms()
 {
     SC_ForceUniform1i(uTex0, 0);
     SC_ForceUniform1i(uTex1, 1);
+    SC_ForceUniform1i(uNoise, 2);
     SC_ForceUniform4fv(uEnvColor, &gDP.envColor.r);
     SC_ForceUniform4fv(uPrimColor, &gDP.primColor.r);
     SC_ForceUniform1f(uPrimLODFrac, gDP.primColor.l);
+    SC_ForceUniform1f(uK4, gDP.convert.k4);
+    SC_ForceUniform1f(uK5, gDP.convert.k5);
     SC_ForceUniform4fv(uFogColor, &gDP.fogColor.r);
-    SC_ForceUniform1i(uEnableFog, (OGL.enableFog && (gSP.geometryMode & G_FOG)));
+    SC_ForceUniform1i(uEnableFog, ((OGL.enableFog==1) && (gSP.geometryMode & G_FOG)));
     SC_ForceUniform1f(uRenderState, OGL.renderState);
     SC_ForceUniform1f(uFogMultiplier, (float) gSP.fog.multiplier / 255.0f);
     SC_ForceUniform1f(uFogOffset, (float) gSP.fog.offset / 255.0f);
@@ -390,6 +495,8 @@ void _update_uniforms()
     SC_SetUniform1f(uFogMultiplier, (float) gSP.fog.multiplier / 255.0f);
     SC_SetUniform1f(uFogOffset, (float) gSP.fog.offset / 255.0f);
     SC_SetUniform1f(uAlphaRef, (gDP.otherMode.cvgXAlpha) ? 0.5 : gDP.blendColor.a);
+    SC_SetUniform1f(uK4, gDP.convert.k4);
+    SC_SetUniform1f(uK5, gDP.convert.k5);
 
     //for some reason i must force these...
     SC_ForceUniform2f(uTexScale, gSP.texture.scales, gSP.texture.scalet);
@@ -439,11 +546,11 @@ void ShaderCombiner_Init()
     str += sprintf(str, "}\n\n");
 
 #ifdef PRINT_SHADER
-    printf("=============================================================\n");
-    printf("Vertex Shader:\n");
-    printf("=============================================================\n");
-    printf("%s", buff);
-    printf("=============================================================\n");
+    LOG(LOG_VERBOSE, "=============================================================\n");
+    LOG(LOG_VERBOSE, "Vertex Shader:\n");
+    LOG(LOG_VERBOSE, "=============================================================\n");
+    LOG(LOG_VERBOSE, "%s", buff);
+    LOG(LOG_VERBOSE, "=============================================================\n");
 #endif
 
     src[0] = buff;
@@ -487,31 +594,11 @@ void ShaderCombiner_Set(u64 mux, int flags)
                                  0, 0, 0, 0, TEXEL0, 0, PRIMITIVE, 0 );
     }
 
-
-    DecodedMux dmux(mux);
-
-    // Hack for Mario Golf
-    #if 0
-    if (OGL.enableMarioGolfHack && mux == 0x00115407f1ffca7eLL)
-    {
-        dmux.replace(TEXEL0, TEXEL1);
-        dmux.replace(TEXEL0_ALPHA, TEXEL1_ALPHA);
-    }
-    if (OGL.enableTonyHawkHack)// && (gSP.texture.tile == 1))
-    {
-        dmux.replace(TEXEL1, TEXEL0);
-        dmux.replace(TEXEL1_ALPHA, TEXEL0_ALPHA);
-    }
-    #endif
-
-    dmux.swap(1, TEXEL0, TEXEL1);
-    dmux.swap(1, TEXEL0_ALPHA, TEXEL1_ALPHA);
-
     //determine flags
     if (flags == -1)
     {
         flags = 0;
-        if ((OGL.enableFog) &&(gSP.geometryMode & G_FOG))
+        if ((OGL.enableFog) && (gSP.geometryMode & G_FOG))
             flags |= SC_FOGENABLED;
 
         if (OGL.enableAlphaTest)
@@ -529,11 +616,17 @@ void ShaderCombiner_Set(u64 mux, int flags)
             flags |= SC_2CYCLE;
     }
 
+
+    DecodedMux dmux(mux, flags&SC_2CYCLE);
+
     //if already bound:
-    if (scProgramCurrent && _program_compare(scProgramCurrent, &dmux, flags))
+    if (scProgramCurrent)
     {
-        scProgramChanged = 0;
-        return;
+        if (_program_compare(scProgramCurrent, &dmux, flags))
+        {
+            scProgramChanged = 0;
+            return;
+        }
     }
 
     //traverse binary tree for cached programs
@@ -566,30 +659,35 @@ void ShaderCombiner_Set(u64 mux, int flags)
     {
         scProgramCurrent = prog;
         glUseProgram(prog->program);
-        _update_uniforms();
+        _force_uniforms();
     }
 }
 
 ShaderProgram *ShaderCombiner_Compile(DecodedMux *dmux, int flags)
 {
     GLint success;
-    char *frag = (char*)malloc(4096);
+    char frag[4096];
     char *buffer = frag;
     ShaderProgram *prog = (ShaderProgram*) malloc(sizeof(ShaderProgram));
 
     prog->left = prog->right = NULL;
-    prog->usesT0 = prog->usesT1 = prog->usesCol = 0;
+    prog->usesT0 = prog->usesT1 = prog->usesCol = prog->usesNoise = 0;
     prog->combine = dmux->combine;
     prog->flags = flags;
     prog->vertex = _vertex_shader;
 
     for(int i=0; i < ((flags & SC_2CYCLE) ? 4 : 2); i++)
     {
-        for(int j=0;j<4;j++)
+        //make sure were not ignoring cycle:
+        if ((dmux->flags&(1<<i)) == 0)
         {
-            prog->usesT0 |= (dmux->decode[i][j] == TEXEL0 || dmux->decode[i][j] == TEXEL0_ALPHA);
-            prog->usesT1 |= (dmux->decode[i][j] == TEXEL1 || dmux->decode[i][j] == TEXEL1_ALPHA);
-            prog->usesCol |= (dmux->decode[i][j] == SHADE || dmux->decode[i][j] == SHADE_ALPHA);
+            for(int j=0;j<4;j++)
+            {
+                prog->usesT0 |= (dmux->decode[i][j] == TEXEL0 || dmux->decode[i][j] == TEXEL0_ALPHA);
+                prog->usesT1 |= (dmux->decode[i][j] == TEXEL1 || dmux->decode[i][j] == TEXEL1_ALPHA);
+                prog->usesCol |= (dmux->decode[i][j] == SHADE || dmux->decode[i][j] == SHADE_ALPHA);
+                prog->usesNoise |= (dmux->decode[i][j] == NOISE);
+            }
         }
     }
 
@@ -598,27 +696,38 @@ ShaderProgram *ShaderCombiner_Compile(DecodedMux *dmux, int flags)
         buffer += sprintf(buffer, "lowp vec4 lTex0 = texture2D(uTex0, vTexCoord0); \n");
     if (prog->usesT1)
         buffer += sprintf(buffer, "lowp vec4 lTex1 = texture2D(uTex1, vTexCoord1); \n");
+    if (prog->usesNoise)
+        buffer += sprintf(buffer, "lowp vec4 lNoise = texture2D(uNoise, gl_FragCoord.st); \n");
 
     for(int i = 0; i < ((flags & SC_2CYCLE) ? 2 : 1); i++)
     {
-        buffer += sprintf(buffer, "lFragColor.rgb = (%s - %s) * %s + %s; \n",
-            _color_param_str(dmux->decode[i*2][0]),
-            _color_param_str(dmux->decode[i*2][1]),
-            _color_param_str(dmux->decode[i*2][2]),
-            _color_param_str(dmux->decode[i*2][3])
-            );
-        buffer += sprintf(buffer, "lFragColor.a = (%s - %s) * %s + %s; \n",
-            _alpha_param_str(dmux->decode[i*2+1][0]),
-            _alpha_param_str(dmux->decode[i*2+1][1]),
-            _alpha_param_str(dmux->decode[i*2+1][2]),
-            _alpha_param_str(dmux->decode[i*2+1][3])
-            );
+        if ((dmux->flags&(1<<(i*2))) == 0)
+        {
+            buffer += sprintf(buffer, "lFragColor.rgb = (%s - %s) * %s + %s; \n",
+                _color_param_str(dmux->decode[i*2][0]),
+                _color_param_str(dmux->decode[i*2][1]),
+                _color_param_str(dmux->decode[i*2][2]),
+                _color_param_str(dmux->decode[i*2][3])
+                );
+        }
+
+        if ((dmux->flags&(1<<(i*2+1))) == 0)
+        {
+            buffer += sprintf(buffer, "lFragColor.a = (%s - %s) * %s + %s; \n",
+                _alpha_param_str(dmux->decode[i*2+1][0]),
+                _alpha_param_str(dmux->decode[i*2+1][1]),
+                _alpha_param_str(dmux->decode[i*2+1][2]),
+                _alpha_param_str(dmux->decode[i*2+1][3])
+                );
+        }
         buffer += sprintf(buffer, "gl_FragColor = lFragColor; \n");
     };
 
     //fog
     if (flags&SC_FOGENABLED)
+    {
         buffer += sprintf(buffer, "gl_FragColor = mix(gl_FragColor, uFogColor, vFactor); \n");
+    }
 
     //alpha function
     if (flags&SC_ALPHAENABLED)
@@ -632,12 +741,12 @@ ShaderProgram *ShaderCombiner_Compile(DecodedMux *dmux, int flags)
     *buffer = 0;
 
 #ifdef PRINT_SHADER
-    printf("=============================================================\n");
-    printf("Combine=%llx flags=%x\n", prog->combine.mux, flags);
-    printf("Num=%i \t usesT0=%i usesT1=%i usesCol=%i \n", scProgramCount, prog->usesT0, prog->usesT1, prog->usesCol);
-    printf("=============================================================\n");
-    printf("%s", frag);
-    printf("=============================================================\n");
+    LOG(LOG_VERBOSE, "=============================================================\n");
+    LOG(LOG_VERBOSE, "Combine=0x%llx flags=0x%x dmux flags=0x%x\n", prog->combine.mux, flags, dmux->flags);
+    LOG(LOG_VERBOSE, "Num=%i \t usesT0=%i usesT1=%i usesCol=%i usesNoise=%i\n", scProgramCount, prog->usesT0, prog->usesT1, prog->usesCol, prog->usesNoise);
+    LOG(LOG_VERBOSE, "=============================================================\n");
+    LOG(LOG_VERBOSE, "%s", frag);
+    LOG(LOG_VERBOSE, "=============================================================\n");
 #endif
 
     prog->program = glCreateProgram();
@@ -648,8 +757,11 @@ ShaderProgram *ShaderCombiner_Compile(DecodedMux *dmux, int flags)
     GLint len[1];
     len[0] = min(4096, strlen(frag));
     prog->fragment = glCreateShader(GL_FRAGMENT_SHADER);
+
     glShaderSource(prog->fragment, 1, (const char**) src, len);
     glCompileShader(prog->fragment);
+
+
     glGetShaderiv(prog->fragment, GL_COMPILE_STATUS, &success);
     if (!success)
     {
@@ -672,7 +784,6 @@ ShaderProgram *ShaderCombiner_Compile(DecodedMux *dmux, int flags)
     glUseProgram(prog->program);
     _force_uniforms();
 
-    free(frag);
     return prog;
 }
 

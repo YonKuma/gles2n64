@@ -66,6 +66,8 @@
 #define F3D_RDPHALF_CONT        0xB2
 #define F3D_TRI4                0xB1
 
+#define F3D_TRI_UNKNOWN         0xC0
+
 void F3D_SPNoOp( u32 w0, u32 w1 );
 void F3D_Mtx( u32 w0, u32 w1 );
 void F3D_Reserved0( u32 w0, u32 w1 );

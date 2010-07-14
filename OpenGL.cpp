@@ -16,6 +16,7 @@
 
 #define timeGetTime() time(NULL)
 
+#include "Common.h"
 #include "winlnxdefs.h"
 #include "gles2N64.h"
 #include "OpenGL.h"
@@ -512,12 +513,18 @@ bool OGL_Start()
 
     TextureCache_Init();
 
-    memset(gSP.vertices, 0, 80 * sizeof(SPVertex));
-    OGL.numElements = 0;
+#ifdef __TRIBUFFER_OPT
+    __indexmap_init();
+#endif
+
+    //memset(OGL.triangles.vertices, 0, 256 * sizeof(SPVertex));
+    OGL.triangles.num = 0;
     OGL.renderingToTexture = false;
     OGL.renderState = RS_NONE;
     gSP.changed = gDP.changed = 0xFFFFFFFF;
     VI.displayNum = 0;
+    glGetError();
+
 
     return TRUE;
 }
@@ -624,6 +631,12 @@ void OGL_UpdateStates()
 
     }
 
+    if (gDP.changed & CHANGED_CONVERT)
+    {
+        SC_SetUniform1f(uK4, gDP.convert.k4);
+        SC_SetUniform1f(uK5, gDP.convert.k5);
+    }
+
     if (gDP.changed & CHANGED_RENDERMODE)
     {
         glDepthFunc((gDP.otherMode.depthCompare) ? GL_GEQUAL : GL_ALWAYS);
@@ -658,27 +671,32 @@ void OGL_UpdateStates()
 
     if ((gSP.changed & CHANGED_TEXTURE) || (gDP.changed & CHANGED_TILE) || (gDP.changed & CHANGED_TMEM))
     {
-        if (scProgramCurrent->usesT0)
-        {
-            TextureCache_Update(0);
-            SC_ForceUniform2f(uTexOffset[0], gSP.textureTile[0]->fuls, gSP.textureTile[0]->fult);
-            SC_ForceUniform2f(uCacheShiftScale[0], cache.current[0]->shiftScaleS, cache.current[0]->shiftScaleT);
-            SC_ForceUniform2f(uCacheScale[0], cache.current[0]->scaleS, cache.current[0]->scaleT);
-            SC_ForceUniform2f(uCacheOffset[0], cache.current[0]->offsetS, cache.current[0]->offsetT);
-        }
-        //else TextureCache_ActivateDummy(0);
 
-        //Note: enabling dummies makes some F-zero X textures flicker.... strange.
-
-        if (scProgramCurrent->usesT1)
+        //For some reason updating the texture cache on the first frame of LOZ:OOT causes a NULL Pointer exception...
+        if (scProgramCurrent)
         {
-            TextureCache_Update(1);
-            SC_ForceUniform2f(uTexOffset[1], gSP.textureTile[1]->fuls, gSP.textureTile[1]->fult);
-            SC_ForceUniform2f(uCacheShiftScale[1], cache.current[1]->shiftScaleS, cache.current[1]->shiftScaleT);
-            SC_ForceUniform2f(uCacheScale[1], cache.current[1]->scaleS, cache.current[1]->scaleT);
-            SC_ForceUniform2f(uCacheOffset[1], cache.current[1]->offsetS, cache.current[1]->offsetT);
+            if (scProgramCurrent->usesT0)
+            {
+                TextureCache_Update(0);
+                SC_ForceUniform2f(uTexOffset[0], gSP.textureTile[0]->fuls, gSP.textureTile[0]->fult);
+                SC_ForceUniform2f(uCacheShiftScale[0], cache.current[0]->shiftScaleS, cache.current[0]->shiftScaleT);
+                SC_ForceUniform2f(uCacheScale[0], cache.current[0]->scaleS, cache.current[0]->scaleT);
+                SC_ForceUniform2f(uCacheOffset[0], cache.current[0]->offsetS, cache.current[0]->offsetT);
+            }
+            //else TextureCache_ActivateDummy(0);
+
+            //Note: enabling dummies makes some F-zero X textures flicker.... strange.
+
+            if (scProgramCurrent->usesT1)
+            {
+                TextureCache_Update(1);
+                SC_ForceUniform2f(uTexOffset[1], gSP.textureTile[1]->fuls, gSP.textureTile[1]->fult);
+                SC_ForceUniform2f(uCacheShiftScale[1], cache.current[1]->shiftScaleS, cache.current[1]->shiftScaleT);
+                SC_ForceUniform2f(uCacheScale[1], cache.current[1]->scaleS, cache.current[1]->scaleT);
+                SC_ForceUniform2f(uCacheOffset[1], cache.current[1]->offsetS, cache.current[1]->offsetT);
+            }
+            //else TextureCache_ActivateDummy(1);
         }
-        //else TextureCache_ActivateDummy(1);
     }
 
     if ((gDP.changed & CHANGED_FOGCOLOR) && OGL.enableFog)
@@ -753,11 +771,11 @@ void OGL_DrawTriangle(SPVertex *vertices, int v0, int v1, int v2)
 
 }
 
-void OGL_AddTriangle(int v0, int v1, int v2 )
+void OGL_AddTriangle(int v0, int v1, int v2)
 {
-    OGL.elements[OGL.numElements++] = v0;
-    OGL.elements[OGL.numElements++] = v1;
-    OGL.elements[OGL.numElements++] = v2;
+    OGL.triangles.elements[OGL.triangles.num++] = v0;
+    OGL.triangles.elements[OGL.triangles.num++] = v1;
+    OGL.triangles.elements[OGL.triangles.num++] = v2;
 }
 
 void OGL_SetColorArray()
@@ -781,21 +799,15 @@ void OGL_SetTexCoordArrays()
         glDisableVertexAttribArray(SC_TEXCOORD1);
 }
 
-void OGL_FlushTriangles()
-{
-    if (gSP.changed || gDP.changed)
-    {
-        OGL_DrawTriangles();
-    }
-}
-
 void OGL_DrawTriangles()
 {
     if (OGL.renderingToTexture && OGL.ignoreOffscreenRendering)
     {
-        OGL.numElements = 0;
+        OGL.triangles.num = 0;
         return;
     }
+
+    if (OGL.triangles.num == 0) return;
 
     if ((OGL.updateMode == SCREEN_UPDATE_AT_1ST_PRIMITIVE) && OGL.screenUpdate)
         OGL_SwapBuffers();
@@ -816,13 +828,13 @@ void OGL_DrawTriangles()
 #ifdef RENDERSTATE_TEST
         StateChanges++;
 #endif
-        glVertexAttribPointer(SC_POSITION, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].x);
+        glVertexAttribPointer(SC_POSITION, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &OGL.triangles.vertices[0].x);
 #ifdef __PACKVERTEX_OPT
-        glVertexAttribPointer(SC_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(SPVertex), &gSP.vertices[0].r);
+        glVertexAttribPointer(SC_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(SPVertex), &OGL.triangles.vertices[0].r);
 #else
-        glVertexAttribPointer(SC_COLOR, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].r);
+        glVertexAttribPointer(SC_COLOR, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &OGL.triangles.vertices[0].r);
 #endif
-        glVertexAttribPointer(SC_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].s);
+        glVertexAttribPointer(SC_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &OGL.triangles.vertices[0].s);
 
         OGL_UpdateCullFace();
         OGL_UpdateViewport();
@@ -830,8 +842,12 @@ void OGL_DrawTriangles()
         OGL.renderState = RS_TRIANGLE;
     }
 
-    glDrawElements(GL_TRIANGLES, OGL.numElements, GL_UNSIGNED_BYTE, OGL.elements);
-    OGL.numElements = 0;
+    glDrawElements(GL_TRIANGLES, OGL.triangles.num, GL_UNSIGNED_BYTE, OGL.triangles.elements);
+    OGL.triangles.num = 0;
+
+#ifdef __TRIBUFFER_OPT
+    __indexmap_clear();
+#endif
 }
 
 void OGL_DrawLine(int v0, int v1, float width )
@@ -853,11 +869,11 @@ void OGL_DrawLine(int v0, int v1, float width )
         glDisableVertexAttribArray(SC_TEXCOORD0);
         glDisableVertexAttribArray(SC_TEXCOORD1);
 
-        glVertexAttribPointer(SC_POSITION, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].x);
+        glVertexAttribPointer(SC_POSITION, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &OGL.triangles.vertices[0].x);
 #ifdef __PACKVERTEX_OPT
-        glVertexAttribPointer(SC_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(SPVertex), &gSP.vertices[0].r);
+        glVertexAttribPointer(SC_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(SPVertex), &OGL.triangles.vertices[0].r);
 #else
-        glVertexAttribPointer(SC_COLOR, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &gSP.vertices[0].r);
+        glVertexAttribPointer(SC_COLOR, 4, GL_FLOAT, GL_FALSE, sizeof(SPVertex), &OGL.triangles.vertices[0].r);
 #endif
         SC_ForceUniform1f(uRenderState, RS_LINE);
         OGL_UpdateCullFace();
@@ -916,6 +932,7 @@ void OGL_DrawRect( int ulx, int uly, int lrx, int lry, float *color)
     glVertexAttrib4fv(SC_COLOR, color);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glEnable(GL_SCISSOR_TEST);
+    OGL_UpdateViewport();
 
 }
 
@@ -941,6 +958,7 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 #ifdef RENDERSTATE_TEST
         StateChanges++;
 #endif
+        glVertexAttrib4f(SC_COLOR, 0, 0, 0, 0);
         glVertexAttrib4f(SC_POSITION, 0, 0, (gDP.otherMode.depthSource == G_ZS_PRIM) ? gDP.primDepth.z : gSP.viewport.nearz, 1.0);
         glVertexAttribPointer(SC_POSITION, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].x);
         glVertexAttribPointer(SC_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &OGL.rect[0].s0);
@@ -1055,6 +1073,8 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
     }
 
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    OGL_UpdateViewport();
+
 }
 
 void OGL_ClearDepthBuffer()
@@ -1213,21 +1233,21 @@ OGL_SwapBuffers()
             float fps = 0.0f;
             for (int i = 0; i < 5; i++) fps += frames[i];
             fps /= 5.0f;
-            printf("fps = %f \n", fps);
+            LOG(LOG_MINIMAL, "fps = %f \n", fps);
 #ifdef BATCH_TEST
-            printf("average draw calls per frame = %f\n", (float)TotalDrawCalls / frames[framesIndex]);
-            printf("average vertices per draw call = %f\n", (float)TotalTriangles / TotalDrawCalls);
+            LOG(LOG_VERBOSE, "average draw calls per frame = %f\n", (float)TotalDrawCalls / frames[framesIndex]);
+            LOG(LOG_VERBOSE, "average vertices per draw call = %f\n", (float)TotalTriangles / TotalDrawCalls);
             TotalDrawCalls = 0;
             TotalTriangles = 0;
 #endif
 
 #ifdef SHADER_TEST
-            printf("average shader changes per frame = %f\n", (float)ProgramSwaps / frames[framesIndex]);
+            LOG(LOG_VERBOSE, "average shader changes per frame = %f\n", (float)ProgramSwaps / frames[framesIndex]);
             ProgramSwaps = 0;
 #endif
 
 #ifdef TEXTURECACHE_TEST
-            printf("texture cache per frame: hits=%.2f misses=%.2f\n", (float)cache.hits / frames[framesIndex],
+            LOG(LOG_VERBOSE, "texture cache per frame: hits=%.2f misses=%.2f\n", (float)cache.hits / frames[framesIndex],
                     (float)cache.misses / frames[framesIndex]);
             cache.hits = cache.misses = 0;
 #endif
@@ -1243,10 +1263,10 @@ OGL_SwapBuffers()
     static u32 profileLastTicks = 0;
     if (profileTicks >= (profileLastTicks + 10000))
     {
-        printf("GBI PROFILE DATA: %i ms \n", profileTicks - profileLastTicks);
-        printf("=========================================================\n");
+        LOG(LOG_VERBOSE, "GBI PROFILE DATA: %i ms \n", profileTicks - profileLastTicks);
+        LOG(LOG_VERBOSE, "=========================================================\n");
         GBI_ProfilePrint(stdout);
-        printf("=========================================================\n");
+        LOG(LOG_VERBOSE, "=========================================================\n");
         GBI_ProfileReset();
         profileLastTicks = profileTicks;
     }
@@ -1298,7 +1318,7 @@ OGL_SwapBuffers()
 
         glBindFramebuffer(GL_FRAMEBUFFER, OGL.framebuffer.fb);
         OGL_UpdateViewport();
-        gDP.changed |= CHANGED_COMBINE;
+        if (scProgramCurrent) glUseProgram(scProgramCurrent->program);
         OGL.renderState = RS_NONE;
     }
     else

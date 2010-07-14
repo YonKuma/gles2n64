@@ -9,12 +9,6 @@
 #include "SDL.h"
 #include "gSP.h"
 
-#if 0
-#define LOG(...)    fprintf(stdout, __VA_ARGS__); fflush(stdout)
-#else
-#define LOG(...)
-#endif
-
 #ifndef min
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #endif
@@ -100,13 +94,16 @@ struct GLInfo
         int     mipmap;
         int     force_bilinear;
         int     SaI2x;
+        int     useIA;
     } texture;
+
 
     int     frameskip, vsync;
     int     frame_vsync, frame_actual, frame_dl;
     int     frame_prevdl;
     int     mustRenderDlist;
 
+    //this stuff should really be in a struct Config
     int     logFrameRate;
     int     enableFog;
     int     enablePrimZ;
@@ -114,10 +111,10 @@ struct GLInfo
     int     enableAlphaTest;
     int     enableClipping;
     int     enableFaceCulling;
-
     int     forceClear;
     int     rdpClampMode;
     int     ignoreOffscreenRendering;
+    int     configversion;
 
     int     renderingToTexture;
 
@@ -128,8 +125,26 @@ struct GLInfo
 
     float   scaleX, scaleY;
 
-    GLubyte elements[255];
-    int     numElements;
+#define INDEXMAP_SIZE 64
+#define VERTBUFF_SIZE 256
+#define ELEMBUFF_SIZE 1024
+
+    struct {
+        SPVertex    vertices[VERTBUFF_SIZE];
+        GLubyte     elements[ELEMBUFF_SIZE];
+        int         num;
+
+#ifdef __TRIBUFFER_OPT
+
+        u32     indexmap[INDEXMAP_SIZE];
+        u32     indexmapinv[VERTBUFF_SIZE];
+        u32     indexmap_prev;
+        u32     indexmap_nomap;
+#endif
+
+    } triangles;
+
+
     unsigned int    renderState;
 
     GLVertex rect[4];

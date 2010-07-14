@@ -9,7 +9,6 @@
 #include "gSP.h"
 #include "gDP.h"
 #include "GBI.h"
-#include "gSPFunc.h"
 
 
 void F3DWRUS_Vtx( u32 w0, u32 w1 )

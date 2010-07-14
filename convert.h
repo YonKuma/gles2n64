@@ -273,7 +273,7 @@ inline u16 IA31_IA88( u8 color )
 {
     u8 i = Three2Eight[color >> 1];
     u8 a = One2Eight[color & 0x01];
-    return (i << 8) | a;
+    return (a << 8) | i;
 }
 
 inline u32 IA31_RGBA8888( u8 color )
@@ -317,6 +317,15 @@ inline u16 I8_IA88( u8 color )
 {
     return (color << 8) | color;
 }
+
+
+inline u16 IA88_IA88( u16 color )
+{
+    u8 a = (color&0xFF);
+    u8 i = (color>>8);
+    return  (i << 8) | a;
+}
+
 
 inline u32 I4_RGBA8888( u8 color )
 {

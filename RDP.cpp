@@ -4,18 +4,16 @@
 #include "gDP.h"
 #include "Types.h"
 #include "Debug.h"
+#include "Common.h"
+#include "gSP.h"
 
 void RDP_Unknown( u32 w0, u32 w1 )
 {
-#ifdef DEBUG
-    DebugMsg( DEBUG_UNKNOWN, "RDP_Unknown\r\n" );
-    DebugMsg( DEBUG_UNKNOWN, "\tUnknown RDP opcode %02X\r\n", _SHIFTR( w0, 24, 8 ) );
-#endif
 }
 
 void RDP_NoOp( u32 w0, u32 w1 )
 {
-//    gDPNoOp();
+    gSPNoOp();
 }
 
 void RDP_SetCImg( u32 w0, u32 w1 )
@@ -252,6 +250,48 @@ void RDP_TexRect( u32 w0, u32 w1 )
                          _FIXED2FLOAT( (s16)_SHIFTR( w3,  0, 16 ), 10 ) );  // dsdy
 }
 
+
+//Low Level RDP Drawing Commands:
+void RDP_TriFill(u32 w0, u32 w1)
+{
+    LOG(LOG_VERBOSE, "RSP_TRI_FILL Command\n");
+}
+
+void RDP_TriFillZBuff(u32 w0, u32 w1)
+{
+    LOG(LOG_VERBOSE, "RSP_TRI_FILL_ZBUFF Command\n");
+}
+
+void RDP_TriTxtr(u32 w0, u32 w1)
+{
+    LOG(LOG_VERBOSE, "RSP_TRI_TXTR Command\n");
+}
+
+void RDP_TriTxtrZBuff(u32 w0, u32 w1)
+{
+    LOG(LOG_VERBOSE, "RSP_TRI_TXTR_ZBUFF Command\n");
+}
+
+void RDP_TriShade(u32 w0, u32 w1)
+{
+    LOG(LOG_VERBOSE, "RSP_TRI_SHADE Command\n");
+}
+
+void RDP_TriShadeZBuff(u32 w0, u32 w1)
+{
+    LOG(LOG_VERBOSE, "RSP_TRI_SHADE_ZBUFF Command\n");
+}
+
+void RDP_TriShadeTxtr(u32 w0, u32 w1)
+{
+    LOG(LOG_VERBOSE, "RSP_TRI_SHADE_TXTR Command\n");
+}
+
+void RDP_TriShadeTxtrZBuff(u32 w0, u32 w1)
+{
+    LOG(LOG_VERBOSE, "RSP_TRI_SHADE_TXTR_ZBUFF Command\n");
+}
+
 void RDP_Init()
 {
     // Initialize RDP commands to RDP_UNKNOWN
@@ -291,5 +331,17 @@ void RDP_Init()
     GBI.cmd[G_RDPLOADSYNC]      = RDP_LoadSync;
     GBI.cmd[G_TEXRECTFLIP]      = RDP_TexRectFlip;
     GBI.cmd[G_TEXRECT]          = RDP_TexRect;
+
+    GBI.cmd[G_RDPNOOP]          = RDP_NoOp;
+
+    //Low Level RDP Drawing Commands:
+    GBI.cmd[G_TRI_FILL]             = RDP_TriFill;
+    GBI.cmd[G_TRI_FILL_ZBUFF]       = RDP_TriFillZBuff;
+    GBI.cmd[G_TRI_TXTR]             = RDP_TriTxtr;
+    GBI.cmd[G_TRI_TXTR_ZBUFF]       = RDP_TriTxtrZBuff;
+    GBI.cmd[G_TRI_SHADE]            = RDP_TriShade;
+    GBI.cmd[G_TRI_SHADE_TXTR]       = RDP_TriShadeTxtr;
+    GBI.cmd[G_TRI_SHADE_TXTR_ZBUFF] = RDP_TriShadeTxtrZBuff;
+
 }
 

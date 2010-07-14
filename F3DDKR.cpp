@@ -8,6 +8,8 @@
 #include "gSP.h"
 #include "gDP.h"
 #include "GBI.h"
+#include "OpenGL.h"
+
 
 void F3DDKR_DMA_Mtx( u32 w0, u32 w1 )
 {

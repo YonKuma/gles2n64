@@ -9,7 +9,6 @@
 #include "GBI.h"
 #include "OpenGL.h"
 #include "DepthBuffer.h"
-#include "gSPFunc.h"
 
 void F3D_SPNoOp( u32 w0, u32 w1 )
 {
@@ -39,6 +38,9 @@ void F3D_Reserved0( u32 w0, u32 w1 )
 
 void F3D_MoveMem( u32 w0, u32 w1 )
 {
+#ifdef __TRIBUFFER_OPT
+    gSPFlushTriangles();
+#endif
     switch (_SHIFTR( w0, 16, 8 ))
     {
         case F3D_MV_VIEWPORT://G_MV_VIEWPORT:
@@ -46,7 +48,6 @@ void F3D_MoveMem( u32 w0, u32 w1 )
             break;
         case G_MV_MATRIX_1:
             gSPForceMatrix( w1 );
-
             // force matrix takes four commands
             RSP.PC[RSP.PCi] += 24;
             break;
@@ -101,6 +102,11 @@ void F3D_DList( u32 w0, u32 w1 )
             gSPBranchList( w1 );
             break;
     }
+
+#ifdef __TRIBUFFER_OPT
+    //since PCi can be changed in gSPDisplayList
+    gSPFlushTriangles();
+#endif
 }
 
 void F3D_Reserved2( u32 w0, u32 w1 )
@@ -118,64 +124,9 @@ void F3D_Sprite2D_Base( u32 w0, u32 w1 )
 }
 
 
-inline bool __isclipped(const u32 v0, const u32 v1, const u32 v2)
-{
-    if (!OGL.enableClipping) return 0;
-
-    SPVertex * sv0 = &gSP.vertices[v0];
-    SPVertex * sv1 = &gSP.vertices[v1];
-    SPVertex * sv2 = &gSP.vertices[v2];
-
-    if  (sv0->xClip != 0)
-    {
-         if ((sv0->xClip == sv1->xClip) && (sv1->xClip == sv2->xClip)) return 1;
-    }
-
-    if  (sv0->yClip != 0)
-    {
-         if ((sv0->yClip == sv1->yClip) && (sv1->yClip == sv2->yClip)) return 1;
-    }
-
-    if  (sv0->zClip != 0)
-    {
-         if ((sv0->zClip == sv1->zClip) && (sv1->zClip == sv2->zClip)) return 1;
-    }
-
-    return 0;
-}
-
 void F3D_Tri1( u32 w0, u32 w1 )
 {
-#if 1
-    u32 v0 = _SHIFTR( w1, 16, 8 );
-    u32 v1 = _SHIFTR( w1, 8, 8 );
-    u32 v2 = _SHIFTR( w1, 0, 8 );
-
-#if 1
-    //doesn't use umull = faster.
-    v0 = ((v0 << 12) * 410) >> 24;
-    v1 = ((v1 << 12) * 410) >> 24;
-    v2 = ((v2 << 12) * 410) >> 24;
-#else
-    v0 /= 10;
-    v1 /= 10;
-    v2 /= 10;
-#endif
-
-    if (!__isclipped(v0,v1,v2)) OGL_AddTriangle(v0, v1, v2);
-
-    if ((RSP.nextCmd != G_TRI1) && (RSP.nextCmd != G_TRI2) &&
-        (RSP.nextCmd != G_TRI4) && (RSP.nextCmd != G_QUAD))
-    {
-        OGL_DrawTriangles();
-    }
-
-#else
-    gSP1Triangle( _SHIFTR( w1, 16, 8 ) / 10,
-                  _SHIFTR( w1, 8, 8 ) / 10,
-                  _SHIFTR( w1, 0, 8 ) / 10,
-                  _SHIFTR( w1, 24, 8 ) );
-#endif
+    gSP1Triangle( _SHIFTR( w1, 16, 8 ) / 10, _SHIFTR( w1, 8, 8 ) / 10, _SHIFTR( w1, 0, 8 ) / 10);
 }
 
 void F3D_CullDL( u32 w0, u32 w1 )
@@ -195,26 +146,23 @@ void F3D_MoveWord( u32 w0, u32 w1 )
         case G_MW_MATRIX:
             gSPInsertMatrix( _SHIFTR( w0, 8, 16 ), w1 );
             break;
+
         case G_MW_NUMLIGHT:
             gSPNumLights( ((w1 - 0x80000000) >> 5) - 1 );
             break;
+
         case G_MW_CLIP:
             gSPClipRatio( w1 );
             break;
+
         case G_MW_SEGMENT:
             gSPSegment( _SHIFTR( w0, 8, 16 ) >> 2, w1 & 0x00FFFFFF );
             break;
+
         case G_MW_FOG:
-/*          u32 fm, fo, min, max;
-
-            fm = _SHIFTR( w1, 16, 16 );
-            fo = _SHIFTR( w1, 0, 16 );
-
-            min = 500 - (fo * (128000 / fm)) / 256;
-            max = (128000 / fm) + min;*/
-
             gSPFogFactor( (s16)_SHIFTR( w1, 16, 16 ), (s16)_SHIFTR( w1, 0, 16 ) );
             break;
+
         case G_MW_LIGHTCOL:
             switch (_SHIFTR( w0, 8, 16 ))
             {
@@ -366,24 +314,6 @@ void F3D_Quad( u32 w0, u32 w1 )
 void F3D_RDPHalf_1( u32 w0, u32 w1 )
 {
     gDP.half_1 = w1;
-
-    //implement triangle command for GE/PD/KI, thanks to glide64.
-    if (w1 >= 0xC8 && w1 <=0xCF)
-    {
-        u32 pc, cmd_w0, cmd_w1;
-
-        do
-        {
-            pc = RSP.PC[RSP.PCi];
-            cmd_w0 = *(u32*)&RDRAM[pc];
-            cmd_w1 = *(u32*)&RDRAM[pc+4];
-            RSP.nextCmd = _SHIFTR( *(u32*)&RDRAM[pc+8], 24, 8 );
-            RSP.cmd = _SHIFTR( w0, 24, 8 );
-            RSP.PC[RSP.PCi] += 8;
-        } while ((w0 >> 24) != 0xB3);
-
-        GBI.cmd[RSP.cmd](cmd_w0, cmd_w1);
-    }
 }
 
 void F3D_RDPHalf_2( u32 w0, u32 w1 )
@@ -437,5 +367,6 @@ void F3D_Init()
     GBI_SetGBI( G_RDPHALF_2,            F3D_RDPHALF_2,          F3D_RDPHalf_2 );
     GBI_SetGBI( G_RDPHALF_CONT,         F3D_RDPHALF_CONT,       F3D_RDPHalf_Cont );
     GBI_SetGBI( G_TRI4,                 F3D_TRI4,               F3D_Tri4 );
+
 }
 

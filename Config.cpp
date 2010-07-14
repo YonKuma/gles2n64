@@ -32,6 +32,7 @@
 
 #include "winlnxdefs.h"
 #include "Config.h"
+#include "Common.h"
 
 
 struct Option
@@ -41,10 +42,15 @@ struct Option
     const int   initial;
 };
 
+
+#define CONFIG_VERSION 1
+
 Option config_options[] =
 {
     {"#gles2n64 Graphics Plugin for N64", NULL, 0},
     {"#by Orkin / glN64 developers and Adventus.", NULL, 0},
+
+    {"config version", &OGL.configversion, 0},
 
     {"#These values are the physical pixel dimensions of", NULL, 0},
     {"#your screen. They are only used for centering the", NULL, 0},
@@ -71,7 +77,7 @@ Option config_options[] =
     {"#framebuffer dimensions specify the resolution which",NULL,0},
     {"#gles2n64 will render to.",NULL,0},
 
-    {"framebuffer enable", &OGL.framebuffer.enable, 1},
+    {"framebuffer enable", &OGL.framebuffer.enable, 0},
     {"framebuffer bilinear", &OGL.framebuffer.bilinear, 0},
     {"framebuffer width", &OGL.framebuffer.width, 400},
     {"framebuffer height", &OGL.framebuffer.height, 240},
@@ -80,7 +86,7 @@ Option config_options[] =
     {"#tasks than GPU emulation, but at the cost of a lower", NULL, 0},
     {"#framerate.", NULL, 0},
 
-    {"frame skip", &OGL.frameskip, 1},
+    {"frame render rate", &OGL.frameskip, 1},
 
     {"#Vertical Sync Divider (0=No VSYNC, 1=60Hz, 2=30Hz, etc)", NULL, 0},
 
@@ -93,7 +99,7 @@ Option config_options[] =
     {"enable primitive z", &OGL.enablePrimZ, 1},
     {"enable lighting", &OGL.enableLighting, 1},
     {"enable alpha test", &OGL.enableAlphaTest, 1},
-    {"enable clipping", &OGL.enableClipping, 1},
+    {"enable clipping", &OGL.enableClipping, 0},
     {"enable face culling", &OGL.enableFaceCulling, 1},
 
     {"#Texture Bit Depth (0=force 16bit, 1=either 16/32bit, 2=force 32bit)", NULL, 0},
@@ -107,6 +113,7 @@ Option config_options[] =
     {"update mode", &OGL.updateMode, 1},
     {"ignore offscreen rendering", &OGL.ignoreOffscreenRendering, 0},
     {"force screen clear", &OGL.forceClear, 0},
+    {"use IA textures", &OGL.texture.useIA, 0},
 
 };
 
@@ -134,6 +141,7 @@ static inline const char *GetPluginDir()
 
 void Config_WriteConfig(const char *filename)
 {
+    OGL.configversion = CONFIG_VERSION;
     FILE* f = fopen(filename, "w");
     if (!f)
     {
@@ -165,7 +173,7 @@ void Config_LoadConfig()
         if (o->data) *(o->data) = o->initial;
     }
 
-    cache.maxBytes = 32 * 1048576;
+    cache.maxBytes = 16 * 1024 * 1024;
 
     // read configuration
     char filename[PATH_MAX];
@@ -199,12 +207,28 @@ void Config_LoadConfig()
                 Option *o = &config_options[i];
                 if (strcasecmp(line, o->name) == 0)
                 {
-                    if (o->data) *(o->data) = atoi(val);
+                    if (o->data)
+                    {
+                        int v = atoi(val);
+                        *(o->data) = v;
+                    }
                     break;
                 }
             }
-
         }
+
+        if (OGL.configversion != CONFIG_VERSION)
+        {
+            for(int i=0; i < config_options_size; i++)
+            {
+                Option *o = &config_options[i];
+                if (o->data) *(o->data) = o->initial;
+            }
+
+            LOG(LOG_MINIMAL, "[gles2N64]: Wrong config version, rewriting config with defaults\n");
+            Config_WriteConfig(filename);
+        }
+
     }
     if (f) fclose(f);
 }

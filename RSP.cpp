@@ -4,6 +4,7 @@
 # include "winlnxdefs.h"
 #endif
 #include <math.h>
+#include "Common.h"
 #include "gles2N64.h"
 #include "OpenGL.h"
 #include "Debug.h"
@@ -16,6 +17,12 @@
 #include "ShaderCombiner.h"
 #include "DepthBuffer.h"
 #include "GBI.h"
+#include "gSP.h"
+#include "Textures.h"
+
+//#define PRINT_DISPLAYLIST
+#define PRINT_DISPLAYLIST_NUM 10
+//#define PROFILE_GBI
 
 
 RSPInfo     RSP;
@@ -87,6 +94,7 @@ void RSP_ProcessDList()
 {
     VI_UpdateSize();
     OGL_UpdateScale();
+    TextureCache_ActivateNoise(2);
 
     RSP.PC[0] = *(u32*)&DMEM[0x0FF0];
     RSP.PCi = 0;
@@ -94,6 +102,10 @@ void RSP_ProcessDList()
 
     RSP.halt = FALSE;
     RSP.busy = TRUE;
+
+#ifdef __TRIBUFFER_OPT
+    __indexmap_init();
+#endif
 
     gSP.matrix.stackSize = min( 32, *(u32*)&DMEM[0x0FE4] >> 6 );
     gSP.matrix.modelViewi = 0;
@@ -130,6 +142,12 @@ void RSP_ProcessDList()
     gDPSetCycleType( G_CYC_1CYCLE );
     gDPPipelineMode( G_PM_NPRIMITIVE );
 
+
+
+#ifdef PRINT_DISPLAYLIST
+    if ((RSP.DList%PRINT_DISPLAYLIST_NUM) == 0) LOG(LOG_VERBOSE, "BEGIN DISPLAY LIST %i \n", RSP.DList);
+#endif
+
     while (!RSP.halt)
     {
         u32 pc = RSP.PC[RSP.PCi];
@@ -153,12 +171,20 @@ void RSP_ProcessDList()
         GBI_ProfileBegin(RSP.cmd);
 #endif
 
+#ifdef PRINT_DISPLAYLIST
+        if ((RSP.DList%PRINT_DISPLAYLIST_NUM) == 0) LOG(LOG_VERBOSE, "%s: w0=0x%x w1=0x%x\n", GBI_GetFuncName(GBI.current->type, RSP.cmd), w0, w1);
+#endif
+
         GBI.cmd[RSP.cmd]( w0, w1 );
 
 #ifdef PROFILE_GBI
         GBI_ProfileEnd(RSP.cmd);
 #endif
     }
+
+#ifdef PRINT_DISPLAYLIST
+        if ((RSP.DList%PRINT_DISPLAYLIST_NUM) == 0) LOG(LOG_VERBOSE, "END DISPLAY LIST %i \n", RSP.DList);
+#endif
 
     RSP.busy = FALSE;
     RSP.DList++;

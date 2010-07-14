@@ -12,30 +12,27 @@ VIInfo VI;
 
 void VI_UpdateSize()
 {
-	f32 xScale = _FIXED2FLOAT( _SHIFTR( *REG.VI_X_SCALE, 0, 12 ), 10 );
-	f32 xOffset = _FIXED2FLOAT( _SHIFTR( *REG.VI_X_SCALE, 16, 12 ), 10 );
+    f32 xScale = _FIXED2FLOAT( _SHIFTR( *REG.VI_X_SCALE, 0, 12 ), 10 );
+    f32 xOffset = _FIXED2FLOAT( _SHIFTR( *REG.VI_X_SCALE, 16, 12 ), 10 );
 
-	f32 yScale = _FIXED2FLOAT( _SHIFTR( *REG.VI_Y_SCALE, 0, 12 ), 10 );
-	f32 yOffset = _FIXED2FLOAT( _SHIFTR( *REG.VI_Y_SCALE, 16, 12 ), 10 );
+    f32 yScale = _FIXED2FLOAT( _SHIFTR( *REG.VI_Y_SCALE, 0, 12 ), 10 );
+    f32 yOffset = _FIXED2FLOAT( _SHIFTR( *REG.VI_Y_SCALE, 16, 12 ), 10 );
 
-	u32 hEnd = _SHIFTR( *REG.VI_H_START, 0, 10 );
-	u32 hStart = _SHIFTR( *REG.VI_H_START, 16, 10 );
+    u32 hEnd = _SHIFTR( *REG.VI_H_START, 0, 10 );
+    u32 hStart = _SHIFTR( *REG.VI_H_START, 16, 10 );
 
-	// These are in half-lines, so shift an extra bit
-	u32 vEnd = _SHIFTR( *REG.VI_V_START, 1, 9 );
-	u32 vStart = _SHIFTR( *REG.VI_V_START, 17, 9 );
+    // These are in half-lines, so shift an extra bit
+    u32 vEnd = _SHIFTR( *REG.VI_V_START, 1, 9 );
+    u32 vStart = _SHIFTR( *REG.VI_V_START, 17, 9 );
 
-    VI.realWidth = hEnd - hStart;
-    VI.realHeight = vEnd - vStart;
+    VI.width = (hEnd - hStart) * xScale;
+    VI.height = (vEnd - vStart) * yScale * 1.0126582f;
 
-	VI.width = VI.realWidth * xScale;
-	VI.height = VI.realHeight * yScale * 1.0126582f;
+    VI.rwidth = 1.0f / VI.width;
+    VI.rheight = 1.0f / VI.height;
 
-	if (VI.width == 0.0f) VI.width = 320.0f;
-	if (VI.height == 0.0f) VI.height = 240.0f;
-
-	VI.rwidth = 1.0f / VI.width;
-	VI.rheight = 1.0f / VI.height;
+    if (VI.width == 0.0f) VI.width = 320.0f;
+    if (VI.height == 0.0f) VI.height = 240.0f;
 
     //add display buffer if doesn't exist
     if (OGL.ignoreOffscreenRendering)
@@ -77,11 +74,11 @@ void VI_UpdateScreen()
             break;
 
         default: //SCREEN_UPDATE_AT_VI_UPDATE
-            //if (gSP.changed & CHANGED_COLORBUFFER)
-            //{
+            if (gSP.changed & CHANGED_COLORBUFFER)
+            {
                 OGL_SwapBuffers();
-                //gSP.changed &= ~CHANGED_COLORBUFFER;
-            //}
+                gSP.changed &= ~CHANGED_COLORBUFFER;
+            }
             break;
     }
 

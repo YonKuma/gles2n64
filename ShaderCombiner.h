@@ -187,9 +187,9 @@
 
 struct UniformLocation
 {
-    struct {GLint loc; int val;} uTex0, uTex1;
+    struct {GLint loc; int val;} uTex0, uTex1, uNoise;
     struct {GLint loc; int val;} uEnableFog;
-    struct {GLint loc; float val;} uFogMultiplier, uFogOffset, uAlphaRef, uPrimLODFrac, uRenderState;
+    struct {GLint loc; float val;} uFogMultiplier, uFogOffset, uAlphaRef, uPrimLODFrac, uRenderState, uK4, uK5;
     struct {GLint loc; float val[4];} uEnvColor, uPrimColor, uFogColor;
     struct {GLint loc; float val[2];}  uTexScale, uTexOffset[2], uCacheShiftScale[2],
         uCacheScale[2], uCacheOffset[2];
@@ -203,6 +203,7 @@ struct ShaderProgram
     int         usesT0;       //uses texcoord0 attrib
     int         usesT1;       //uses texcoord1 attrib
     int         usesCol;      //uses color attrib
+    int         usesNoise;    //requires noise texture
 
     UniformLocation uniforms;
     gDPCombine      combine;
@@ -210,33 +211,35 @@ struct ShaderProgram
     ShaderProgram   *left, *right;
 };
 
+
+//dmux flags:
+#define SC_IGNORE_RGB0      (1<<0)
+#define SC_IGNORE_ALPHA0    (1<<1)
+#define SC_IGNORE_RGB1      (1<<2)
+#define SC_IGNORE_ALPHA1    (1<<3)
+
 class DecodedMux
 {
     public:
-        DecodedMux(u64 mux);
+        DecodedMux(u64 mux, bool cycle2);
 
-        void swap(int cycle, int src0, int src1);
-        void replace(int cycle, int src, int dest);
+        bool find(int index, int src);
+        bool swap(int cycle, int src0, int src1);
+        bool replace(int cycle, int src, int dest);
+
         gDPCombine combine;
         int decode[4][4];
+        int flags;
 };
 
-extern int saRGBExpanded[];
-extern int sbRGBExpanded[];
-extern int mRGBExpanded[];
-extern int aRGBExpanded[];
-extern int saAExpanded[];
-extern int sbAExpanded[];
-extern int mAExpanded[];
-extern int aAExpanded[];
 extern int CCEncodeA[];
 extern int CCEncodeB[];
 extern int CCEncodeC[];
 extern int CCEncodeD[];
-extern DWORD64 ACEncodeA[];
-extern DWORD64 ACEncodeB[];
-extern DWORD64 ACEncodeC[];
-extern DWORD64 ACEncodeD[];
+extern int ACEncodeA[];
+extern int ACEncodeB[];
+extern int ACEncodeC[];
+extern int ACEncodeD[];
 
 extern ShaderProgram    *scProgramRoot;
 extern ShaderProgram    *scProgramCurrent;

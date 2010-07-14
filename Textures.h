@@ -31,6 +31,7 @@ struct CachedTexture
 
 };
 
+#define TEXTUREBUFFER_SIZE (128 * 1024)
 
 struct TextureCache
 {
@@ -45,6 +46,7 @@ struct TextureCache
     //GLuint            glDummyName;
     CachedTexture   *dummy;
     u32             enable2xSaI, bitDepth;
+    u8              textureBuffer[TEXTUREBUFFER_SIZE];    //buffer for texture conversion
 };
 
 extern TextureCache cache;

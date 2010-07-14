@@ -16,11 +16,13 @@
 #include "F3DDKR.h"
 #include "F3DWRUS.h"
 #include "F3DPD.h"
+#include "F3DCBFD.h"
 #include "Types.h"
 # include <string.h>
 # include <unistd.h>
 # include <stdlib.h>
 # include "convert.h"
+#include "Common.h"
 
 #ifndef __LINUX__
 #elif defined(USE_GTK)
@@ -35,14 +37,15 @@ char uc_str[256];
 
 SpecialMicrocodeInfo specialMicrocodes[] =
 {
-{F3DWRUS, FALSE, 0xd17906e2, "RSP SW Version: 2.0D, 04-01-96"},
-{F3DWRUS, FALSE,  0x94c4c833, "RSP SW Version: 2.0D, 04-01-96"},
-{S2DEX, FALSE, 0x9df31081, "RSP Gfx ucode S2DEX  1.06 Yoshitaka Yasumoto Nintendo."},
-{F3DDKR, FALSE, 0x8d91244f, "Diddy Kong Racing"},
-{F3DDKR, FALSE, 0x6e6fc893, "Diddy Kong Racing"},
-{F3DDKR, FALSE, 0xbde9d1fb, "Jet Force Gemini"},
-{F3DPD, FALSE, 0x1c4f7869, "Perfect Dark"},
-{F3DEX, FALSE, 0x0ace4c3f, "Mario Kart"},
+    {F3DWRUS, FALSE, 0xd17906e2, "RSP SW Version: 2.0D, 04-01-96"},
+    {F3DWRUS, FALSE,  0x94c4c833, "RSP SW Version: 2.0D, 04-01-96"},
+    {S2DEX, FALSE, 0x9df31081, "RSP Gfx ucode S2DEX  1.06 Yoshitaka Yasumoto Nintendo."},
+    {F3DDKR, FALSE, 0x8d91244f, "Diddy Kong Racing"},
+    {F3DDKR, FALSE, 0x6e6fc893, "Diddy Kong Racing"},
+    {F3DDKR, FALSE, 0xbde9d1fb, "Jet Force Gemini"},
+    {F3DPD, FALSE, 0x1c4f7869, "Perfect Dark"},
+    {F3DEX, FALSE, 0x0ace4c3f, "Mario Kart"},
+    {F3DCBFD, FALSE, 0x1b4ace88, "RSP Gfx ucode F3DEXBG.NoN fifo 2.08  Yoshitaka Yasumoto 1999 Nintendo."},
 };
 
 u32 G_RDPHALF_1, G_RDPHALF_2, G_RDPHALF_CONT;
@@ -65,7 +68,7 @@ u32 G_BG_1CYC, G_BG_COPY;
 u32 G_OBJ_RECTANGLE, G_OBJ_SPRITE, G_OBJ_MOVEMEM;
 u32 G_SELECT_DL, G_OBJ_RENDERMODE, G_OBJ_RECTANGLE_R;
 u32 G_OBJ_LOADTXTR, G_OBJ_LDTX_SPRITE, G_OBJ_LDTX_RECT, G_OBJ_LDTX_RECT_R;
-u32 G_RDPHALF_0;
+u32 G_RDPHALF_0, G_TRI_UNKNOWN;
 
 u32 G_MTX_STACKSIZE;
 u32 G_MTX_MODELVIEW;
@@ -98,9 +101,6 @@ GBIInfo GBI;
 
 void GBI_Unknown( u32 w0, u32 w1 )
 {
-#ifdef DEBUG
-    DebugMsg( DEBUG_LOW | DEBUG_UNKNOWN, "UNKNOWN GBI COMMAND 0x%02X", _SHIFTR( w0, 24, 8 ) );
-#endif
 }
 
 #if 0
@@ -335,7 +335,6 @@ void GBI_Destroy()
     }
 }
 
-#ifdef PROFILE_GBI
 void
 GBI_ProfileInit()
 {
@@ -791,10 +790,18 @@ GBI_GetFuncName(unsigned int ucode, unsigned int cmd)
             }
         }
 
-        default:                return "UNKNOWN CMD";
+        default:
+        {
+            if (ucode == F3DCBFD)
+            {
+                if (cmd >= 0x10 && cmd <= 0x1f)
+                    return "F3DCBFD_TRI4";
+
+            }
+            return "UNKNOWN CMD";
+        }
     }
 }
-#endif
 
 MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 {
@@ -823,6 +830,8 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 
     // See if we can identify it by CRC
     uc_crc = CRC_Calculate( 0xFFFFFFFF, &RDRAM[uc_start & 0x1FFFFFFF], 4096 );
+    LOG(LOG_VERBOSE, "UCODE CRC=0x%x\n", uc_crc);
+
     for (u32 i = 0; i < sizeof( specialMicrocodes ) / sizeof( SpecialMicrocodeInfo ); i++)
     {
         if (uc_crc == specialMicrocodes[i].crc)
@@ -836,6 +845,7 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
     char uc_data[2048];
     UnswapCopy( &RDRAM[uc_dstart & 0x1FFFFFFF], uc_data, 2048 );
     strcpy( uc_str, "Not Found" );
+
 
     for (u32 i = 0; i < 2048; i++)
     {
@@ -883,6 +893,8 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
                 }
             }
 
+            LOG(LOG_VERBOSE, "UCODE STRING=%s\n", uc_str);
+
             if (type != NONE)
             {
                 current->type = type;
@@ -892,6 +904,7 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
             break;
         }
     }
+
 
     for (u32 i = 0; i < sizeof( specialMicrocodes ) / sizeof( SpecialMicrocodeInfo ); i++)
     {
@@ -943,7 +956,6 @@ void GBI_MakeCurrent( MicrocodeInfo *current )
             GBI.cmd[i] = GBI_Unknown;
 
         RDP_Init();
-
         switch (current->type)
         {
             case F3D:       F3D_Init();     break;
@@ -957,8 +969,10 @@ void GBI_MakeCurrent( MicrocodeInfo *current )
             case F3DDKR:    F3DDKR_Init();  break;
             case F3DWRUS:   F3DWRUS_Init(); break;
             case F3DPD:     F3DPD_Init();   break;
+            case F3DCBFD:   F3DCBFD_Init(); break;
         }
     }
+
 
     GBI.current = current;
 }

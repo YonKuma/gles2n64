@@ -1,6 +1,7 @@
 #ifndef GBI_H
 #define GBI_H
 #include "Types.h"
+#include <stdio.h>
 
 // Microcode Types
 #define F3D         0
@@ -14,23 +15,25 @@
 #define F3DPD       8
 #define F3DDKR      9
 #define F3DWRUS     10
-#define NONE        11
+#define F3DCBFD     11
+#define NONE        12
 
 #ifdef MAINDEF
 const char *MicrocodeTypes[] =
 {
-"Fast3D",
-"F3DEX",
-"F3DEX2",
-"Line3D",
-"L3DEX",
-"L3DEX2",
-"S2DEX",
-"S2DEX2",
-"Perfect Dark",
-"DKR/JFG",
-"Waverace US",
-"None",
+    "Fast3D",
+    "F3DEX",
+    "F3DEX2",
+    "Line3D",
+    "L3DEX",
+    "L3DEX2",
+    "S2DEX",
+    "S2DEX2",
+    "Perfect Dark",
+    "DKR/JFG",
+    "Waverace US",
+    "Conker's Bad Fur Day",
+    "None",
 };
 #else
 extern const char *MicrocodeTypes[];
@@ -138,6 +141,7 @@ static const int numMicrocodeTypes = 11;
 #define G_MW_FORCEMTX       0x0C
 #define G_MW_POINTS         0x0C
 #define G_MW_PERSPNORM      0x0E
+#define G_MV_COORDMOD       0x10    //Conker Bad Fur Day
 
 #define G_MWO_NUMLIGHT      0x00
 #define G_MWO_CLIP_RNX      0x04
@@ -310,13 +314,15 @@ static const char *SegmentText[] =
 #define G_TEXRECTFLIP           0xE5    /* -27 */
 #define G_TEXRECT               0xE4    /* -28 */
 
+#define G_RDPNOOP               0xC0
+
 #define G_TRI_FILL              0xC8    /* fill triangle:            11001000 */
-#define G_TRI_SHADE             0xCC    /* shade triangle:           11001100 */
-#define G_TRI_TXTR              0xCA    /* texture triangle:         11001010 */
-#define G_TRI_SHADE_TXTR        0xCE    /* shade, texture triangle:  11001110 */
 #define G_TRI_FILL_ZBUFF        0xC9    /* fill, zbuff triangle:     11001001 */
-#define G_TRI_SHADE_ZBUFF       0xCD    /* shade, zbuff triangle:    11001101 */
+#define G_TRI_TXTR              0xCA    /* texture triangle:         11001010 */
 #define G_TRI_TXTR_ZBUFF        0xCB    /* texture, zbuff triangle:  11001011 */
+#define G_TRI_SHADE             0xCC    /* shade triangle:           11001100 */
+#define G_TRI_SHADE_ZBUFF       0xCD    /* shade, zbuff triangle:    11001101 */
+#define G_TRI_SHADE_TXTR        0xCE    /* shade, texture triangle:  11001110 */
 #define G_TRI_SHADE_TXTR_ZBUFF  0xCF    /* shade, txtr, zbuff trngl: 11001111 */
 
 /*
@@ -638,7 +644,7 @@ extern u32 G_BG_1CYC, G_BG_COPY;
 extern u32 G_OBJ_RECTANGLE, G_OBJ_SPRITE, G_OBJ_MOVEMEM;
 extern u32 G_SELECT_DL, G_OBJ_RENDERMODE, G_OBJ_RECTANGLE_R;
 extern u32 G_OBJ_LOADTXTR, G_OBJ_LDTX_SPRITE, G_OBJ_LDTX_RECT, G_OBJ_LDTX_RECT_R;
-extern u32 G_RDPHALF_0;
+extern u32 G_RDPHALF_0, G_TRI_UNKNOWN;
 
 #define LIGHT_1 1
 #define LIGHT_2 2
@@ -689,6 +695,7 @@ typedef struct
     s16 t, s;
 } PDVertex;
 
+
 typedef struct
 {
     u8      v2, v1, v0, flag;
@@ -735,17 +742,13 @@ struct GBIInfo
     u32 PCStackSize, numMicrocodes;
     MicrocodeInfo *current, *top, *bottom;
 
-#ifdef PROFILE_GBI
     unsigned int profileTimer[256 * 12];
     unsigned int profileNum[256 * 12];
     unsigned int profileTmp;
-#endif
 };
 
 extern GBIInfo GBI;
 
-#ifdef PROFILE_GBI
-#include <stdio.h>
 void GBI_ProfileReset();
 void GBI_ProfileInit();
 void GBI_ProfileBegin(u32 cmd);
@@ -753,7 +756,6 @@ void GBI_ProfileEnd(u32 cmd);
 u32  GBI_ProfilePrint(FILE *file);
 const char* GBI_GetFuncName(u32 ucode, u32 cmd);
 u32  GBI_GetFuncTime(u32 ucode, u32 cmd);
-#endif
 
 void GBI_MakeCurrent( MicrocodeInfo *current );
 MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize );

@@ -14,6 +14,44 @@
 #define CHANGED_TEXTURESCALE    0x40
 
 
+#ifdef __TRIBUFFER_OPT
+#define gSPFlushTriangles() \
+    if ((OGL.triangles.num > 1000) || ( \
+        (RSP.nextCmd != G_NOOP) && \
+        (RSP.nextCmd != G_RDPNOOP) && \
+        (RSP.nextCmd != G_MOVEMEM) && \
+        (RSP.nextCmd != G_ENDDL) && \
+        (RSP.nextCmd != G_DL) && \
+        (RSP.nextCmd != G_VTXCOLORBASE) && \
+        (RSP.nextCmd != G_TRI1) && \
+        (RSP.nextCmd != G_TRI2) && \
+        (RSP.nextCmd != G_TRI4) && \
+        (RSP.nextCmd != G_QUAD) && \
+        (RSP.nextCmd != G_VTX) && \
+        (RSP.nextCmd != G_MTX))){ \
+        OGL_DrawTriangles(); \
+        }
+#else
+#define gSPFlushTriangles() \
+    if ((RSP.nextCmd != G_TRI1) && \
+        (RSP.nextCmd != G_TRI2) && \
+        (RSP.nextCmd != G_TRI4) && \
+        (RSP.nextCmd != G_QUAD))\
+        OGL_DrawTriangles()
+#endif
+
+#define CLIP_X      0x03
+#define CLIP_NEGX   0x01
+#define CLIP_POSX   0x02
+
+#define CLIP_Y      0x0C
+#define CLIP_NEGY   0x04
+#define CLIP_POSY   0x08
+
+#define CLIP_Z      0x30
+#define CLIP_NEGZ   0x10
+#define CLIP_POSZ   0x20
+
 struct SPVertex
 {
     f32     x, y, z, w;
@@ -29,7 +67,7 @@ struct SPVertex
 #endif
     f32     s, t;
 
-    s32     xClip, yClip, zClip;
+    u32     clip;
     s16     flag;
     s16     __pad1;
 };
@@ -60,8 +98,6 @@ struct gSPInfo
         f32 X, Y;
         f32 baseScaleX, baseScaleY;
     } objMatrix;
-
-    SPVertex vertices[80];
 
     u32 vertexColorBase;
     u32 vertexi;
@@ -126,7 +162,7 @@ void gSPBranchList( u32 dl );
 void gSPBranchLessZ( u32 branchdl, u32 vtx, f32 zval );
 void gSPSprite2DBase( u32 base );
 void gSPDMATriangles( u32 tris, u32 n );
-void gSP1Quadrangle( s32 v0, s32 v1, s32 v2, s32 v4 );
+void gSP1Quadrangle( s32 v0, s32 v1, s32 v2, s32 v3 );
 void gSPCullDisplayList( u32 v0, u32 vn );
 void gSPPopMatrix( u32 param );
 void gSPPopMatrixN( u32 param, u32 num );
@@ -156,5 +192,25 @@ void gSPObjMatrix( u32 mtx );
 void gSPObjSubMatrix( u32 mtx );
 void gSPSetDMAOffsets( u32 mtxoffset, u32 vtxoffset );
 void gSPSetVertexColorBase( u32 base );
+void gSPProcessVertex(u32 v);
+
+void gSPTriangleUnknown();
+
+void gSP1Triangle(s32 v0, s32 v1, s32 v2);
+void gSP2Triangles(const s32 v00, const s32 v01, const s32 v02, const s32 flag0,
+                    const s32 v10, const s32 v11, const s32 v12, const s32 flag1 );
+void gSP4Triangles(const s32 v00, const s32 v01, const s32 v02,
+                    const s32 v10, const s32 v11, const s32 v12,
+                    const s32 v20, const s32 v21, const s32 v22,
+                    const s32 v30, const s32 v31, const s32 v32 );
+
+
+#ifdef __TRIBUFFER_OPT
+void __indexmap_init();
+void __indexmap_clear();
+u32 __indexmap_findunused(u32 num);
+u32 __indexmap_getnew(u32 index, u32 num);
+#endif
+
 #endif
 

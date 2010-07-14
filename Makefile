@@ -57,11 +57,11 @@ CFLAGS  += -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp -ffast-m
 CFLAGS  += -findirect-inlining
 CFLAGS  += -ftree-switch-conversion
 CFLAGS  += -floop-interchange -floop-strip-mine -floop-block
-
-CFLAGS  += -D__NEON_OPT -D__VEC4_OPT -DARM_ASM  -DINLINE_OPT
 CFLAGS  += -DX11_WINDOW
 
-#CFLAGS += -D__PACKVERTEX_OPT 
+CFLAGS  +=-DARM_ASM -D__NEON_OPT -D__VEC4_OPT
+#CFLAGS += -D__PACKVERTEX_OPT
+CFLAGS += -D__TRIBUFFER_OPT
 endif
 
 ifeq ($(OS), LINUX)
@@ -105,7 +105,8 @@ OBJECTS = Config.o \
 	S2DEX2.o \
 	F3DPD.o \
 	F3DDKR.o \
-	F3DWRUS.o
+	F3DWRUS.o \
+	F3DCBFD.o
 
 # build targets
 all: gles2n64.$(SO_EXTENSION)

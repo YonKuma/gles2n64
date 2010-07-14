@@ -8,8 +8,6 @@
 #include "gSP.h"
 #include "gDP.h"
 #include "GBI.h"
-#include "gSPFunc.h"
-
 
 void F3DEX_Vtx( u32 w0, u32 w1 )
 {

@@ -385,23 +385,35 @@ void gDPSetColorImage( u32 format, u32 size, u32 width, u32 address )
         //colorimage byte size:
         //color image height is not the best thing to base this on, its normally set
         //later on in the code
-        int s = 0;
-        switch(size)
-        {
-            case G_IM_SIZ_4b:   s = (gDP.colorImage.width * gDP.colorImage.height) / 2; break;
-            case G_IM_SIZ_8b:   s = (gDP.colorImage.width * gDP.colorImage.height); break;
-            case G_IM_SIZ_16b:  s = (gDP.colorImage.width * gDP.colorImage.height) * 2; break;
-            case G_IM_SIZ_32b:  s = (gDP.colorImage.width * gDP.colorImage.height) * 4; break;
-        }
-        u32 start = addr & 0x00FFFFFF;
-        u32 end = min(start + s, RDRAMSize);
-        for(i = 0; i < VI.displayNum; i++)
-        {
-            if (VI.display[i].start <= end && VI.display[i].start >= start) break;
-            if (start <= VI.display[i].end && start >= VI.display[i].start) break;
-        }
 
-        OGL.renderingToTexture = (i == VI.displayNum);
+        if (gDP.colorImage.address == gDP.depthImageAddress)
+        {
+            OGL.renderingToTexture = false;
+        }
+        else if (size == G_IM_SIZ_16b && format == G_IM_FMT_RGBA)
+        {
+            int s = 0;
+            switch(size)
+            {
+                case G_IM_SIZ_4b:   s = (gDP.colorImage.width * gDP.colorImage.height) / 2; break;
+                case G_IM_SIZ_8b:   s = (gDP.colorImage.width * gDP.colorImage.height); break;
+                case G_IM_SIZ_16b:  s = (gDP.colorImage.width * gDP.colorImage.height) * 2; break;
+                case G_IM_SIZ_32b:  s = (gDP.colorImage.width * gDP.colorImage.height) * 4; break;
+            }
+            u32 start = addr & 0x00FFFFFF;
+            u32 end = min(start + s, RDRAMSize);
+            for(i = 0; i < VI.displayNum; i++)
+            {
+                if (VI.display[i].start <= end && VI.display[i].start >= start) break;
+                if (start <= VI.display[i].end && start >= VI.display[i].start) break;
+            }
+
+            OGL.renderingToTexture = (i == VI.displayNum);
+        }
+        else
+        {
+            OGL.renderingToTexture = true;
+        }
 
 #if 0
         if (OGL.renderingToTexture)
@@ -540,7 +552,6 @@ void gDPSetPrimColor( u32 m, u32 l, u32 r, u32 g, u32 b, u32 a )
 #endif
 }
 
-#ifndef INLINE_OPT
 void gDPSetTile( u32 format, u32 size, u32 line, u32 tmem, u32 tile, u32 palette, u32 cmt, u32 cms, u32 maskt, u32 masks, u32 shiftt, u32 shifts )
 {
     if (((size == G_IM_SIZ_4b) || (size == G_IM_SIZ_8b)) && (format == G_IM_FMT_RGBA))
@@ -560,26 +571,7 @@ void gDPSetTile( u32 format, u32 size, u32 line, u32 tmem, u32 tile, u32 palette
 
     if (!gDP.tiles[tile].masks) gDP.tiles[tile].clamps = 1;
     if (!gDP.tiles[tile].maskt) gDP.tiles[tile].clampt = 1;
-
-#ifdef DEBUG
-    DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TEXTURE, "gDPSetTile( %s, %s, %i, %i, %i, %i, %s%s, %s%s, %i, %i, %i, %i );\n",
-        ImageFormatText[format],
-        ImageSizeText[size],
-        line,
-        tmem,
-        tile,
-        palette,
-        cmt & G_TX_MIRROR ? "G_TX_MIRROR" : "G_TX_NOMIRROR",
-        cmt & G_TX_CLAMP ? " | G_TX_CLAMP" : "",
-        cms & G_TX_MIRROR ? "G_TX_MIRROR" : "G_TX_NOMIRROR",
-        cms & G_TX_CLAMP ? " | G_TX_CLAMP" : "",
-        maskt,
-        masks,
-        shiftt,
-        shifts );
-#endif
 }
-#endif
 
 void gDPSetTileSize( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt )
 {
@@ -821,7 +813,10 @@ void gDPFillRectangle( s32 ulx, s32 uly, s32 lrx, s32 lry )
 
     //shouldn't this be primitive color?
     //OGL_DrawRect( ulx, uly, lrx, lry, (gDP.otherMode.cycleType == G_CYC_FILL) ? &gDP.fillColor.r : &gDP.blendColor.r );
-    OGL_DrawRect( ulx, uly, lrx, lry, (gDP.otherMode.cycleType == G_CYC_FILL) ? &gDP.fillColor.r : &gDP.primColor.r);
+    //OGL_DrawRect( ulx, uly, lrx, lry, (gDP.otherMode.cycleType == G_CYC_FILL) ? &gDP.fillColor.r : &gDP.primColor.r);
+
+    float black[] = {0,0,0,0};
+    OGL_DrawRect( ulx, uly, lrx, lry, (gDP.otherMode.cycleType == G_CYC_FILL) ? &gDP.fillColor.r : black);
 
     if (depthBuffer.current) depthBuffer.current->cleared = FALSE;
     gDP.colorImage.changed = TRUE;
@@ -835,12 +830,13 @@ void gDPFillRectangle( s32 ulx, s32 uly, s32 lrx, s32 lry )
 
 void gDPSetConvert( s32 k0, s32 k1, s32 k2, s32 k3, s32 k4, s32 k5 )
 {
-    gDP.convert.k0 = k0;
-    gDP.convert.k1 = k1;
-    gDP.convert.k2 = k2;
-    gDP.convert.k3 = k3;
-    gDP.convert.k4 = k4;
-    gDP.convert.k5 = k5;
+    gDP.convert.k0 = k0 * 0.0039215689f;
+    gDP.convert.k1 = k1 * 0.0039215689f;
+    gDP.convert.k2 = k2 * 0.0039215689f;
+    gDP.convert.k3 = k3 * 0.0039215689f;
+    gDP.convert.k4 = k4 * 0.0039215689f;
+    gDP.convert.k5 = k5 * 0.0039215689f;
+    gDP.changed |= CHANGED_CONVERT;
 }
 
 void gDPSetKeyR( u32 cR, u32 sR, u32 wR )

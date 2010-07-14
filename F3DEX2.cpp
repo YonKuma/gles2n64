@@ -9,7 +9,7 @@
 #include "gSP.h"
 #include "gDP.h"
 #include "GBI.h"
-#include "gSPFunc.h"
+#include "OpenGL.h"
 
 
 void F3DEX2_Mtx( u32 w0, u32 w1 )
@@ -19,28 +19,26 @@ void F3DEX2_Mtx( u32 w0, u32 w1 )
 
 void F3DEX2_MoveMem( u32 w0, u32 w1 )
 {
+#ifdef __TRIBUFFER_OPT
+    gSPFlushTriangles();
+#endif
     switch (_SHIFTR( w0, 0, 8 ))
     {
         case F3DEX2_MV_VIEWPORT:
             gSPViewport( w1 );
             break;
+
         case G_MV_MATRIX:
             gSPForceMatrix( w1 );
-
-            // force matrix takes two commands
-            RSP.PC[RSP.PCi] += 8;
+            RSP.PC[RSP.PCi] += 8;             // force matrix takes two commands
             break;
+
         case G_MV_LIGHT:
             u32 offset = _SHIFTR( w0, 8, 8 ) << 3;
-
             if (offset >= 48)
             {
                 gSPLight( w1, (offset - 24) / 24);
             }
-/*          else
-            {
-                // Do lookat stuff
-            }*/
             break;
     }
 }
