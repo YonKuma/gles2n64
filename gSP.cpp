@@ -59,7 +59,6 @@ void __indexmap_clear()
 u32 __indexmap_findunused(u32 num)
 {
     u32 c = 0;
-    //u32 i = (OGL.triangles.indexmap_prev+1)&0xFF;
     u32 i = 0;
     u32 n = 0;
     while(n < VERTBUFF_SIZE)
@@ -101,10 +100,27 @@ u32 __indexmap_getnew(u32 index, u32 num)
     {
         OGL_DrawTriangles();
         ind = __indexmap_findunused(num);
+
+        //OK the indices are spread so sparsely, we cannot find a num element block.
         if (ind > VERTBUFF_SIZE)
         {
-            LOG(LOG_ERROR, "Could not allocate %i indices, ind=%i \n", ind, num);
-            return 0xFFFFFFFF;
+            __indexmap_undomap();
+            ind = __indexmap_findunused(num);
+            if (ind > VERTBUFF_SIZE)
+            {
+                LOG(LOG_ERROR, "Could not allocate %i indices\n", num);
+
+                LOG(LOG_VERBOSE, "indexmap=[");
+                for(int i=0;i<INDEXMAP_SIZE;i++)
+                    LOG(LOG_VERBOSE, "%i,", OGL.triangles.indexmap[i]);
+                LOG(LOG_VERBOSE, "]\n");
+
+                LOG(LOG_VERBOSE, "indexmapinv=[");
+                for(int i=0;i<VERTBUFF_SIZE;i++)
+                    LOG(LOG_VERBOSE, "%i,", OGL.triangles.indexmapinv[i]);
+                LOG(LOG_VERBOSE, "]\n");
+            }
+            return ind;
         }
     }
 
@@ -130,12 +146,6 @@ void gSPTriangle(s32 v0, s32 v1, s32 v2)
         v0 = OGL.triangles.indexmap[v0];
         v1 = OGL.triangles.indexmap[v1];
         v2 = OGL.triangles.indexmap[v2];
-
-        if (v0 < 0 || v1 < 0 || v2 < 0)
-        {
-            LOG(LOG_ERROR, "Negative INDEX!\n");
-        }
-
 #endif
 
         // Don't bother with triangles completely outside clipping frustrum
@@ -471,7 +481,6 @@ void gSPTransformNormal4(u32 v, float mtx[4][4])
 }
 #endif
 
-//sizeof(light) = 24
 #ifdef __VEC4_OPT
 void __attribute__((noinline))
 gSPLightVertex4(u32 v)
@@ -638,8 +647,8 @@ gSPLightVertex4(u32 v)
     "vst1.32 		{d4, d5}, [%4]!	        \n\t"	//
     "vst1.32 		{d6, d7}, [%4]     	    \n\t"	//
 
-    :: "r"(tmp), "r"(i), "r"(ptr0), "r"(ptr1), "r"(ptr2),
-        "I"(sizeof(SPLight))
+    : "+&r"(tmp), "+&r"(i), "+&r"(ptr0), "+&r"(ptr1), "+&r"(ptr2)
+    : "I"(sizeof(SPLight))
     : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
       "d8", "d9", "d10", "d11", "d12", "d13", "d14", "d15",
       "d16","d17", "d18","d19", "d20", "d21", "d22", "d23",
@@ -675,13 +684,13 @@ gSPLightVertex4(u32 v)
             OGL.triangles.vertices[v+j].b += gSP.lights[i].b * intensity;
         }
 #ifdef __PACKVERTEX_OPT
-        OGL.triangles.vertices[v+j].r = min(255.0f, r);
-        OGL.triangles.vertices[v+j].g = min(255.0f, g);
-        OGL.triangles.vertices[v+j].b = min(255.0f, b);
+        OGL.triangles.vertices[v+j].r = min(255, r);
+        OGL.triangles.vertices[v+j].g = min(255, g);
+        OGL.triangles.vertices[v+j].b = min(255, b);
 #else
-        OGL.triangles.vertices[v].r = min(1.0, r);
-        OGL.triangles.vertices[v].g = min(1.0, g);
-        OGL.triangles.vertices[v].b = min(1.0, b);
+        OGL.triangles.vertices[v+j].r = min(1.0f, r);
+        OGL.triangles.vertices[v+j].g = min(1.0f, g);
+        OGL.triangles.vertices[v+j].b = min(1.0f, b);
 #endif
     }
 #endif
@@ -790,18 +799,18 @@ void gSPProcessVertex4(u32 v)
         else
         {
 #ifdef __PACKVERTEX_OPT
-            OGL.triangles.vertices[v].r = 255.0f;
-            OGL.triangles.vertices[v].g = 255.0f;
-            OGL.triangles.vertices[v].b = 255.0f;
-            OGL.triangles.vertices[v+1].r = 255.0f;
-            OGL.triangles.vertices[v+1].g = 255.0f;
-            OGL.triangles.vertices[v+1].b = 255.0f;
-            OGL.triangles.vertices[v+2].r = 255.0f;
-            OGL.triangles.vertices[v+2].g = 255.0f;
-            OGL.triangles.vertices[v+2].b = 255.0f;
-            OGL.triangles.vertices[v+3].r = 255.0f;
-            OGL.triangles.vertices[v+3].g = 255.0f;
-            OGL.triangles.vertices[v+3].b = 255.0f;
+            OGL.triangles.vertices[v].r = 255;
+            OGL.triangles.vertices[v].g = 255;
+            OGL.triangles.vertices[v].b = 255;
+            OGL.triangles.vertices[v+1].r = 255;
+            OGL.triangles.vertices[v+1].g = 255;
+            OGL.triangles.vertices[v+1].b = 255;
+            OGL.triangles.vertices[v+2].r = 255;
+            OGL.triangles.vertices[v+2].g = 255;
+            OGL.triangles.vertices[v+2].b = 255;
+            OGL.triangles.vertices[v+3].r = 255;
+            OGL.triangles.vertices[v+3].g = 255;
+            OGL.triangles.vertices[v+3].b = 255;
 #else
             OGL.triangles.vertices[v].r = 1.0f;
             OGL.triangles.vertices[v].g = 1.0f;
