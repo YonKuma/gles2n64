@@ -1,5 +1,6 @@
 #ifndef GBI_H
 #define GBI_H
+#include "Hash.h"
 #include "Types.h"
 #include <stdio.h>
 
@@ -711,16 +712,24 @@ struct Light
     s8 pad2, z, y, x;
 };
 
+struct LightMM
+{
+    u8 pad0, b, g, r;
+    u8 pad1, b2, g2, r2;
+    s16 y, x, range, z;
+};
+
+
 // GBI commands
 typedef void (*GBIFunc)( u32 w0, u32 w1 );
 //extern GBIFunc GBICmd[256];
 
 struct SpecialMicrocodeInfo
 {
-u32 type;
-u32 NoN;
-u32 crc;
-const char *text;
+    u32 type;
+    u32 NoN;
+    u32 crc;
+    const char *text;
 };
 
 struct MicrocodeInfo

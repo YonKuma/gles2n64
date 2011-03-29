@@ -5,6 +5,7 @@
 #include "ShaderCombiner.h"
 #include "Common.h"
 #include "Textures.h"
+#include "Config.h"
 
 #ifndef max
 #define max(a,b) ((a) > (b) ? (a) : (b))
@@ -12,7 +13,6 @@
 
 
 //(sa - sb) * m + a
-
 static const u32 saRGBExpanded[] =
 {
     COMBINED,           TEXEL0,             TEXEL1,             PRIMITIVE,
@@ -159,6 +159,12 @@ const char * _vertfog = "                                   \n"\
 "vFactor = clamp(vFactor, 0.0, 1.0);                        \n"\
 "}                                                          \n";
 
+const char * _vertzhack = "                                 \n"\
+"if (uRenderState == 1.0)                                   \n"\
+"{                                                          \n"\
+"gl_Position.z = (gl_Position.z + gl_Position.w*9.0) * 0.1; \n"\
+"}                                                          \n";
+
 
 const char * _color_param_str(int param)
 {
@@ -223,7 +229,7 @@ const char * _alpha_param_str(int param)
 DecodedMux::DecodedMux(u64 mux, bool cycle2)
 {
     combine.mux = mux;
-    this->flags = 0;
+    flags = 0;
 
     //set to ZERO.
     for(int i=0;i<4;i++)
@@ -251,34 +257,44 @@ DecodedMux::DecodedMux(u64 mux, bool cycle2)
         decode[3][2] = mAExpanded[combine.mA1];
         decode[3][3] = aAExpanded[combine.aA1];
 
+        //texel 0/1 are swapped in 2nd cycle.
         swap(1, TEXEL0, TEXEL1);
         swap(1, TEXEL0_ALPHA, TEXEL1_ALPHA);
     }
 
     //simplifying mux:
-    #if 0
     if (replace(G_CYC_1CYCLE, LOD_FRACTION, ZERO) || replace(G_CYC_2CYCLE, LOD_FRACTION, ZERO))
-        LOG(LOG_WARNING, "SC Replacing LOD_FRACTION with ZERO\n");
-
+        LOG(LOG_VERBOSE, "SC Replacing LOD_FRACTION with ZERO\n");
+#if 1
     if (replace(G_CYC_1CYCLE, K4, ZERO) || replace(G_CYC_2CYCLE, K4, ZERO))
-        LOG(LOG_WARNING, "SC Replacing K4 with ZERO\n");
+        LOG(LOG_VERBOSE, "SC Replacing K4 with ZERO\n");
 
     if (replace(G_CYC_1CYCLE, K5, ZERO) || replace(G_CYC_2CYCLE, K5, ZERO))
-        LOG(LOG_WARNING, "SC Replacing K5 with ZERO\n");
-    #endif
+        LOG(LOG_VERBOSE, "SC Replacing K5 with ZERO\n");
+#endif
 
     if (replace(G_CYC_1CYCLE, CENTER, ZERO) || replace(G_CYC_2CYCLE, CENTER, ZERO))
-        LOG(LOG_WARNING, "SC Replacing CENTER with ZERO\n");
+        LOG(LOG_VERBOSE, "SC Replacing CENTER with ZERO\n");
 
     if (replace(G_CYC_1CYCLE, SCALE, ZERO) || replace(G_CYC_2CYCLE, SCALE, ZERO))
-        LOG(LOG_WARNING, "SC Replacing SCALE with ZERO\n");
+        LOG(LOG_VERBOSE, "SC Replacing SCALE with ZERO\n");
 
     //Combiner has initial value of zero in cycle 0
     if (replace(G_CYC_1CYCLE, COMBINED, ZERO))
-        LOG(LOG_WARNING, "SC Setting CYCLE1 COMBINED to ZERO\n");
+        LOG(LOG_VERBOSE, "SC Setting CYCLE1 COMBINED to ZERO\n");
 
     if (replace(G_CYC_1CYCLE, COMBINED_ALPHA, ZERO))
-        LOG(LOG_WARNING, "SC Setting CYCLE1 COMBINED_ALPHA to ZERO\n");
+        LOG(LOG_VERBOSE, "SC Setting CYCLE1 COMBINED_ALPHA to ZERO\n");
+
+    if (!config.enableNoise)
+    {
+        if (replace(G_CYC_1CYCLE, NOISE, ZERO))
+            LOG(LOG_VERBOSE, "SC Setting CYCLE1 NOISE to ZERO\n");
+
+        if (replace(G_CYC_2CYCLE, NOISE, ZERO))
+            LOG(LOG_VERBOSE, "SC Setting CYCLE2 NOISE to ZERO\n");
+
+    }
 
     //mutiplying by zero: (A-B)*0 + C = C
     for(int i=0 ; i<4; i++)
@@ -290,23 +306,31 @@ DecodedMux::DecodedMux(u64 mux, bool cycle2)
         }
     }
 
+    //(A1-B1)*C1 + D1
+    //(A2-B2)*C2 + D2
+    //1. ((A1-B1)*C1 + D1 - B2)*C2 + D2 = A1*C1*C2 - B1*C1*C2 + D1*C2 - B2*C2 + D2
+    //2. (A2 - (A1-B1)*C1 - D1)*C2 + D2 = A2*C2 - A1*C1*C2 + B1*C1*C2 - D1*C2 + D2
+    //3. (A2 - B2)*((A1-B1)*C1 + D1) + D2 = A2*A1*C1 - A2*B1*C1 + A2*D1 - B2*A1*C1 + B2*B1*C1 - B2*D1 + D2
+    //4. (A2-B2)*C2 + (A1-B1)*C1 + D1 = A2*C2 - B2*C2 + A1*C1 - B1*C1 + D1
+
     if (cycle2)
     {
 
         if (!find(2, COMBINED))
-            this->flags |= SC_IGNORE_RGB0;
+            flags |= SC_IGNORE_RGB0;
 
         if (!(find(2, COMBINED_ALPHA) || find(3, COMBINED_ALPHA) || find(3, COMBINED)))
-            this->flags |= SC_IGNORE_ALPHA0;
+            flags |= SC_IGNORE_ALPHA0;
 
         if (decode[2][0] == ZERO && decode[2][1] == ZERO && decode[2][2] == ZERO && decode[2][3] == COMBINED)
         {
-            this->flags |= SC_IGNORE_RGB1;
+            flags |= SC_IGNORE_RGB1;
         }
+
         if (decode[3][0] == ZERO && decode[3][1] == ZERO && decode[3][2] == ZERO &&
             (decode[3][3] == COMBINED_ALPHA || decode[3][3] == COMBINED))
         {
-            this->flags |= SC_IGNORE_ALPHA1;
+            flags |= SC_IGNORE_ALPHA1;
         }
 
     }
@@ -348,6 +372,24 @@ bool DecodedMux::swap(int cycle, int src0, int src1)
         }
     }
     return r;
+}
+
+void DecodedMux::hack()
+{
+    if (config.hackZelda)
+    {
+        if(combine.mux == 0xfffd923800ffadffLL)
+        {
+            replace(G_CYC_1CYCLE, TEXEL1, TEXEL0);
+            replace(G_CYC_2CYCLE, TEXEL1, TEXEL0);
+        }
+        else if (combine.mux == 0xff5bfff800121603LL)
+        {
+            replace(G_CYC_1CYCLE, TEXEL1, ZERO);
+            replace(G_CYC_2CYCLE, TEXEL1, ZERO);
+        }
+    }
+
 }
 
 
@@ -434,7 +476,7 @@ void _force_uniforms()
     SC_ForceUniform1f(uK4, gDP.convert.k4);
     SC_ForceUniform1f(uK5, gDP.convert.k5);
     SC_ForceUniform4fv(uFogColor, &gDP.fogColor.r);
-    SC_ForceUniform1i(uEnableFog, ((OGL.enableFog==1) && (gSP.geometryMode & G_FOG)));
+    SC_ForceUniform1i(uEnableFog, ((config.enableFog==1) && (gSP.geometryMode & G_FOG)));
     SC_ForceUniform1f(uRenderState, OGL.renderState);
     SC_ForceUniform1f(uFogMultiplier, (float) gSP.fog.multiplier / 255.0f);
     SC_ForceUniform1f(uFogOffset, (float) gSP.fog.offset / 255.0f);
@@ -481,7 +523,6 @@ void _force_uniforms()
         SC_ForceUniform2f(uCacheScale[1], 1.0f, 1.0f);
         SC_ForceUniform2f(uCacheOffset[1], 0.0f, 0.0f);
     }
-
 }
 
 void _update_uniforms()
@@ -490,7 +531,7 @@ void _update_uniforms()
     SC_SetUniform4fv(uPrimColor, &gDP.primColor.r);
     SC_SetUniform1f(uPrimLODFrac, gDP.primColor.l);
     SC_SetUniform4fv(uFogColor, &gDP.fogColor.r);
-    SC_SetUniform1i(uEnableFog, (OGL.enableFog && (gSP.geometryMode & G_FOG)));
+    SC_SetUniform1i(uEnableFog, (config.enableFog && (gSP.geometryMode & G_FOG)));
     SC_SetUniform1f(uRenderState, OGL.renderState);
     SC_SetUniform1f(uFogMultiplier, (float) gSP.fog.multiplier / 255.0f);
     SC_SetUniform1f(uFogOffset, (float) gSP.fog.offset / 255.0f);
@@ -538,9 +579,13 @@ void ShaderCombiner_Init()
     char *str = buff;
 
     str += sprintf(str, "%s", _vert);
-    if (OGL.enableFog)
+    if (config.enableFog)
     {
         str += sprintf(str, "%s", _vertfog);
+    }
+    if (config.zHack)
+    {
+        str += sprintf(str, "%s", _vertzhack);
     }
 
     str += sprintf(str, "}\n\n");
@@ -564,14 +609,14 @@ void ShaderCombiner_Init()
     }
 };
 
-void ShaderCombiner_DeleteProgram(ShaderProgram *prog)
+void ShaderCombiner_DeletePrograms(ShaderProgram *prog)
 {
     if (prog)
     {
-        ShaderCombiner_DeleteProgram(prog->left);
-        ShaderCombiner_DeleteProgram(prog->right);
+        ShaderCombiner_DeletePrograms(prog->left);
+        ShaderCombiner_DeletePrograms(prog->right);
         glDeleteProgram(prog->program);
-        glDeleteShader(prog->fragment);
+        //glDeleteShader(prog->fragment);
         free(prog);
         scProgramCount--;
     }
@@ -579,7 +624,7 @@ void ShaderCombiner_DeleteProgram(ShaderProgram *prog)
 
 void ShaderCombiner_Destroy()
 {
-    ShaderCombiner_DeleteProgram(scProgramRoot);
+    ShaderCombiner_DeletePrograms(scProgramRoot);
     glDeleteShader(_vertex_shader);
     scProgramCount = scProgramChanged = 0;
     scProgramRoot = scProgramCurrent = NULL;
@@ -598,10 +643,10 @@ void ShaderCombiner_Set(u64 mux, int flags)
     if (flags == -1)
     {
         flags = 0;
-        if ((OGL.enableFog) && (gSP.geometryMode & G_FOG))
+        if ((config.enableFog) && (gSP.geometryMode & G_FOG))
             flags |= SC_FOGENABLED;
 
-        if (OGL.enableAlphaTest)
+        if (config.enableAlphaTest)
         {
             if ((gDP.otherMode.alphaCompare == G_AC_THRESHOLD) && !(gDP.otherMode.alphaCvgSel)){
                 flags |= SC_ALPHAENABLED;
@@ -618,6 +663,7 @@ void ShaderCombiner_Set(u64 mux, int flags)
 
 
     DecodedMux dmux(mux, flags&SC_2CYCLE);
+    dmux.hack();
 
     //if already bound:
     if (scProgramCurrent)
@@ -655,12 +701,11 @@ void ShaderCombiner_Set(u64 mux, int flags)
             root->left = prog;
 
     }
-    else
-    {
-        scProgramCurrent = prog;
-        glUseProgram(prog->program);
-        _force_uniforms();
-    }
+
+    prog->lastUsed = OGL.frame_dl;
+    scProgramCurrent = prog;
+    glUseProgram(prog->program);
+    _force_uniforms();
 }
 
 ShaderProgram *ShaderCombiner_Compile(DecodedMux *dmux, int flags)
@@ -697,7 +742,7 @@ ShaderProgram *ShaderCombiner_Compile(DecodedMux *dmux, int flags)
     if (prog->usesT1)
         buffer += sprintf(buffer, "lowp vec4 lTex1 = texture2D(uTex1, vTexCoord1); \n");
     if (prog->usesNoise)
-        buffer += sprintf(buffer, "lowp vec4 lNoise = texture2D(uNoise, gl_FragCoord.st); \n");
+        buffer += sprintf(buffer, "lowp vec4 lNoise = texture2D(uNoise, (1.0 / 1024.0) * gl_FragCoord.st); \n");
 
     for(int i = 0; i < ((flags & SC_2CYCLE) ? 2 : 1); i++)
     {
@@ -733,9 +778,9 @@ ShaderProgram *ShaderCombiner_Compile(DecodedMux *dmux, int flags)
     if (flags&SC_ALPHAENABLED)
     {
         if (flags&SC_ALPHAGREATER)
-            buffer += sprintf(buffer, "if (gl_FragColor.a < uAlphaRef) discard; \n");
+            buffer += sprintf(buffer, "if (gl_FragColor.a < uAlphaRef) %s;\n", config.hackAlpha ? "gl_FragColor.a = 0" : "discard");
         else
-            buffer += sprintf(buffer, "if (gl_FragColor.a <= uAlphaRef) discard; \n");
+            buffer += sprintf(buffer, "if (gl_FragColor.a <= uAlphaRef) %s;\n", config.hackAlpha ? "gl_FragColor.a = 0" : "discard");
     }
     buffer += sprintf(buffer, "} \n\n");
     *buffer = 0;
@@ -778,12 +823,11 @@ ShaderProgram *ShaderCombiner_Compile(DecodedMux *dmux, int flags)
     {
         _gllinker_error(prog->program);
     }
+
+    //remove fragment shader:
+    glDeleteShader(prog->fragment);
+
     _locate_uniforms(prog);
-
-    scProgramCurrent = prog;
-    glUseProgram(prog->program);
-    _force_uniforms();
-
     return prog;
 }
 

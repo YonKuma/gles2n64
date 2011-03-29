@@ -35,6 +35,8 @@
 #include "Common.h"
 
 
+Config config;
+
 struct Option
 {
     const char* name;
@@ -43,82 +45,86 @@ struct Option
 };
 
 
-#define CONFIG_VERSION 1
+#define CONFIG_VERSION 2
 
-Option config_options[] =
+Option configOptions[] =
 {
     {"#gles2n64 Graphics Plugin for N64", NULL, 0},
     {"#by Orkin / glN64 developers and Adventus.", NULL, 0},
 
-    {"config version", &OGL.configversion, 0},
+    {"config version", &config.version, 0},
+    {"", NULL, 0},
 
-    {"#These values are the physical pixel dimensions of", NULL, 0},
-    {"#your screen. They are only used for centering the", NULL, 0},
-    {"#window.", NULL, 0},
+    {"#Screen Settings:", NULL, 0},
+    {"screen width", &config.screen.width, 800},
+    {"screen height", &config.screen.height, 480},
+    {"", NULL, 0},
 
-    {"screen width", &OGL.screen.width, 800},
-    {"screen height", &OGL.screen.height, 480},
+    {"#Window Settings:", NULL, 0},
+    {"window enable x11", &config.window.enableX11, 1},
+    {"window fullscreen", &config.window.fullscreen, 1},
+    {"window centre", &config.window.centre, 1},
+    {"window xpos", &config.window.xpos, 0},
+    {"window ypos", &config.window.ypos, 0},
+    {"window width", &config.window.width, 800},
+    {"window height", &config.window.height, 480},
+    {"", NULL, 0},
 
-    {"#The Window position and dimensions specify how and", NULL, 0},
-    {"#where the games will appear on the screen. Enabling", NULL, 0},
-    {"#Centre will ensure that the window is centered", NULL, 0},
-    {"#within the screen (overriding xpos/ypos).", NULL, 0},
+    {"#Framebuffer Settings:",NULL,0},
+    {"framebuffer enable", &config.framebuffer.enable, 0},
+    {"framebuffer bilinear", &config.framebuffer.bilinear, 0},
+    {"framebuffer width", &config.framebuffer.width, 400},
+    {"framebuffer height", &config.framebuffer.height, 240},
+    {"", NULL, 0},
 
-    {"window enable x11", &OGL.window.enablex11, 1},
-    {"window fullscreen", &OGL.window.fullscreen, 1},
-    {"window centre", &OGL.window.centre, 1},
-    {"window xpos", &OGL.window.xpos, 0},
-    {"window ypos", &OGL.window.ypos, 0},
-    {"window width", &OGL.window.width, 800},
-    {"window height", &OGL.window.height, 480},
+    {"#VI Settings:", NULL, 0},
+    {"video force", &config.video.force, 0},
+    {"video width", &config.video.width, 320},
+    {"video height", &config.video.height, 240},
+    {"", NULL, 0},
 
-    {"#Enabling offscreen frambuffering allows the resulting",NULL,0},
-    {"#image to be upscaled to the window dimensions. The",NULL,0},
-    {"#framebuffer dimensions specify the resolution which",NULL,0},
-    {"#gles2n64 will render to.",NULL,0},
+    {"#Render Settings:", NULL, 0},
+    {"enable fog", &config.enableFog, 0},
+    {"enable primitive z", &config.enablePrimZ, 1},
+    {"enable lighting", &config.enableLighting, 1},
+    {"enable alpha test", &config.enableAlphaTest, 1},
+    {"enable clipping", &config.enableClipping, 0},
+    {"enable face culling", &config.enableFaceCulling, 1},
+    {"enable noise", &config.enableNoise, 0},
+    {"", NULL, 0},
 
-    {"framebuffer enable", &OGL.framebuffer.enable, 0},
-    {"framebuffer bilinear", &OGL.framebuffer.bilinear, 0},
-    {"framebuffer width", &OGL.framebuffer.width, 400},
-    {"framebuffer height", &OGL.framebuffer.height, 240},
+    {"#Texture Settings:", NULL, 0},
+    {"texture 2xSAI", &config.texture.sai2x, 0},
+    {"texture force bilinear", &config.texture.forceBilinear, 0},
+    {"texture max anisotropy", &config.texture.maxAnisotropy, 0},
+    {"texture use IA", &config.texture.useIA, 0},
+    {"texture fast CRC", &config.texture.fastCRC, 1},
+    {"texture pow2", &config.texture.pow2, 1},
+    {"", NULL, 0},
 
-    {"#Frameskipping allows more CPU time be spent on other", NULL, 0},
-    {"#tasks than GPU emulation, but at the cost of a lower", NULL, 0},
-    {"#framerate.", NULL, 0},
+    {"#Frame skip:", NULL, 0},
+    {"auto frameskip", &config.autoFrameSkip, 0},
+    {"target FPS", &config.targetFPS, 20},
+    {"frame render rate", &config.frameRenderRate, 1},
+    {"vertical sync", &config.verticalSync, 0},
+    {"", NULL, 0},
 
-    {"frame render rate", &OGL.frameskip, 1},
+    {"#Other Settings:", NULL, 0},
+    {"update mode", &config.updateMode, SCREEN_UPDATE_AT_VI_UPDATE },
+    {"ignore offscreen rendering", &config.ignoreOffscreenRendering, 0},
+    {"force screen clear", &config.forceBufferClear, 0},
+    {"flip vertical", &config.screen.flipVertical, 0},
+    {"", NULL, 0},
 
-    {"#Vertical Sync Divider (0=No VSYNC, 1=60Hz, 2=30Hz, etc)", NULL, 0},
-
-    {"vertical sync", &OGL.vsync, 0},
-
-    {"#These options enable different rendering paths, they", NULL, 0},
-    {"#can relieve pressure on the GPU / CPU.", NULL, 0},
-
-    {"enable fog", &OGL.enableFog, 0},
-    {"enable primitive z", &OGL.enablePrimZ, 1},
-    {"enable lighting", &OGL.enableLighting, 1},
-    {"enable alpha test", &OGL.enableAlphaTest, 1},
-    {"enable clipping", &OGL.enableClipping, 0},
-    {"enable face culling", &OGL.enableFaceCulling, 1},
-
-    {"#Texture Bit Depth (0=force 16bit, 1=either 16/32bit, 2=force 32bit)", NULL, 0},
-    {"texture depth", &OGL.texture.bit_depth, 1},
-    {"texture mipmap", &OGL.texture.mipmap, 0},
-    {"texture 2xSAI", &OGL.texture.SaI2x, 0},
-    {"texture force bilinear", &OGL.texture.force_bilinear, 0},
-    {"texture max anisotropy", &OGL.texture.max_anisotropy, 0},
-
-    {"#", NULL, 0},
-    {"update mode", &OGL.updateMode, 1},
-    {"ignore offscreen rendering", &OGL.ignoreOffscreenRendering, 0},
-    {"force screen clear", &OGL.forceClear, 0},
-    {"use IA textures", &OGL.texture.useIA, 0},
+    {"#Hack Settings:", NULL, 0},
+    {"hack banjo tooie", &config.hackBanjoTooie, 0},
+    {"hack zelda", &config.hackZelda, 0},
+    {"hack alpha", &config.hackAlpha, 0},
+    {"hack z", &config.zHack, 0},
 
 };
 
-const int config_options_size = sizeof(config_options) / sizeof(Option);
-
+const int configOptionsSize = sizeof(configOptions) / sizeof(Option);
 
 static inline const char *GetPluginDir()
 {
@@ -141,22 +147,123 @@ static inline const char *GetPluginDir()
 
 void Config_WriteConfig(const char *filename)
 {
-    OGL.configversion = CONFIG_VERSION;
+    config.version = CONFIG_VERSION;
     FILE* f = fopen(filename, "w");
     if (!f)
     {
-        printf("Could Not Open %s for writing\n", filename);
+        LOG(LOG_ERROR, "Could Not Open %s for writing\n", filename);
     }
 
-    for(int i=0; i<config_options_size; i++)
+    for(int i=0; i<configOptionsSize; i++)
     {
-        Option *o = &config_options[i];
+        Option *o = &configOptions[i];
         fprintf(f, o->name);
         if (o->data) fprintf(f,"=%i", *(o->data));
         fprintf(f, "\n");
     }
 
+
     fclose(f);
+}
+
+void Config_SetDefault()
+{
+    for(int i=0; i < configOptionsSize; i++)
+    {
+        Option *o = &configOptions[i];
+        if (o->data) *(o->data) = o->initial;
+    }
+}
+
+void Config_SetOption(char* line, char* val)
+{
+    for(int i=0; i< configOptionsSize; i++)
+    {
+        Option *o = &configOptions[i];
+        if (strcasecmp(line, o->name) == 0)
+        {
+            if (o->data)
+            {
+                int v = atoi(val);
+                *(o->data) = v;
+                LOG(LOG_VERBOSE, "Config Option: %s = %i\n", o->name, v);
+            }
+            break;
+        }
+    }
+}
+
+void Config_LoadRomConfig(unsigned char* header)
+{
+    char line[4096];
+    char filename[PATH_MAX];
+
+    // get the name of the ROM
+    for (int i=0; i<20; i++) config.romName[i] = header[0x20+i];
+    config.romName[20] = '\0';
+    while (config.romName[strlen(config.romName)-1] == ' ')
+    {
+        config.romName[strlen(config.romName)-1] = '\0';
+    }
+
+    switch(header[0x3e])
+    {
+        case 0x44: //Germany ('D')
+            config.romPAL = true;
+            break;
+        case 0x45: //USA ('E')
+            config.romPAL = false;
+            break;
+        case 0x4A: //= Japan ('J')
+            config.romPAL = false;
+            break;
+        case 0x50: //= Europe ('P')
+            config.romPAL = true;
+            break;
+        case 0x55: //= Australia ('U')
+            config.romPAL = true;
+            break;
+        default:
+            config.romPAL = false;
+            break;
+    }
+
+    LOG(LOG_MINIMAL, "Rom is %s\n", config.romPAL ? "PAL" : "NTSC");
+
+    snprintf(filename, PATH_MAX, "%s/gles2n64rom.conf", GetPluginDir());
+    FILE *f = fopen(filename,"r");
+    if (!f)
+    {
+        LOG(LOG_MINIMAL, "Could not find %s Rom settings file, using global.\n", filename);
+        return;
+    }
+    else
+    {
+        LOG(LOG_MINIMAL, "[gles2N64]: Searching %s Database for \"%s\" ROM\n", filename, config.romName);
+        bool isRom = false;
+        while (!feof(f))
+        {
+            fgets(line, 4096, f);
+            if (line[0] == '\n') continue;
+
+            if (strncmp(line,"rom name=", 9) == 0)
+            {
+                char* v = strchr(line, '\n');
+                if (v) *v='\0';
+                isRom = (strcasecmp(config.romName, line+9) == 0);
+            }
+            else
+            {
+                if (isRom)
+                {
+                    char* val = strchr(line, '=');
+                    if (!val) continue;
+                    *val++ = '\0';
+                    Config_SetOption(line,val);
+                }
+            }
+        }
+    }
 }
 
 void Config_LoadConfig()
@@ -164,30 +271,22 @@ void Config_LoadConfig()
     FILE *f;
     char line[4096];
 
-    const char *pluginDir = GetPluginDir();
-
     // default configuration
-    for(int i=0; i < config_options_size; i++)
-    {
-        Option *o = &config_options[i];
-        if (o->data) *(o->data) = o->initial;
-    }
-
-    cache.maxBytes = 16 * 1024 * 1024;
+    Config_SetDefault();
 
     // read configuration
     char filename[PATH_MAX];
-    snprintf( filename, PATH_MAX, "%s/gles2n64.conf", pluginDir );
-    f = fopen( filename, "r" );
+    snprintf(filename, PATH_MAX, "%s/gles2n64.conf", GetPluginDir());
+    f = fopen(filename, "r");
     if (!f)
     {
-        fprintf( stdout, "[gles2N64]: Couldn't open config file '%s' for reading: %s\n", filename, strerror( errno ) );
-        fprintf( stdout, "[gles2N64]: Attempting to write new Config \n");
+        LOG(LOG_MINIMAL, "[gles2N64]: Couldn't open config file '%s' for reading: %s\n", filename, strerror( errno ) );
+        LOG(LOG_MINIMAL, "[gles2N64]: Attempting to write new Config \n");
         Config_WriteConfig(filename);
     }
     else
     {
-        printf("[gles2n64]: Loading Config from %s \n", filename);
+        LOG(LOG_MINIMAL, "[gles2n64]: Loading Config from %s \n", filename);
 
         while (!feof( f ))
         {
@@ -202,35 +301,18 @@ void Config_LoadConfig()
 
             *val++ = '\0';
 
-            for(int i=0; i< config_options_size; i++)
-            {
-                Option *o = &config_options[i];
-                if (strcasecmp(line, o->name) == 0)
-                {
-                    if (o->data)
-                    {
-                        int v = atoi(val);
-                        *(o->data) = v;
-                    }
-                    break;
-                }
-            }
+             Config_SetOption(line,val);
         }
 
-        if (OGL.configversion != CONFIG_VERSION)
+        if (config.version < CONFIG_VERSION)
         {
-            for(int i=0; i < config_options_size; i++)
-            {
-                Option *o = &config_options[i];
-                if (o->data) *(o->data) = o->initial;
-            }
-
-            LOG(LOG_MINIMAL, "[gles2N64]: Wrong config version, rewriting config with defaults\n");
+            LOG(LOG_WARNING, "[gles2N64]: Wrong config version, rewriting config with defaults\n");
+            Config_SetDefault();
             Config_WriteConfig(filename);
         }
 
+        fclose(f);
     }
-    if (f) fclose(f);
 }
 
 void Config_DoConfig(HWND)
@@ -238,12 +320,7 @@ void Config_DoConfig(HWND)
     FILE *f = fopen("./config/gles2n64.conf", "r" );
     if (!f)
     {
-        // default configuration
-        for(int i=0; i < config_options_size; i++)
-        {
-            Option *o = &config_options[i];
-            if (o->data) *(o->data) = o->initial;
-        }
+        Config_SetDefault();
         Config_WriteConfig("./config/gles2n64.conf");
     }
     else

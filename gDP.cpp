@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "gles2N64.h"
 #include "N64.h"
 #include "GBI.h"
@@ -11,14 +13,8 @@
 #include "CRC.h"
 #include "DepthBuffer.h"
 #include "VI.h"
-#include <stdlib.h>
+#include "Config.h"
 
-# ifndef min
-#  define min(a,b) ((a) < (b) ? (a) : (b))
-# endif
-# ifndef max
-#  define max(a,b) ((a) > (b) ? (a) : (b))
-# endif
 
 //thank rice_video for this:
 bool _IsRenderTexture()
@@ -159,7 +155,8 @@ void gDPSetPrimDepth( u16 z, u16 dz )
 {
     z = z&0x7FFF;
 
-    gDP.primDepth.z = min( 1.0f, max( 0.0f, (_FIXED2FLOAT( z, 15 ) - gSP.viewport.vtrans[2]) / gSP.viewport.vscale[2] ) );
+    //gDP.primDepth.z = (_FIXED2FLOAT( z, 15 ) - gSP.viewport.vtrans[2]) / gSP.viewport.vscale[2] ;
+    gDP.primDepth.z = (z - gSP.viewport.vtrans[2]) / gSP.viewport.vscale[2] ;
     gDP.primDepth.deltaZ = dz;
     gDP.changed |= CHANGED_PRIMITIVEZ;
 
@@ -356,10 +353,10 @@ void gDPSetCombine( s32 muxs0, s32 muxs1 )
 
 void gDPSetColorImage( u32 format, u32 size, u32 width, u32 address )
 {
-    if (OGL.updateMode == SCREEN_UPDATE_AT_CI_CHANGE)
+    if (config.updateMode == SCREEN_UPDATE_AT_CI_CHANGE)
         OGL_SwapBuffers();
 
-    if (OGL.updateMode == SCREEN_UPDATE_AT_1ST_CI_CHANGE && OGL.screenUpdate)
+    if (config.updateMode == SCREEN_UPDATE_AT_1ST_CI_CHANGE && OGL.screenUpdate)
         OGL_SwapBuffers();
 
     u32 addr = RSP_SegmentToPhysical( address );
@@ -378,7 +375,7 @@ void gDPSetColorImage( u32 format, u32 size, u32 width, u32 address )
     gDP.colorImage.width = width;
     gDP.colorImage.address = addr;
 
-    if (OGL.ignoreOffscreenRendering)
+    if (config.ignoreOffscreenRendering)
     {
         int i;
 
@@ -462,12 +459,13 @@ void gDPSetDepthImage( u32 address )
 //  if (address != gDP.depthImageAddress)
 //      OGL_ClearDepthBuffer();
 
-    DepthBuffer_SetBuffer( RSP_SegmentToPhysical( address ) );
+    u32 addr = RSP_SegmentToPhysical(address);
+    DepthBuffer_SetBuffer(addr);
 
     if (depthBuffer.current->cleared)
         OGL_ClearDepthBuffer();
 
-    gDP.depthImageAddress = RSP_SegmentToPhysical( address );
+    gDP.depthImageAddress = addr;
 
 #ifdef DEBUG
     DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gDPSetDepthImage( 0x%08X );\n", gDP.depthImageAddress );

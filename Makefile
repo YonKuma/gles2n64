@@ -41,7 +41,7 @@ CFLAGS += -DINLINE_OPT -m32
 
 else
 
-COMPILER_DIR = C:/CS2009q3
+COMPILER_DIR = C:/CS2010q1
 SO_EXTENSION = so
 CXX = 	$(COMPILER_DIR)/bin/arm-none-linux-gnueabi-g++
 LD = 	$(COMPILER_DIR)/bin/arm-none-linux-gnueabi-g++
@@ -51,24 +51,23 @@ CFLAGS 	+= -I$(INCLUDE)/SDL
 CFLAGS	+= -I$(INCLUDE)
 CFLAGS 	+= -I$(COMPILER_DIR)/arm-none-linux-gnueabi/libc/lib
 CFLAGS  += -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp -ffast-math \
-		  -fsingle-precision-constant  -ftree-vectorize -funroll-loops \
-		  -fexpensive-optimizations -fomit-frame-pointer
+		  -fsingle-precision-constant  -ftree-vectorize -fexpensive-optimizations -fomit-frame-pointer
 
 CFLAGS  += -findirect-inlining
 CFLAGS  += -ftree-switch-conversion
 CFLAGS  += -floop-interchange -floop-strip-mine -floop-block
 CFLAGS  += -DX11_WINDOW
 
-CFLAGS  +=-DARM_ASM -D__NEON_OPT -D__VEC4_OPT
+CFLAGS  +=-DARM_ASM -D__NEON_OPT -D__VEC4_OPT -D__HASHMAP_OPT -D__CRC_OPT
 #CFLAGS += -D__PACKVERTEX_OPT
 CFLAGS += -D__TRIBUFFER_OPT
 endif
 
 ifeq ($(OS), LINUX)
 CFLAGS += -Wall -D__LINUX__ -fPIC
-LDFLAGS += -LC:/Users/jim/Desktop/Lachlan/Pandora/20101302-pandora-xfce/usr/lib
+LDFLAGS += -LC:/Users/jim/Desktop/Lachlan/Pandora/OS/20101302-pandora-xfce/usr/lib
 LDFLAGS += -lEGL -lGLESv2 -lsrv_um -lSDL-1.2 -lpng12 -lz -lIMGegl
-LDFLAGS += -lX11
+LDFLAGS += -lX11 -lts-1.0 -lXau -lXdmcp -shared
 else
 CFLAGS += -Wall
 LDFLAGS +=  -LC:/MinGW/lib/PVR -lSDLmain -lSDL -lpng -lGLESv2
@@ -90,6 +89,7 @@ OBJECTS = Config.o \
 	ShaderCombiner.o \
 	gDP.o \
 	gSP.o \
+	gSPNeon.o \
 	GBI.o \
 	DepthBuffer.o \
 	CRC.o \
@@ -125,7 +125,7 @@ ui_gln64config.h: gln64config.ui
 	$(UIC) $< -o $@
 
 gles2n64.$(SO_EXTENSION): $(OBJECTS)
-	$(CXX) $^ $(LDFLAGS) $(SDL_LIBS) $(LIBGL_LIBS) -shared -o $@
+	$(CXX) $^ $(LDFLAGS) $(SDL_LIBS) $(LIBGL_LIBS) -o $@
 
 gles2n64.o: gles2N64.cpp
 	$(CXX) $(CFLAGS) $(SDL_FLAGS) -DMAINDEF -c -o $@ $<

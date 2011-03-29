@@ -121,8 +121,8 @@ struct gDPInfo
                     unsigned int textureEdge : 1;
 //              } renderMode;
 
-//              struct
-//              {
+                //struct
+                //{
                     unsigned int c2_m2b : 2;
                     unsigned int c1_m2b : 2;
                     unsigned int c2_m2a : 2;
@@ -131,7 +131,7 @@ struct gDPInfo
                     unsigned int c1_m1b : 2;
                     unsigned int c2_m1a : 2;
                     unsigned int c1_m1a : 2;
-//              } blender;
+                //} blender;
 
                 unsigned int blendMask : 4;
                 unsigned int alphaDither : 2;

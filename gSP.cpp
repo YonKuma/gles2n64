@@ -1,4 +1,7 @@
 #include <math.h>
+#include <stdlib.h>
+
+#include "Common.h"
 #include "gles2N64.h"
 #include "Debug.h"
 #include "Types.h"
@@ -13,17 +16,9 @@
 #include "convert.h"
 #include "S2DEX.h"
 #include "VI.h"
-#include <stdlib.h>
 #include "DepthBuffer.h"
-#include "Common.h"
-
-# ifndef min
-#  define min(a,b) ((a) < (b) ? (a) : (b))
-# endif
-# ifndef max
-#  define max(a,b) ((a) > (b) ? (a) : (b))
-# endif
-
+#include "Config.h"
+#include "gSPNeon.h"
 
 //Note: 0xC0 is used by 1080 alot, its an unknown command.
 
@@ -31,7 +26,6 @@
 extern u32 uc_crc, uc_dcrc;
 extern char uc_str[256];
 #endif
-
 
 void gSPCombineMatrices();
 
@@ -42,7 +36,7 @@ void __indexmap_init()
     for(int i=0;i<INDEXMAP_SIZE;i++)
     {
         OGL.triangles.indexmap[i] = i;
-        OGL.triangles.indexmapinv[i] = i;
+        //OGL.triangles.indexmapinv[i] = i;
     }
 
     OGL.triangles.indexmap_prev = -1;
@@ -59,7 +53,7 @@ void __indexmap_clear()
 u32 __indexmap_findunused(u32 num)
 {
     u32 c = 0;
-    u32 i = 0;
+    u32 i = min(OGL.triangles.indexmap_prev+1, VERTBUFF_SIZE-1);
     u32 n = 0;
     while(n < VERTBUFF_SIZE)
     {
@@ -82,7 +76,8 @@ void __indexmap_undomap()
 
     for(int i=0;i<INDEXMAP_SIZE;i++)
     {
-        tmp[i] = OGL.triangles.vertices[OGL.triangles.indexmap[i]];
+        u32 ind = OGL.triangles.indexmap[i];
+        tmp[i] = OGL.triangles.vertices[ind];
         OGL.triangles.indexmap[i] = i;
         OGL.triangles.indexmapinv[i] = i;
     }
@@ -93,34 +88,55 @@ void __indexmap_undomap()
 
 u32 __indexmap_getnew(u32 index, u32 num)
 {
-    u32 ind = __indexmap_findunused(num);
+    u32 ind;
 
-    //no more room in buffer....
-    if (ind > VERTBUFF_SIZE)
+    //test to see if unmapped
+    u32 unmapped = 1;
+    for(int i=0;i<num;i++)
     {
-        OGL_DrawTriangles();
+        if (OGL.triangles.indexmap[i]!=0xFFFFFFFF)
+        {
+            unmapped = 0;
+            break;
+        }
+
+    }
+
+    if (unmapped)
+    {
+        ind = index;
+    }
+    else
+    {
         ind = __indexmap_findunused(num);
 
-        //OK the indices are spread so sparsely, we cannot find a num element block.
+        //no more room in buffer....
         if (ind > VERTBUFF_SIZE)
         {
-            __indexmap_undomap();
+            OGL_DrawTriangles();
             ind = __indexmap_findunused(num);
+
+            //OK the indices are spread so sparsely, we cannot find a num element block.
             if (ind > VERTBUFF_SIZE)
             {
-                LOG(LOG_ERROR, "Could not allocate %i indices\n", num);
+                __indexmap_undomap();
+                ind = __indexmap_findunused(num);
+                if (ind > VERTBUFF_SIZE)
+                {
+                    LOG(LOG_ERROR, "Could not allocate %i indices\n", num);
 
-                LOG(LOG_VERBOSE, "indexmap=[");
-                for(int i=0;i<INDEXMAP_SIZE;i++)
-                    LOG(LOG_VERBOSE, "%i,", OGL.triangles.indexmap[i]);
-                LOG(LOG_VERBOSE, "]\n");
+                    LOG(LOG_VERBOSE, "indexmap=[");
+                    for(int i=0;i<INDEXMAP_SIZE;i++)
+                        LOG(LOG_VERBOSE, "%i,", OGL.triangles.indexmap[i]);
+                    LOG(LOG_VERBOSE, "]\n");
 
-                LOG(LOG_VERBOSE, "indexmapinv=[");
-                for(int i=0;i<VERTBUFF_SIZE;i++)
-                    LOG(LOG_VERBOSE, "%i,", OGL.triangles.indexmapinv[i]);
-                LOG(LOG_VERBOSE, "]\n");
+                    LOG(LOG_VERBOSE, "indexmapinv=[");
+                    for(int i=0;i<VERTBUFF_SIZE;i++)
+                        LOG(LOG_VERBOSE, "%i,", OGL.triangles.indexmapinv[i]);
+                    LOG(LOG_VERBOSE, "]\n");
+                }
+                return ind;
             }
-            return ind;
         }
     }
 
@@ -148,14 +164,16 @@ void gSPTriangle(s32 v0, s32 v1, s32 v2)
         v2 = OGL.triangles.indexmap[v2];
 #endif
 
+#if 0
         // Don't bother with triangles completely outside clipping frustrum
-        if (OGL.enableClipping)
+        if (config.enableClipping)
         {
             if (OGL.triangles.vertices[v0].clip & OGL.triangles.vertices[v1].clip & OGL.triangles.vertices[v2].clip)
             {
                 return;
             }
         }
+#endif
 
         OGL_AddTriangle(v0, v1, v2);
 
@@ -203,144 +221,9 @@ f32 identityMatrix[4][4] =
     { 0.0f, 0.0f, 0.0f, 1.0f }
 };
 
-#ifdef __NEON_OPT2
-
-const float __acosf_pi_2 = M_PI_2;
-
-const float __acosf_lut[8] = {
-	0.105312459675071, 	//p7
-	0.105312459675071, 	//p7
-	0.051599985887214, 	//p5
-	0.051599985887214, 	//p5
-	0.169303418571894,	//p3
-	0.169303418571894,	//p3
-	0.999954835104825,	//p1
-	0.999954835104825	//p1
-};
-
-//computes 2 acosf in parallel
-void acosf_neon(float x[2], float r[2])
-{
-	asm volatile (
-
-	"vld1.f32	 	{d0}, %0				\n\t"	//d0 = {x0, x1};
-	"vdup.f32	 	d17, %3					\n\t"	//d17 = {pi/2, pi/2};
-	"vmov.f32	 	d6, d0					\n\t"	//d6 = d0;
-	"vabs.f32	 	d0, d0					\n\t"	//d0 = fabs(d0) ;
-
-	"vmov.f32	 	d5, #0.5				\n\t"	//d5 = 0.5;
-	"vmls.f32	 	d5, d0, d5				\n\t"	//d5 = d5 - d0*d5;
-
-	//fast invsqrt approx
-	"vmov.f32 		d1, d5					\n\t"	//d1 = d5
-	"vrsqrte.f32 	d5, d5					\n\t"	//d5 = ~ 1.0 / sqrt(d5)
-	"vmul.f32 		d2, d5, d1				\n\t"	//d2 = d5 * d1
-	"vrsqrts.f32 	d3, d2, d5				\n\t"	//d3 = (3 - d5 * d2) / 2
-	"vmul.f32 		d5, d5, d3				\n\t"	//d5 = d5 * d3
-	"vmul.f32 		d2, d5, d1				\n\t"	//d2 = d5 * d1
-	"vrsqrts.f32 	d3, d2, d5				\n\t"	//d3 = (3 - d5 * d3) / 2
-	"vmul.f32 		d5, d5, d3				\n\t"	//d5 = d5 * d3
-
-	//fast reciporical approximation
-	"vrecpe.f32		d1, d5					\n\t"	//d1 = ~ 1 / d5;
-	"vrecps.f32		d2, d1, d5				\n\t"	//d2 = 2.0 - d1 * d5;
-	"vmul.f32		d1, d1, d2				\n\t"	//d1 = d1 * d2;
-	"vrecps.f32		d2, d1, d5				\n\t"	//d2 = 2.0 - d1 * d5;
-	"vmul.f32		d5, d1, d2				\n\t"	//d5 = d1 * d2;
-
-	//if |x| > 0.5 -> ax = sqrt((1-ax)/2), r = pi/2
-	"vsub.f32		d5, d0, d5				\n\t"	//d5 = d0 - d5;
-	"vmov.f32	 	d2, #0.5				\n\t"	//d2 = 0.5;
-	"vcgt.f32	 	d3, d0, d2				\n\t"	//d3 = (d0 > d2);
-	"vmov.f32		d1, #3.0 				\n\t"	//d1 = 3.0;
-	"vshr.u32	 	d3, #31					\n\t"	//d3 = d3 >> 31;
-	"vmov.f32		d16, #1.0 				\n\t"	//d16 = 1.0;
-	"vcvt.f32.u32	d3, d3					\n\t"	//d3 = (float) d3;
-	"vmls.f32		d0, d5, d3  			\n\t"	//d0 = d0 - d5 * d3;
-	"vmul.f32		d7, d17, d3  			\n\t"	//d7 = d17 * d3;
-	"vmls.f32		d16, d1, d3 			\n\t"	//d16 = d16 - d1 * d3;
-
-	//polynomial:
-	"vld1.32 		{d2, d3}, [%2]	 		\n\t"	//d2 = {p7, p7}, d3 = {p5, p5}
-	"vmul.f32 		d1, d0, d0				\n\t"	//d1 = d0 * d0 = {x0^2, x1^2}
-	"vld1.32 		{d4}, [%2, #16]			\n\t"	//d4 = {p3, p3}
-	"vmla.f32 		d3, d2, d1				\n\t"	//d3 = d3 + d2 * d1;
-	"vld1.32	 	{d5}, [%2, #24]			\n\t"	//d5 = {p1, p1}
-	"vmla.f32 		d4, d3, d1				\n\t"	//d4 = d4 + d3 * d1;
-	"vmla.f32 		d5, d4, d1				\n\t"	//d5 = d5 + d4 * d1;
-	"vmul.f32 		d5, d5, d0				\n\t"	//d5 = d5 * d0;
-
-	"vmla.f32 		d7, d5, d16				\n\t"	//d7 = d7 + d5*d16
-
-	"vadd.f32 		d2, d7, d7				\n\t"	//d2 = d7 + d7
-	"vclt.f32	 	d3, d6, #0				\n\t"	//d3 = (d6 < 0)
-	"vshr.u32	 	d3, #31					\n\t"	//d3 = d3 >> 31;
-	"vcvt.f32.u32	d3, d3					\n\t"	//d3 = (float) d3
-	"vmls.f32 		d7, d2, d3		    	\n\t"	//d7 = d7 - d2 * d3;
-
-	"vsub.f32 		d0, d17, d7		    	\n\t"	//d0 = d17 - d7
-
-	"vst1.f32 		{d0}, [%1]				\n\t"	//s0 = s3
-
-	::"r"(x), "r"(r), "r"(__acosf_lut),  "r"(__acosf_pi_2)
-    : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d16", "d17"
-	);
-
-}
-#endif
-
 #ifdef __VEC4_OPT
 void gSPTransformVertex4(u32 v, float mtx[4][4])
 {
-#ifdef __NEON_OPT
-    float *ptr = &OGL.triangles.vertices[v].x;
-	asm volatile (
-	"vld1.32 		{d0, d1}, [%1]		  	\n\t"	//q0 = {x,y,z,w}
-	"add 		    %1, %1, %2   		  	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d2, d3}, [%1]	    	\n\t"	//q1 = {x,y,z,w}
-	"add 		    %1, %1, %2 	    	  	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d4, d5}, [%1]	        \n\t"	//q2 = {x,y,z,w}
-	"add 		    %1, %1, %2 		      	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d6, d7}, [%1]	        \n\t"	//q3 = {x,y,z,w}
-    "sub 		    %1, %1, %3   		  	\n\t"	//q0 = {x,y,z,w}
-
-	"vld1.32 		{d18, d19}, [%0]!		\n\t"	//q9 = m
-	"vld1.32 		{d20, d21}, [%0]!       \n\t"	//q10 = m
-	"vld1.32 		{d22, d23}, [%0]!       \n\t"	//q11 = m
-	"vld1.32 		{d24, d25}, [%0]        \n\t"	//q12 = m
-
-	"vmov.f32 		q13, q12    			\n\t"	//q13 = q12
-	"vmov.f32 		q14, q12    			\n\t"	//q14 = q12
-	"vmov.f32 		q15, q12    			\n\t"	//q15 = q12
-
-	"vmla.f32 		q12, q9, d0[0]			\n\t"	//q12 = q9*d0[0]
-	"vmla.f32 		q13, q9, d2[0]			\n\t"	//q13 = q9*d0[0]
-	"vmla.f32 		q14, q9, d4[0]			\n\t"	//q14 = q9*d0[0]
-	"vmla.f32 		q15, q9, d6[0]			\n\t"	//q15 = q9*d0[0]
-	"vmla.f32 		q12, q10, d0[1]			\n\t"	//q12 = q10*d0[1]
-	"vmla.f32 		q13, q10, d2[1]			\n\t"	//q13 = q10*d0[1]
-	"vmla.f32 		q14, q10, d4[1]			\n\t"	//q14 = q10*d0[1]
-	"vmla.f32 		q15, q10, d6[1]			\n\t"	//q15 = q10*d0[1]
-	"vmla.f32 		q12, q11, d1[0]			\n\t"	//q12 = q11*d1[0]
-	"vmla.f32 		q13, q11, d3[0]			\n\t"	//q13 = q11*d1[0]
-	"vmla.f32 		q14, q11, d5[0]			\n\t"	//q14 = q11*d1[0]
-	"vmla.f32 		q15, q11, d7[0]			\n\t"	//q15 = q11*d1[0]
-
-	"vst1.32 		{d24, d25}, [%1] 		\n\t"	//q12
-	"add 		    %1, %1, %2 		      	\n\t"	//q0 = {x,y,z,w}
-	"vst1.32 		{d26, d27}, [%1] 	    \n\t"	//q13
-	"add 		    %1, %1, %2 	    	  	\n\t"	//q0 = {x,y,z,w}
-	"vst1.32 		{d28, d29}, [%1] 	    \n\t"	//q14
-	"add 		    %1, %1, %2   		  	\n\t"	//q0 = {x,y,z,w}
-	"vst1.32 		{d30, d31}, [%1]     	\n\t"	//q15
-
-	: "+&r"(mtx), "+&r"(ptr)
-	: "I"(sizeof(SPVertex)), "I"(3 * sizeof(SPVertex))
-    : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
-      "d18","d19", "d20", "d21", "d22", "d23", "d24",
-      "d25", "d26", "d27", "d28", "d29", "d30", "d31", "memory"
-	);
-#else
     float x, y, z, w;
     int i;
     for(i = 0; i < 4; i++)
@@ -354,11 +237,8 @@ void gSPTransformVertex4(u32 v, float mtx[4][4])
         OGL.triangles.vertices[v+i].z = x * mtx[0][2] + y * mtx[1][2] + z * mtx[2][2] + mtx[3][2];
         OGL.triangles.vertices[v+i].w = x * mtx[0][3] + y * mtx[1][3] + z * mtx[2][3] + mtx[3][3];
     }
-#endif
 }
-#endif
 
-#ifdef __VEC4_OPT
 void gSPClipVertex4(u32 v)
 {
     int i;
@@ -371,91 +251,9 @@ void gSPClipVertex4(u32 v)
         if (vtx->y < -vtx->w)   vtx->clip |= CLIP_NEGY;
     }
 }
-#endif
 
-//4x Transform normal and normalize
-#ifdef __VEC4_OPT
 void gSPTransformNormal4(u32 v, float mtx[4][4])
 {
-#ifdef __NEON_OPT
-    void *ptr = (void*)&OGL.triangles.vertices[v].nx;
-	asm volatile (
-    "vld1.32 		{d0, d1}, [%1]		  	\n\t"	//q0 = {x,y,z,w}
-	"add 		    %1, %1, %2  		  	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d2, d3}, [%1]	    	\n\t"	//q1 = {x,y,z,w}
-	"add 		    %1, %1, %2  		  	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d4, d5}, [%1]	        \n\t"	//q2 = {x,y,z,w}
-	"add 		    %1, %1, %2  		  	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d6, d7}, [%1]	        \n\t"	//q3 = {x,y,z,w}
-    "sub 		    %1, %1, %3  		  	\n\t"	//q0 = {x,y,z,w}
-
-	"vld1.32 		{d18, d19}, [%0]!		\n\t"	//q9 = m
-	"vld1.32 		{d20, d21}, [%0]!	    \n\t"	//q10 = m+16
-	"vld1.32 		{d22, d23}, [%0]    	\n\t"	//q11 = m+32
-
-	"vmul.f32 		q12, q9, d0[0]			\n\t"	//q12 = q9*d0[0]
-	"vmul.f32 		q13, q9, d2[0]			\n\t"	//q13 = q9*d2[0]
-    "vmul.f32 		q14, q9, d4[0]			\n\t"	//q14 = q9*d4[0]
-    "vmul.f32 		q15, q9, d6[0]			\n\t"	//q15 = q9*d6[0]
-
-    "vmla.f32 		q12, q10, d0[1]			\n\t"	//q12 += q10*q0[1]
-    "vmla.f32 		q13, q10, d2[1]			\n\t"	//q13 += q10*q2[1]
-    "vmla.f32 		q14, q10, d4[1]			\n\t"	//q14 += q10*q4[1]
-    "vmla.f32 		q15, q10, d6[1]			\n\t"	//q15 += q10*q6[1]
-
-	"vmla.f32 		q12, q11, d1[0]			\n\t"	//q12 += q11*d1[0]
-	"vmla.f32 		q13, q11, d3[0]			\n\t"	//q13 += q11*d3[0]
-	"vmla.f32 		q14, q11, d5[0]			\n\t"	//q14 += q11*d5[0]
-	"vmla.f32 		q15, q11, d7[0]			\n\t"	//q15 += q11*d7[0]
-
-    "vmul.f32 		q0, q12, q12			\n\t"	//q0 = q12*q12
-    "vmul.f32 		q1, q13, q13			\n\t"	//q1 = q13*q13
-    "vmul.f32 		q2, q14, q14			\n\t"	//q2 = q14*q14
-    "vmul.f32 		q3, q15, q15			\n\t"	//q3 = q15*q15
-
-    "vpadd.f32 		d0, d0  				\n\t"	//d0[0] = d0[0] + d0[1]
-    "vpadd.f32 		d2, d2  				\n\t"	//d2[0] = d2[0] + d2[1]
-    "vpadd.f32 		d4, d4  				\n\t"	//d4[0] = d4[0] + d4[1]
-    "vpadd.f32 		d6, d6  				\n\t"	//d6[0] = d6[0] + d6[1]
-
-    "vmov.f32    	s1, s2  				\n\t"	//d0[1] = d1[0]
-    "vmov.f32 	    s5, s6  				\n\t"	//d2[1] = d3[0]
-    "vmov.f32 	    s9, s10  				\n\t"	//d4[1] = d5[0]
-    "vmov.f32    	s13, s14  				\n\t"	//d6[1] = d7[0]
-
-    "vpadd.f32 		d0, d0, d2  			\n\t"	//d0 = {d0[0] + d0[1], d2[0] + d2[1]}
-    "vpadd.f32 		d1, d4, d6  			\n\t"	//d1 = {d4[0] + d4[1], d6[0] + d6[1]}
-
-	"vmov.f32 		q1, q0					\n\t"	//q1 = q0
-	"vrsqrte.f32 	q0, q0					\n\t"	//q0 = ~ 1.0 / sqrt(q0)
-	"vmul.f32 		q2, q0, q1				\n\t"	//q2 = q0 * q1
-	"vrsqrts.f32 	q3, q2, q0				\n\t"	//q3 = (3 - q0 * q2) / 2
-	"vmul.f32 		q0, q0, q3				\n\t"	//q0 = q0 * q3
-	"vmul.f32 		q2, q0, q1				\n\t"	//q2 = q0 * q1
-	"vrsqrts.f32 	q3, q2, q0				\n\t"	//q3 = (3 - q0 * q2) / 2
-	"vmul.f32 		q0, q0, q3				\n\t"	//q0 = q0 * q3
-
-	"vmul.f32 		q3, q15, d1[1]			\n\t"	//q3 = q15*d1[1]
-	"vmul.f32 		q2, q14, d1[0]			\n\t"	//q2 = q14*d1[0]
-	"vmul.f32 		q1, q13, d0[1]			\n\t"	//q1 = q13*d0[1]
-	"vmul.f32 		q0, q12, d0[0]			\n\t"	//q0 = q12*d0[0]
-
-	"vst1.32 		{d0, d1}, [%1]  	    \n\t"	//d0={nx,ny,nz,pad}
-	"add 		    %1, %1, %2   		  	\n\t"	//q0 = {x,y,z,w}
-	"vst1.32 		{d2, d3}, [%1]  	    \n\t"	//d2={nx,ny,nz,pad}
-	"add 		    %1, %1, %2  		  	\n\t"	//q0 = {x,y,z,w}
-	"vst1.32 		{d4, d5}, [%1]  	    \n\t"	//d4={nx,ny,nz,pad}
-	"add 		    %1, %1, %2  		  	\n\t"	//q0 = {x,y,z,w}
-    "vst1.32 		{d6, d7}, [%1]        	\n\t"	//d6={nx,ny,nz,pad}
-
-    : "+&r"(mtx), "+&r"(ptr)
-    : "I"(sizeof(SPVertex)), "I"(3 * sizeof(SPVertex))
-    : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
-      "d16","d17", "d18","d19", "d20", "d21", "d22",
-      "d23", "d24", "d25", "d26", "d27", "d28", "d29",
-      "d30", "d31", "memory"
-	);
-#else
     float len, x, y, z;
     int i;
     for(i = 0; i < 4; i++){
@@ -477,197 +275,10 @@ void gSPTransformNormal4(u32 v, float mtx[4][4])
             OGL.triangles.vertices[v+i].nz /= len;
         }
     }
-#endif
 }
-#endif
 
-#ifdef __VEC4_OPT
-void __attribute__((noinline))
-gSPLightVertex4(u32 v)
+void gSPLightVertex4(u32 v)
 {
-#ifdef __NEON_OPT
-    volatile float result[16];
-
- 	volatile int i = gSP.numLights;
-    volatile int tmp = 0;
-    volatile void *ptr0 = &(gSP.lights[0].r);
-    volatile void *ptr1 = &(OGL.triangles.vertices[v].nx);
-    volatile void *ptr2 = result;
-	volatile void *ptr3 = gSP.matrix.modelView[gSP.matrix.modelViewi];
-	asm volatile (
-    "vld1.32 		{d0, d1}, [%1]		  	\n\t"	//q0 = {x,y,z,w}
-	"add 		    %1, %1, %2 		      	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d2, d3}, [%1]	    	\n\t"	//q1 = {x,y,z,w}
-	"add 		    %1, %1, %2 	    	  	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d4, d5}, [%1]	        \n\t"	//q2 = {x,y,z,w}
-	"add 		    %1, %1, %2   		  	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d6, d7}, [%1]	        \n\t"	//q3 = {x,y,z,w}
-    "sub 		    %1, %1, %3   		  	\n\t"	//q0 = {x,y,z,w}
-
-	"vld1.32 		{d18, d19}, [%0]!		\n\t"	//q9 = m
-	"vld1.32 		{d20, d21}, [%0]!	    \n\t"	//q10 = m+16
-	"vld1.32 		{d22, d23}, [%0]    	\n\t"	//q11 = m+32
-
-	"vmul.f32 		q12, q9, d0[0]			\n\t"	//q12 = q9*d0[0]
-	"vmul.f32 		q13, q9, d2[0]			\n\t"	//q13 = q9*d2[0]
-    "vmul.f32 		q14, q9, d4[0]			\n\t"	//q14 = q9*d4[0]
-    "vmul.f32 		q15, q9, d6[0]			\n\t"	//q15 = q9*d6[0]
-
-    "vmla.f32 		q12, q10, d0[1]			\n\t"	//q12 += q10*q0[1]
-    "vmla.f32 		q13, q10, d2[1]			\n\t"	//q13 += q10*q2[1]
-    "vmla.f32 		q14, q10, d4[1]			\n\t"	//q14 += q10*q4[1]
-    "vmla.f32 		q15, q10, d6[1]			\n\t"	//q15 += q10*q6[1]
-
-	"vmla.f32 		q12, q11, d1[0]			\n\t"	//q12 += q11*d1[0]
-	"vmla.f32 		q13, q11, d3[0]			\n\t"	//q13 += q11*d3[0]
-	"vmla.f32 		q14, q11, d5[0]			\n\t"	//q14 += q11*d5[0]
-	"vmla.f32 		q15, q11, d7[0]			\n\t"	//q15 += q11*d7[0]
-
-    "vmul.f32 		q0, q12, q12			\n\t"	//q0 = q12*q12
-    "vmul.f32 		q1, q13, q13			\n\t"	//q1 = q13*q13
-    "vmul.f32 		q2, q14, q14			\n\t"	//q2 = q14*q14
-    "vmul.f32 		q3, q15, q15			\n\t"	//q3 = q15*q15
-
-    "vpadd.f32 		d0, d0  				\n\t"	//d0[0] = d0[0] + d0[1]
-    "vpadd.f32 		d2, d2  				\n\t"	//d2[0] = d2[0] + d2[1]
-    "vpadd.f32 		d4, d4  				\n\t"	//d4[0] = d4[0] + d4[1]
-    "vpadd.f32 		d6, d6  				\n\t"	//d6[0] = d6[0] + d6[1]
-
-    "vmov.f32    	s1, s2  				\n\t"	//d0[1] = d1[0]
-    "vmov.f32 	    s5, s6  				\n\t"	//d2[1] = d3[0]
-    "vmov.f32 	    s9, s10  				\n\t"	//d4[1] = d5[0]
-    "vmov.f32    	s13, s14  				\n\t"	//d6[1] = d7[0]
-
-    "vpadd.f32 		d0, d0, d2  			\n\t"	//d0 = {d0[0] + d0[1], d2[0] + d2[1]}
-    "vpadd.f32 		d1, d4, d6  			\n\t"	//d1 = {d4[0] + d4[1], d6[0] + d6[1]}
-
-	"vmov.f32 		q1, q0					\n\t"	//q1 = q0
-	"vrsqrte.f32 	q0, q0					\n\t"	//q0 = ~ 1.0 / sqrt(q0)
-	"vmul.f32 		q2, q0, q1				\n\t"	//q2 = q0 * q1
-	"vrsqrts.f32 	q3, q2, q0				\n\t"	//q3 = (3 - q0 * q2) / 2
-	"vmul.f32 		q0, q0, q3				\n\t"	//q0 = q0 * q3
-	"vmul.f32 		q2, q0, q1				\n\t"	//q2 = q0 * q1
-	"vrsqrts.f32 	q3, q2, q0				\n\t"	//q3 = (3 - q0 * q2) / 2
-	"vmul.f32 		q0, q0, q3				\n\t"	//q0 = q0 * q3
-
-	"vmul.f32 		q3, q15, d1[1]			\n\t"	//q3 = q15*d1[1]
-	"vmul.f32 		q2, q14, d1[0]			\n\t"	//q2 = q14*d1[0]
-	"vmul.f32 		q1, q13, d0[1]			\n\t"	//q1 = q13*d0[1]
-	"vmul.f32 		q0, q12, d0[0]			\n\t"	//q0 = q12*d0[0]
-
-	"vst1.32 		{d0, d1}, [%1]  	    \n\t"	//d0={nx,ny,nz,pad}
-	"add 		    %1, %1, %2 		  	    \n\t"	//q0 = {x,y,z,w}
-	"vst1.32 		{d2, d3}, [%1]  	    \n\t"	//d2={nx,ny,nz,pad}
-	"add 		    %1, %1, %2 		  	    \n\t"	//q0 = {x,y,z,w}
-	"vst1.32 		{d4, d5}, [%1]  	    \n\t"	//d4={nx,ny,nz,pad}
-	"add 		    %1, %1, %2 		  	    \n\t"	//q0 = {x,y,z,w}
-    "vst1.32 		{d6, d7}, [%1]        	\n\t"	//d6={nx,ny,nz,pad}
-
-    : "+&r"(ptr3), "+&r"(ptr1)
-    : "I"(sizeof(SPVertex)), "I"(3 * sizeof(SPVertex))
-    : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
-      "d16","d17", "d18","d19", "d20", "d21", "d22",
-      "d23", "d24", "d25", "d26", "d27", "d28", "d29",
-      "d30", "d31", "memory"
-	);
-    asm volatile (
-
-    "mov    		%0, %5        			\n\t"	//r0=sizeof(light)
-    "mla    		%0, %1, %0, %2 			\n\t"	//r0=r1*r0+r2
-
-    "vmov.f32 		q8, q0  			    \n\t"	//q8=q0
-    "vmov.f32 		q9, q1  			    \n\t"	//q9=q1
-    "vmov.f32 		q10, q2  			    \n\t"	//q10=q2
-    "vmov.f32 		q11, q3  			    \n\t"	//q11=q3
-
-    "vld1.32 		{d0}, [%0]			    \n\t"	//d0={r,g}
-    "flds   		s2, [%0, #8]			\n\t"	//d1[0]={b}
-    "vmov.f32 		q1, q0  			    \n\t"	//q1=q0
-    "vmov.f32 		q2, q0  			    \n\t"	//q2=q0
-    "vmov.f32 		q3, q0  			    \n\t"	//q3=q0
-
-    "vmov.f32 		q15, #0.0     			\n\t"	//q15=0
-    "vdup.f32 		q15, d30[0]     		\n\t"	//q15=d30[0]
-
-    "cmp     		%1, #0       			\n\t"	//
-    "beq     		2f             			\n\t"	//(r1==0) goto 2
-
-    "1:                          			\n\t"	//
-    "vld1.32 		{d8}, [%2]!	        	\n\t"	//d8={r,g}
-    "flds    		s18, [%2]   	    	\n\t"	//q9[0]={b}
-    "add    		%2, %2, #4   	    	\n\t"	//q9[0]={b}
-    "vld1.32 		{d10}, [%2]!    		\n\t"	//d10={x,y}
-    "flds    		s22, [%2]   	    	\n\t"	//d11[0]={z}
-    "add    		%2, %2, #4   	    	\n\t"	//q9[0]={b}
-
-    "vmov.f32 		q13, q5  	       		\n\t"	//q13 = q5
-    "vmov.f32 		q12, q4  	       		\n\t"	//q12 = q4
-
-    "vmul.f32 		q4, q8, q13	       		\n\t"	//q4 = q8*q13
-    "vmul.f32 		q5, q9, q13	       		\n\t"	//q5 = q9*q13
-    "vmul.f32 		q6, q10, q13	        \n\t"	//q6 = q10*q13
-    "vmul.f32 		q7, q11, q13	       	\n\t"	//q7 = q11*q13
-
-    "vpadd.f32 		d8, d8  				\n\t"	//d8[0] = d8[0] + d8[1]
-    "vpadd.f32 		d10, d10  				\n\t"	//d10[0] = d10[0] + d10[1]
-    "vpadd.f32 		d12, d12  				\n\t"	//d12[0] = d12[0] + d12[1]
-    "vpadd.f32 		d14, d14  				\n\t"	//d14[0] = d14[0] + d14[1]
-
-    "vmov.f32    	s17, s18  				\n\t"	//d8[1] = d9[0]
-    "vmov.f32    	s21, s22  				\n\t"	//d10[1] = d11[0]
-    "vmov.f32    	s25, s26  				\n\t"	//d12[1] = d13[0]
-    "vmov.f32    	s29, s30  				\n\t"	//d14[1] = d15[0]
-
-    "vpadd.f32 		d8, d8, d10  			\n\t"	//d8 = {d8[0] + d8[1], d10[0] + d10[1]}
-    "vpadd.f32 		d9, d12, d14  			\n\t"	//d9 = {d12[0] + d12[1], d14[0] + d14[1]}
-
-    "vmax.f32 		q4, q4, q15  			\n\t"	//q4=max(q4, 0)
-
-    "vmla.f32 		q0, q12, d8[0]  		\n\t"	//q0 +=
-    "vmla.f32 		q1, q12, d8[1]  		\n\t"	//d1 = {d4[0] + d4[1], d6[0] + d6[1]}
-    "vmla.f32 		q2, q12, d9[0]  		\n\t"	//d1 = {d4[0] + d4[1], d6[0] + d6[1]}
-    "vmla.f32 		q3, q12, d9[1]  		\n\t"	//d1 = {d4[0] + d4[1], d6[0] + d6[1]}
-
-    "subs     		%1, %1, #1       		\n\t"	//r1=r1 - 1
-    "bne     		1b                 		\n\t"	//(r1!=0) goto 1
-
-    "2:                          			\n\t"	//
-#ifdef __PACKVERTEX_OPT
-    "vmov.i32        q4, #255	        	\n\t"	//q4 = 255
-    "vcvt.f32.u32    q4, q4	        	    \n\t"	//q4 = (float)q4
-#else
-    "vmov.f32        q4, #1.0	        	\n\t"	//
-#endif
-    "vmin.f32 		q0, q0, q4  	        \n\t"	//
-    "vmin.f32 		q1, q1, q4  	        \n\t"	//
-    "vmin.f32 		q2, q2, q4  	        \n\t"	//
-    "vmin.f32 		q3, q3, q4  	        \n\t"	//
-    "vst1.32 		{d0, d1}, [%4]!	        \n\t"	//
-    "vst1.32 		{d2, d3}, [%4]! 	    \n\t"	//
-    "vst1.32 		{d4, d5}, [%4]!	        \n\t"	//
-    "vst1.32 		{d6, d7}, [%4]     	    \n\t"	//
-
-    : "+&r"(tmp), "+&r"(i), "+&r"(ptr0), "+&r"(ptr1), "+&r"(ptr2)
-    : "I"(sizeof(SPLight))
-    : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
-      "d8", "d9", "d10", "d11", "d12", "d13", "d14", "d15",
-      "d16","d17", "d18","d19", "d20", "d21", "d22", "d23",
-      "d24", "d25", "d26", "d27", "d28", "d29", "d30", "d31",
-      "memory", "cc"
-    );
-    OGL.triangles.vertices[v].r = result[0];
-    OGL.triangles.vertices[v].g = result[1];
-    OGL.triangles.vertices[v].b = result[2];
-    OGL.triangles.vertices[v+1].r = result[4];
-    OGL.triangles.vertices[v+1].g = result[5];
-    OGL.triangles.vertices[v+1].b = result[6];
-    OGL.triangles.vertices[v+2].r = result[8];
-    OGL.triangles.vertices[v+2].g = result[9];
-    OGL.triangles.vertices[v+2].b = result[10];
-    OGL.triangles.vertices[v+3].r = result[12];
-    OGL.triangles.vertices[v+3].g = result[13];
-    OGL.triangles.vertices[v+3].b = result[14];
-#else
     gSPTransformNormal4(v, gSP.matrix.modelView[gSP.matrix.modelViewi]);
     for(int j = 0; j < 4; j++)
     {
@@ -683,61 +294,14 @@ gSPLightVertex4(u32 v)
             OGL.triangles.vertices[v+j].g += gSP.lights[i].g * intensity;
             OGL.triangles.vertices[v+j].b += gSP.lights[i].b * intensity;
         }
-#ifdef __PACKVERTEX_OPT
-        OGL.triangles.vertices[v+j].r = min(255, r);
-        OGL.triangles.vertices[v+j].g = min(255, g);
-        OGL.triangles.vertices[v+j].b = min(255, b);
-#else
         OGL.triangles.vertices[v+j].r = min(1.0f, r);
         OGL.triangles.vertices[v+j].g = min(1.0f, g);
         OGL.triangles.vertices[v+j].b = min(1.0f, b);
-#endif
     }
-#endif
 }
-#endif
 
-#ifdef __VEC4_OPT
 void gSPBillboardVertex4(u32 v)
 {
-#if __NEON_OPT
-
-    int i = 0;
-#ifdef __TRIBUFFER_OPT
-    i = OGL.triangles.indexmap[0];
-#endif
-
-    void *ptr0 = (void*)&OGL.triangles.vertices[v].x;
-    void *ptr1 = (void*)&OGL.triangles.vertices[i].x;
-    asm volatile (
-
-    "vld1.32 		{d0, d1}, [%0]		  	\n\t"	//q0 = {x,y,z,w}
-	"add 		    %0, %0, %2 		  	    \n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d2, d3}, [%0]	    	\n\t"	//q1 = {x,y,z,w}
-	"add 		    %0, %0, %2 		      	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d4, d5}, [%0]	        \n\t"	//q2 = {x,y,z,w}
-	"add 		    %0, %0, %2 	    	  	\n\t"	//q0 = {x,y,z,w}
-	"vld1.32 		{d6, d7}, [%0]	        \n\t"	//q3 = {x,y,z,w}
-    "sub 		    %0, %0, %3   		  	\n\t"	//q0 = {x,y,z,w}
-
-    "vld1.32 		{d16, d17}, [%1]		\n\t"	//q2={x1,y1,z1,w1}
-    "vadd.f32 		q0, q0, q8 			    \n\t"	//q1=q1+q1
-    "vadd.f32 		q1, q1, q8 			    \n\t"	//q1=q1+q1
-    "vadd.f32 		q2, q2, q8 			    \n\t"	//q1=q1+q1
-    "vadd.f32 		q3, q3, q8 			    \n\t"	//q1=q1+q1
-    "vst1.32 		{d0, d1}, [%0] 		    \n\t"	//
-    "add 		    %0, %0, %2  		  	\n\t"	//q0 = {x,y,z,w}
-	"vst1.32 		{d2, d3}, [%0]          \n\t"	//
-    "add 		    %0, %0, %2 		  	    \n\t"	//q0 = {x,y,z,w}
-	"vst1.32 		{d4, d5}, [%0]          \n\t"	//
-    "add 		    %0, %0, %2 		  	    \n\t"	//q0 = {x,y,z,w}
-	"vst1.32 		{d6, d7}, [%0]          \n\t"	//
-    : "+&r"(ptr0), "+&r"(ptr1)
-    : "I"(sizeof(SPVertex)), "I"(3 * sizeof(SPVertex))
-    : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
-      "d16", "d17", "memory"
-    );
-#else
 
     int i = 0;
 #ifdef __TRIBUFFER_OPT
@@ -760,17 +324,26 @@ void gSPBillboardVertex4(u32 v)
     OGL.triangles.vertices[v+3].y += OGL.triangles.vertices[i].y;
     OGL.triangles.vertices[v+3].z += OGL.triangles.vertices[i].z;
     OGL.triangles.vertices[v+3].w += OGL.triangles.vertices[i].w;
-#endif
 }
-#endif
 
-#ifdef __VEC4_OPT
 void gSPProcessVertex4(u32 v)
 {
     if (gSP.changed & CHANGED_MATRIX)
         gSPCombineMatrices();
 
+#if __NEON_OPT
+    gSPTransformVertex4NEON(v, gSP.matrix.combined );
+#else
     gSPTransformVertex4(v, gSP.matrix.combined );
+#endif
+
+    if (config.screen.flipVertical)
+    {
+        OGL.triangles.vertices[v+0].y = -OGL.triangles.vertices[v+0].y;
+        OGL.triangles.vertices[v+1].y = -OGL.triangles.vertices[v+1].y;
+        OGL.triangles.vertices[v+2].y = -OGL.triangles.vertices[v+2].y;
+        OGL.triangles.vertices[v+3].y = -OGL.triangles.vertices[v+3].y;
+    }
 
     if (gDP.otherMode.depthSource)
     {
@@ -780,7 +353,14 @@ void gSPProcessVertex4(u32 v)
         OGL.triangles.vertices[v+3].z = gDP.primDepth.z * OGL.triangles.vertices[v+3].w;
     }
 
-    if (gSP.matrix.billboard) gSPBillboardVertex4(v);
+    if (gSP.matrix.billboard)
+    {
+#ifdef __NEON_OPT
+        gSPBillboardVertex4NEON(v);
+#else
+        gSPBillboardVertex4(v);
+#endif
+    }
 
     if (!(gSP.geometryMode & G_ZBUFFER))
     {
@@ -792,26 +372,16 @@ void gSPProcessVertex4(u32 v)
 
     if (gSP.geometryMode & G_LIGHTING)
     {
-        if (OGL.enableLighting)
+        if (config.enableLighting)
         {
+#ifdef __NEON_OPT
+            gSPLightVertex4NEON(v);
+#else
             gSPLightVertex4(v);
+#endif
         }
         else
         {
-#ifdef __PACKVERTEX_OPT
-            OGL.triangles.vertices[v].r = 255;
-            OGL.triangles.vertices[v].g = 255;
-            OGL.triangles.vertices[v].b = 255;
-            OGL.triangles.vertices[v+1].r = 255;
-            OGL.triangles.vertices[v+1].g = 255;
-            OGL.triangles.vertices[v+1].b = 255;
-            OGL.triangles.vertices[v+2].r = 255;
-            OGL.triangles.vertices[v+2].g = 255;
-            OGL.triangles.vertices[v+2].b = 255;
-            OGL.triangles.vertices[v+3].r = 255;
-            OGL.triangles.vertices[v+3].g = 255;
-            OGL.triangles.vertices[v+3].b = 255;
-#else
             OGL.triangles.vertices[v].r = 1.0f;
             OGL.triangles.vertices[v].g = 1.0f;
             OGL.triangles.vertices[v].b = 1.0f;
@@ -824,7 +394,6 @@ void gSPProcessVertex4(u32 v)
             OGL.triangles.vertices[v+3].r = 1.0f;
             OGL.triangles.vertices[v+3].g = 1.0f;
             OGL.triangles.vertices[v+3].b = 1.0f;
-#endif
         }
 
         if (gSP.geometryMode & G_TEXTURE_GEN)
@@ -856,7 +425,7 @@ void gSPProcessVertex4(u32 v)
         }
     }
 
-    if (OGL.enableClipping) gSPClipVertex4(v);
+    if (config.enableClipping) gSPClipVertex4(v);
 }
 #endif
 
@@ -871,96 +440,22 @@ void gSPClipVertex(u32 v)
     //if (vtx->w < 0.1f)      vtx->clip |= CLIP_NEGW;
 }
 
-void __attribute__((noinline))
-gSPLightVertex(u32 v)
+void gSPTransformVertex(float vtx[4], float mtx[4][4])
 {
-#ifdef __NEON_OPT
-    volatile float result[4];
+    float x, y, z, w;
+    x = vtx[0];
+    y = vtx[1];
+    z = vtx[2];
+    w = vtx[3];
 
-    volatile int tmp = 0;
-    volatile int i = gSP.numLights;
-    volatile void *ptr0 = &gSP.lights[0].r;
-    volatile void *ptr1 = &OGL.triangles.vertices[v].nx;
-    volatile void *ptr2 = result;;
-    volatile void *ptr3 = gSP.matrix.modelView[gSP.matrix.modelViewi];
+    vtx[0] = x * mtx[0][0] + y * mtx[1][0] + z * mtx[2][0] + mtx[3][0];
+    vtx[1] = x * mtx[0][1] + y * mtx[1][1] + z * mtx[2][1] + mtx[3][1];
+    vtx[2] = x * mtx[0][2] + y * mtx[1][2] + z * mtx[2][2] + mtx[3][2];
+    vtx[3] = x * mtx[0][3] + y * mtx[1][3] + z * mtx[2][3] + mtx[3][3];
+}
 
-	asm volatile (
-	"vld1.32 		{d0, d1}, [%1]  		\n\t"	//Q0 = v
-	"vld1.32 		{d18, d19}, [%0]!		\n\t"	//Q1 = m
-	"vld1.32 		{d20, d21}, [%0]!	    \n\t"	//Q2 = m+4
-	"vld1.32 		{d22, d23}, [%0]	    \n\t"	//Q3 = m+8
-
-	"vmul.f32 		q2, q9, d0[0]			\n\t"	//q2 = q9*Q0[0]
-	"vmla.f32 		q2, q10, d0[1]			\n\t"	//Q5 += Q1*Q0[1]
-	"vmla.f32 		q2, q11, d1[0]			\n\t"	//Q5 += Q2*Q0[2]
-
-    "vmul.f32 		d0, d4, d4				\n\t"	//d0 = d0*d0
-	"vpadd.f32 		d0, d0, d0				\n\t"	//d0 = d[0] + d[1]
-    "vmla.f32 		d0, d5, d5				\n\t"	//d0 = d0 + d5*d5
-
-	"vmov.f32 		d1, d0					\n\t"	//d1 = d0
-	"vrsqrte.f32 	d0, d0					\n\t"	//d0 = ~ 1.0 / sqrt(d0)
-	"vmul.f32 		d2, d0, d1				\n\t"	//d2 = d0 * d1
-	"vrsqrts.f32 	d3, d2, d0				\n\t"	//d3 = (3 - d0 * d2) / 2
-	"vmul.f32 		d0, d0, d3				\n\t"	//d0 = d0 * d3
-	"vmul.f32 		d2, d0, d1				\n\t"	//d2 = d0 * d1
-	"vrsqrts.f32 	d3, d2, d0				\n\t"	//d3 = (3 - d0 * d3) / 2
-	"vmul.f32 		d0, d0, d3				\n\t"	//d0 = d0 * d4
-
-	"vmul.f32 		q1, q2, d0[0]			\n\t"	//q1 = d2*d4
-
-	"vst1.32 		{d2, d3}, [%1]  	    \n\t"	//d0={nx,ny,nz,pad}
-
-	: "+&r"(ptr3): "r"(ptr1)
-    : "d0","d1","d2","d3","d18","d19","d20","d21","d22", "d23", "memory"
-	);
-
-    asm volatile (
-    "mov    		%0, #24        			\n\t"	//r0=24
-    "mla    		%0, %1, %0, %2 			\n\t"	//r0=r1*r0+r2
-
-    "vld1.32 		{d0}, [%0]!	    		\n\t"	//d0={r,g}
-    "flds   		s2, [%0]	        	\n\t"	//d1[0]={b}
-    "cmp            %0, #0     		        \n\t"	//
-    "beq            2f       		        \n\t"	//(r1==0) goto 2
-
-    "1:                        		        \n\t"	//
-    "vld1.32 		{d4}, [%2]!	        	\n\t"	//d4={r,g}
-    "flds    		s10, [%2]	        	\n\t"	//q5[0]={b}
-    "add 		    %2, %2, #4 		        \n\t"	//r2+=4
-    "vld1.32 		{d6}, [%2]!	    		\n\t"	//d6={x,y}
-    "flds    		s14, [%2]	        	\n\t"	//d7[0]={z}
-    "add 		    %2, %2, #4 		        \n\t"	//r2+=4
-    "vmul.f32 		d6, d2, d6 			    \n\t"	//d6=d2*d6
-    "vpadd.f32 		d6, d6   			    \n\t"	//d6=d6[0]+d6[1]
-    "vmla.f32 		d6, d3, d7 			    \n\t"	//d6=d6+d3*d7
-    "vmov.f32 		d7, #0.0     			\n\t"	//d7=0
-    "vmax.f32 		d6, d6, d7   		    \n\t"	//d6=max(d6, d7)
-    "vmla.f32 		q0, q2, d6[0] 		    \n\t"	//q0=q0+q2*d6[0]
-    "sub 		    %1, %1, #1 		        \n\t"	//r0=r0-1
-    "cmp 		    %1, #0   		        \n\t"	//r0=r0-1
-    "bgt 		    1b 		                \n\t"	//(r1!=0) ? goto 1
-    "b  		    2f 		                \n\t"	//(r1!=0) ? goto 1
-    "2:                        	    		\n\t"	//
-#ifdef __PACKVERTEX_OPT
-    "vmov.i32        q1, #255	        	\n\t"	//d2 = 255
-    "vcvt.f32.u32    q1, q1	        	    \n\t"	//d2 = (float)d2
-#else
-    "vmov.f32        q1, #1.0	        	\n\t"	//
-#endif
-    "vmin.f32        q0, q0, q1	        	\n\t"	//
-    "vst1.32        {d0, d1}, [%3]	    	\n\t"	//
-
-    : "+&r"(tmp), "+&r"(i), "+&r"(ptr0), "+&r"(ptr2)
-    :: "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
-      "d16", "memory", "cc"
-    );
-    OGL.triangles.vertices[v].r = result[0];
-    OGL.triangles.vertices[v].g = result[1];
-    OGL.triangles.vertices[v].b = result[2];
-
-#else
-
+void gSPLightVertex(u32 v)
+{
     TransformVectorNormalize( &OGL.triangles.vertices[v].nx, gSP.matrix.modelView[gSP.matrix.modelViewi] );
 
     f32 r, g, b;
@@ -975,50 +470,11 @@ gSPLightVertex(u32 v)
         g += gSP.lights[i].g * intensity;
         b += gSP.lights[i].b * intensity;
     }
-#ifdef __PACKVERTEX_OPT
-    OGL.triangles.vertices[v].r = min(255.0f, r);
-    OGL.triangles.vertices[v].g = min(255.0f, g);
-    OGL.triangles.vertices[v].b = min(255.0f, b);
-#else
     OGL.triangles.vertices[v].r = min(1.0, r);
     OGL.triangles.vertices[v].g = min(1.0, g);
     OGL.triangles.vertices[v].b = min(1.0, b);
-#endif
-#endif
 }
 
-
-void gSPLoadUcodeEx( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
-{
-    RSP.PCi = 0;
-    gSP.matrix.modelViewi = 0;
-    gSP.changed |= CHANGED_MATRIX;
-    gSP.status[0] = gSP.status[1] = gSP.status[2] = gSP.status[3] = 0;
-
-    if ((((uc_start & 0x1FFFFFFF) + 4096) > RDRAMSize) || (((uc_dstart & 0x1FFFFFFF) + uc_dsize) > RDRAMSize))
-    {
-            return;
-    }
-
-    MicrocodeInfo *ucode = GBI_DetectMicrocode( uc_start, uc_dstart, uc_dsize );
-//    LOG(LOG_VERBOSE, "Changed to UCODE = %i\n", ucode->type);
-
-    if (ucode->type != (u32)-1) last_good_ucode = ucode->type;
-    if (ucode->type != NONE){
-        GBI_MakeCurrent( ucode );
-    } else {
-#ifdef RSPTHREAD
-        RSP.threadIdle = 0;
-        RSP.threadEvents.push(RSPMSG_CLOSE);
-#else
-        puts( "Warning: Unknown UCODE!!!" );
-#endif
-    }
-#ifdef DEBUG
-    DebugMsg( DEBUG_HIGH | DEBUG_ERROR, "// Unknown microcode: 0x%08X, 0x%08X, %s\n", uc_crc, uc_dcrc, uc_str );
-    DebugMsg( DEBUG_HIGH | DEBUG_HANDLED, "gSPLoadUcodeEx( 0x%08X, 0x%08X, %i );\n", uc_start, uc_dstart, uc_dsize );
-#endif
-}
 
 void gSPCombineMatrices()
 {
@@ -1034,7 +490,16 @@ void gSPProcessVertex( u32 v )
     if (gSP.changed & CHANGED_MATRIX)
         gSPCombineMatrices();
 
-    TransformVertex( &OGL.triangles.vertices[v].x, gSP.matrix.combined );
+#if __NEON_OPT
+    gSPTransformVertexNEON( &OGL.triangles.vertices[v].x, gSP.matrix.combined );
+#else
+    gSPTransformVertex( &OGL.triangles.vertices[v].x, gSP.matrix.combined );
+#endif
+
+    if (config.screen.flipVertical)
+    {
+        OGL.triangles.vertices[v].y = -OGL.triangles.vertices[v].y;
+    }
 
     if (gDP.otherMode.depthSource)
     {
@@ -1070,26 +535,24 @@ void gSPProcessVertex( u32 v )
         OGL.triangles.vertices[v].z = -OGL.triangles.vertices[v].w;
     }
 
-    if (OGL.enableClipping)
+    if (config.enableClipping)
         gSPClipVertex(v);
 
     if (gSP.geometryMode & G_LIGHTING)
     {
-        if (OGL.enableLighting)
+        if (config.enableLighting)
         {
+#if __NEON_OPT
+            gSPLightVertexNEON(v);
+#else
             gSPLightVertex(v);
+#endif
         }
         else
         {
-#ifdef __PACKVERTEX_OPT
-            OGL.triangles.vertices[v].r = 255.0f;
-            OGL.triangles.vertices[v].g = 255.0f;
-            OGL.triangles.vertices[v].b = 255.0f;
-#else
             OGL.triangles.vertices[v].r = 1.0f;
             OGL.triangles.vertices[v].g = 1.0f;
             OGL.triangles.vertices[v].b = 1.0f;
-#endif
         }
 
         if (gSP.geometryMode & G_TEXTURE_GEN)
@@ -1107,6 +570,34 @@ void gSPProcessVertex( u32 v )
                 OGL.triangles.vertices[v].t = (OGL.triangles.vertices[v].ny + 1.0f) * 512.0f;
             }
         }
+    }
+}
+
+
+void gSPLoadUcodeEx( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
+{
+    RSP.PCi = 0;
+    gSP.matrix.modelViewi = 0;
+    gSP.changed |= CHANGED_MATRIX;
+    gSP.status[0] = gSP.status[1] = gSP.status[2] = gSP.status[3] = 0;
+
+    if ((((uc_start & 0x1FFFFFFF) + 4096) > RDRAMSize) || (((uc_dstart & 0x1FFFFFFF) + uc_dsize) > RDRAMSize))
+    {
+        return;
+    }
+
+    MicrocodeInfo *ucode = GBI_DetectMicrocode( uc_start, uc_dstart, uc_dsize );
+
+    if (ucode->type != 0xFFFFFFFF)
+        last_good_ucode = ucode->type;
+
+    if (ucode->type != NONE)
+    {
+        GBI_MakeCurrent( ucode );
+    }
+    else
+    {
+        LOG(LOG_WARNING, "Unknown Ucode\n");
     }
 }
 
@@ -1237,6 +728,9 @@ void gSPForceMatrix( u32 mptr )
 void gSPLight( u32 l, s32 n )
 {
     n--;
+    if (n >= 8)
+        return;
+
     u32 address = RSP_SegmentToPhysical( l );
 
     if ((address + sizeof( Light )) > RDRAMSize)
@@ -1244,25 +738,29 @@ void gSPLight( u32 l, s32 n )
         return;
     }
 
-    Light *light = (Light*)&RDRAM[address];
+    u8 *addr = &RDRAM[address];
 
-    if (n < 8)
+    if (config.hackZelda && (addr[0] == 0x08) && (addr[4] == 0xFF))
     {
-#ifdef __PACKVERTEX_OPT
-        gSP.lights[n].r = light->r;
-        gSP.lights[n].g = light->g;
-        gSP.lights[n].b = light->b;
-#else
+        LightMM *light = (LightMM*)addr;
         gSP.lights[n].r = light->r * 0.0039215689f;
         gSP.lights[n].g = light->g * 0.0039215689f;
         gSP.lights[n].b = light->b * 0.0039215689f;
-#endif
         gSP.lights[n].x = light->x;
         gSP.lights[n].y = light->y;
         gSP.lights[n].z = light->z;
-
-        Normalize( &gSP.lights[n].x );
     }
+    else
+    {
+        Light *light = (Light*)addr;
+        gSP.lights[n].r = light->r * 0.0039215689f;
+        gSP.lights[n].g = light->g * 0.0039215689f;
+        gSP.lights[n].b = light->b * 0.0039215689f;
+        gSP.lights[n].x = light->x;
+        gSP.lights[n].y = light->y;
+        gSP.lights[n].z = light->z;
+    }
+    Normalize(&gSP.lights[n].x);
 }
 
 void gSPLookAt( u32 l )
@@ -1308,25 +806,14 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
                     OGL.triangles.vertices[v+j].nx = vertex->normal.x;
                     OGL.triangles.vertices[v+j].ny = vertex->normal.y;
                     OGL.triangles.vertices[v+j].nz = vertex->normal.z;
-#ifdef __PACKVERTEX_OPT
-                    OGL.triangles.vertices[v+j].a = vertex->color.a;
-#else
                     OGL.triangles.vertices[v+j].a = vertex->color.a * 0.0039215689f;
-#endif
                 }
                 else
                 {
-#ifdef __PACKVERTEX_OPT
-                    OGL.triangles.vertices[v+j].r = vertex->color.r;
-                    OGL.triangles.vertices[v+j].g = vertex->color.g;
-                    OGL.triangles.vertices[v+j].b = vertex->color.b;
-                    OGL.triangles.vertices[v+j].a = vertex->color.a;
-#else
                     OGL.triangles.vertices[v+j].r = vertex->color.r * 0.0039215689f;
                     OGL.triangles.vertices[v+j].g = vertex->color.g * 0.0039215689f;
                     OGL.triangles.vertices[v+j].b = vertex->color.b * 0.0039215689f;
                     OGL.triangles.vertices[v+j].a = vertex->color.a * 0.0039215689f;
-#endif
                 }
                 vertex++;
             }
@@ -1349,25 +836,14 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
                 OGL.triangles.vertices[v].nx = vertex->normal.x;
                 OGL.triangles.vertices[v].ny = vertex->normal.y;
                 OGL.triangles.vertices[v].nz = vertex->normal.z;
-#ifdef __PACKVERTEX_OPT
-                OGL.triangles.vertices[v].a = vertex->color.a;
-#else
                 OGL.triangles.vertices[v].a = vertex->color.a * 0.0039215689f;
-#endif
             }
             else
             {
-#ifdef __PACKVERTEX_OPT
-                OGL.triangles.vertices[v].r = vertex->color.r;
-                OGL.triangles.vertices[v].g = vertex->color.g;
-                OGL.triangles.vertices[v].b = vertex->color.b;
-                OGL.triangles.vertices[v].a = vertex->color.a;
-#else
                 OGL.triangles.vertices[v].r = vertex->color.r * 0.0039215689f;
                 OGL.triangles.vertices[v].g = vertex->color.g * 0.0039215689f;
                 OGL.triangles.vertices[v].b = vertex->color.b * 0.0039215689f;
                 OGL.triangles.vertices[v].a = vertex->color.a * 0.0039215689f;
-#endif
             }
             gSPProcessVertex(v);
             vertex++;
@@ -1420,25 +896,14 @@ void gSPCIVertex( u32 v, u32 n, u32 v0 )
                     OGL.triangles.vertices[v+j].nx = (s8)color[3];
                     OGL.triangles.vertices[v+j].ny = (s8)color[2];
                     OGL.triangles.vertices[v+j].nz = (s8)color[1];
-#ifdef __PACKVERTEX_OPT
-                    OGL.triangles.vertices[v+j].a = color[0];
-#else
                     OGL.triangles.vertices[v+j].a = color[0] * 0.0039215689f;
-#endif
                 }
                 else
                 {
-#ifdef __PACKVERTEX_OPT
-                    OGL.triangles.vertices[v+j].r = color[3];
-                    OGL.triangles.vertices[v+j].g = color[2];
-                    OGL.triangles.vertices[v+j].b = color[1];
-                    OGL.triangles.vertices[v+j].a = color[0];
-#else
                     OGL.triangles.vertices[v+j].r = color[3] * 0.0039215689f;
                     OGL.triangles.vertices[v+j].g = color[2] * 0.0039215689f;
                     OGL.triangles.vertices[v+j].b = color[1] * 0.0039215689f;
                     OGL.triangles.vertices[v+j].a = color[0] * 0.0039215689f;
-#endif
                 }
                 vertex++;
             }
@@ -1463,25 +928,14 @@ void gSPCIVertex( u32 v, u32 n, u32 v0 )
                 OGL.triangles.vertices[v].nx = (s8)color[3];
                 OGL.triangles.vertices[v].ny = (s8)color[2];
                 OGL.triangles.vertices[v].nz = (s8)color[1];
-#ifdef __PACKVERTEX_OPT
-                OGL.triangles.vertices[v].a = color[0];
-#else
                 OGL.triangles.vertices[v].a = color[0] * 0.0039215689f;
-#endif
             }
             else
             {
-#ifdef __PACKVERTEX_OPT
-                OGL.triangles.vertices[v].r = color[3];
-                OGL.triangles.vertices[v].g = color[2];
-                OGL.triangles.vertices[v].b = color[1];
-                OGL.triangles.vertices[v].a = color[0];
-#else
                 OGL.triangles.vertices[v].r = color[3] * 0.0039215689f;
                 OGL.triangles.vertices[v].g = color[2] * 0.0039215689f;
                 OGL.triangles.vertices[v].b = color[1] * 0.0039215689f;
                 OGL.triangles.vertices[v].a = color[0] * 0.0039215689f;
-#endif
             }
 
             gSPProcessVertex(v);
@@ -1526,25 +980,14 @@ void gSPDMAVertex( u32 v, u32 n, u32 v0 )
                     OGL.triangles.vertices[v+j].nx = *(s8*)&RDRAM[(address + 6) ^ 3];
                     OGL.triangles.vertices[v+j].ny = *(s8*)&RDRAM[(address + 7) ^ 3];
                     OGL.triangles.vertices[v+j].nz = *(s8*)&RDRAM[(address + 8) ^ 3];
-#ifdef __PACKVERTEX_OPT
-                    OGL.triangles.vertices[v+j].a = *(u8*)&RDRAM[(address + 9) ^ 3];
-#else
                     OGL.triangles.vertices[v+j].a = *(u8*)&RDRAM[(address + 9) ^ 3] * 0.0039215689f;
-#endif
                 }
                 else
                 {
-#ifdef __PACKVERTEX_OPT
-                    OGL.triangles.vertices[v+j].r = *(u8*)&RDRAM[(address + 6) ^ 3];
-                    OGL.triangles.vertices[v+j].g = *(u8*)&RDRAM[(address + 7) ^ 3];
-                    OGL.triangles.vertices[v+j].b = *(u8*)&RDRAM[(address + 8) ^ 3];
-                    OGL.triangles.vertices[v+j].a = *(u8*)&RDRAM[(address + 9) ^ 3];
-#else
                     OGL.triangles.vertices[v+j].r = *(u8*)&RDRAM[(address + 6) ^ 3] * 0.0039215689f;
                     OGL.triangles.vertices[v+j].g = *(u8*)&RDRAM[(address + 7) ^ 3] * 0.0039215689f;
                     OGL.triangles.vertices[v+j].b = *(u8*)&RDRAM[(address + 8) ^ 3] * 0.0039215689f;
                     OGL.triangles.vertices[v+j].a = *(u8*)&RDRAM[(address + 9) ^ 3] * 0.0039215689f;
-#endif
                 }
                 address += 10;
             }
@@ -1577,25 +1020,14 @@ void gSPDMAVertex( u32 v, u32 n, u32 v0 )
                 OGL.triangles.vertices[v].nx = *(s8*)&RDRAM[(address + 6) ^ 3];
                 OGL.triangles.vertices[v].ny = *(s8*)&RDRAM[(address + 7) ^ 3];
                 OGL.triangles.vertices[v].nz = *(s8*)&RDRAM[(address + 8) ^ 3];
-#ifdef __PACKVERTEX_OPT
-                OGL.triangles.vertices[v].a = *(u8*)&RDRAM[(address + 9) ^ 3];
-#else
                 OGL.triangles.vertices[v].a = *(u8*)&RDRAM[(address + 9) ^ 3] * 0.0039215689f;
-#endif
             }
             else
             {
-#ifdef __PACKVERTEX_OPT
-                OGL.triangles.vertices[v].r = *(u8*)&RDRAM[(address + 6) ^ 3];
-                OGL.triangles.vertices[v].g = *(u8*)&RDRAM[(address + 7) ^ 3];
-                OGL.triangles.vertices[v].b = *(u8*)&RDRAM[(address + 8) ^ 3];
-                OGL.triangles.vertices[v].a = *(u8*)&RDRAM[(address + 9) ^ 3];
-#else
                 OGL.triangles.vertices[v].r = *(u8*)&RDRAM[(address + 6) ^ 3] * 0.0039215689f;
                 OGL.triangles.vertices[v].g = *(u8*)&RDRAM[(address + 7) ^ 3] * 0.0039215689f;
                 OGL.triangles.vertices[v].b = *(u8*)&RDRAM[(address + 8) ^ 3] * 0.0039215689f;
                 OGL.triangles.vertices[v].a = *(u8*)&RDRAM[(address + 9) ^ 3] * 0.0039215689f;
-#endif
             }
 
             gSPProcessVertex(v);
@@ -1798,7 +1230,7 @@ void gSP1Quadrangle( s32 v0, s32 v1, s32 v2, s32 v3)
 
 bool gSPCullVertices( u32 v0, u32 vn )
 {
-    if (!OGL.enableClipping)
+    if (!config.enableClipping)
         return FALSE;
 
     s32 v = v0;
@@ -1928,17 +1360,10 @@ void gSPModifyVertex( u32 vtx, u32 where, u32 val )
     switch (where)
     {
         case G_MWO_POINT_RGBA:
-#ifdef __PACKVERTEX_OPT
-            OGL.triangles.vertices[v].r = _SHIFTR( val, 24, 8 );
-            OGL.triangles.vertices[v].g = _SHIFTR( val, 16, 8 );
-            OGL.triangles.vertices[v].b = _SHIFTR( val, 8, 8 );
-            OGL.triangles.vertices[v].a = _SHIFTR( val, 0, 8 );
-#else
             OGL.triangles.vertices[v].r = _SHIFTR( val, 24, 8 ) * 0.0039215689f;
             OGL.triangles.vertices[v].g = _SHIFTR( val, 16, 8 ) * 0.0039215689f;
             OGL.triangles.vertices[v].b = _SHIFTR( val, 8, 8 ) * 0.0039215689f;
             OGL.triangles.vertices[v].a = _SHIFTR( val, 0, 8 ) * 0.0039215689f;
-#endif
             break;
         case G_MWO_POINT_ST:
             OGL.triangles.vertices[v].s = _FIXED2FLOAT( (s16)_SHIFTR( val, 16, 16 ), 5 );
@@ -1953,9 +1378,9 @@ void gSPModifyVertex( u32 vtx, u32 where, u32 val )
 
 void gSPNumLights( s32 n )
 {
-    if (n <= 8)
-        gSP.numLights = n;
+    gSP.numLights = (n <= 8) ? n : 0;
 }
+
 
 void gSPLightColor( u32 lightNum, u32 packedColor )
 {
@@ -1963,15 +1388,9 @@ void gSPLightColor( u32 lightNum, u32 packedColor )
 
     if (lightNum < 8)
     {
-#ifdef __PACKVERTEX_OPT
-        gSP.lights[lightNum].r = _SHIFTR( packedColor, 24, 8 );
-        gSP.lights[lightNum].g = _SHIFTR( packedColor, 16, 8 );
-        gSP.lights[lightNum].b = _SHIFTR( packedColor, 8, 8 );
-#else
         gSP.lights[lightNum].r = _SHIFTR( packedColor, 24, 8 ) * 0.0039215689f;
         gSP.lights[lightNum].g = _SHIFTR( packedColor, 16, 8 ) * 0.0039215689f;
         gSP.lights[lightNum].b = _SHIFTR( packedColor, 8, 8 ) * 0.0039215689f;
-#endif
     }
 }
 
@@ -2011,7 +1430,6 @@ void gSPTexture( f32 sc, f32 tc, s32 level, s32 tile, s32 on )
 
 void gSPEndDisplayList()
 {
-
     if (RSP.PCi > 0)
         RSP.PCi--;
     else
@@ -2142,6 +1560,8 @@ void gSPBgRect1Cyc( u32 bg )
 
 void gSPBgRectCopy( u32 bg )
 {
+
+    return;
     u32 address = RSP_SegmentToPhysical( bg );
     uObjBg *objBg = (uObjBg*)&RDRAM[address];
 

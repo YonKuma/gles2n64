@@ -86,56 +86,6 @@ inline void Transpose3x3Matrix( float mtx[4][4] )
 }
 
 
-inline void TransformVertex(float vtx[4], float mtx[4][4])
-{
-#ifdef __NEON_OPT
-	asm volatile (
-	"vld1.32 		{d0, d1}, [%1]		  	\n\t"	//d8 = {x,y}
-	"vld1.32 		{d18, d19}, [%0]!		\n\t"	//Q1 = m
-	"vld1.32 		{d20, d21}, [%0]!   	\n\t"	//Q2 = m+4
-	"vld1.32 		{d22, d23}, [%0]!   	\n\t"	//Q3 = m+8
-	"vld1.32 		{d24, d25}, [%0]    	\n\t"	//Q4 = m+12
-
-	"vmul.f32 		q13, q9, d0[0]			\n\t"	//Q5 = Q1*Q0[0]
-	"vmla.f32 		q13, q10, d0[1]			\n\t"	//Q5 += Q1*Q0[1]
-	"vmla.f32 		q13, q11, d1[0]			\n\t"	//Q5 += Q2*Q0[2]
-	"vadd.f32 		q13, q13, q12			\n\t"	//Q5 += Q3*Q0[3]
-	"vst1.32 		{d26, d27}, [%1] 		\n\t"	//Q4 = m+12
-
-	: "+r"(mtx) : "r"(vtx)
-    : "d0", "d1", "d18","d19","d20","d21","d22","d23","d24","d25",
-	"d26", "d27", "memory"
-	);
-#else
-    float x, y, z, w;
-    x = vtx[0];
-    y = vtx[1];
-    z = vtx[2];
-    w = vtx[3];
-
-    vtx[0] = x * mtx[0][0] +
-             y * mtx[1][0] +
-             z * mtx[2][0] +
-                 mtx[3][0];
-
-    vtx[1] = x * mtx[0][1] +
-             y * mtx[1][1] +
-             z * mtx[2][1] +
-                 mtx[3][1];
-
-    vtx[2] = x * mtx[0][2] +
-             y * mtx[1][2] +
-             z * mtx[2][2] +
-                 mtx[3][2];
-
-    vtx[3] = x * mtx[0][3] +
-             y * mtx[1][3] +
-             z * mtx[2][3] +
-                 mtx[3][3];
-#endif
-}
-
-
 
 inline void TransformVector( float vec[3], float mtx[4][4] )
 {
@@ -171,7 +121,8 @@ inline void TransformVector( float vec[3], float mtx[4][4] )
 
 inline void TransformVectorNormalize(float vec[3], float mtx[4][4])
 {
-#ifdef __NEON_OPT
+
+#if __NEON_OPT
 	asm volatile (
 	"vld1.32 		{d0}, [%1]  			\n\t"	//Q0 = v
 	"flds    		s2, [%1, #8]  			\n\t"	//Q0 = v

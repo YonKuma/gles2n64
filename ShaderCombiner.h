@@ -207,8 +207,9 @@ struct ShaderProgram
 
     UniformLocation uniforms;
     gDPCombine      combine;
-    u32            flags;
+    u32             flags;
     ShaderProgram   *left, *right;
+    u32             lastUsed;
 };
 
 
@@ -223,6 +224,7 @@ class DecodedMux
     public:
         DecodedMux(u64 mux, bool cycle2);
 
+        void hack();
         bool find(int index, int src);
         bool swap(int cycle, int src0, int src1);
         bool replace(int cycle, int src, int dest);

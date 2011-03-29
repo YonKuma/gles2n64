@@ -1,5 +1,5 @@
 #include "Types.h"
-#include "GBI.h"
+//#include "GBI.h"
 
 static inline s16 GetResult1( u32 A, u32 B, u32 C, u32 D, u32 E )
 {
@@ -9,21 +9,21 @@ static inline s16 GetResult1( u32 A, u32 B, u32 C, u32 D, u32 E )
 
     if (A == C) x += 1; else if (B == C) y += 1;
     if (A == D) x += 1; else if (B == D) y += 1;
-    if (x <= 1) r += 1; 
+    if (x <= 1) r += 1;
     if (y <= 1) r -= 1;
 
     return r;
 }
 
-static inline s16 GetResult2( u32 A, u32 B, u32 C, u32 D, u32 E) 
+static inline s16 GetResult2( u32 A, u32 B, u32 C, u32 D, u32 E)
 {
-    s16 x = 0; 
+    s16 x = 0;
     s16 y = 0;
     s16 r = 0;
 
     if (A == C) x += 1; else if (B == C) y += 1;
     if (A == D) x += 1; else if (B == D) y += 1;
-    if (x <= 1) r -= 1; 
+    if (x <= 1) r -= 1;
     if (y <= 1) r += 1;
 
     return r;
@@ -32,13 +32,13 @@ static inline s16 GetResult2( u32 A, u32 B, u32 C, u32 D, u32 E)
 
 static inline s16 GetResult( u32 A, u32 B, u32 C, u32 D )
 {
-    s16 x = 0; 
+    s16 x = 0;
     s16 y = 0;
     s16 r = 0;
 
     if (A == C) x += 1; else if (B == C) y += 1;
     if (A == D) x += 1; else if (B == D) y += 1;
-    if (x <= 1) r += 1; 
+    if (x <= 1) r += 1;
     if (y <= 1) r -= 1;
 
     return r;
@@ -47,7 +47,7 @@ static inline s16 GetResult( u32 A, u32 B, u32 C, u32 D )
 static inline u16 INTERPOLATE4444( u16 A, u16 B)
 {
     if (A != B)
-        return  ((A & 0xEEEE) >> 1) + 
+        return  ((A & 0xEEEE) >> 1) +
                 (((B & 0xEEEE) >> 1) |
                 (A & B & 0x1111));
     else
@@ -57,7 +57,7 @@ static inline u16 INTERPOLATE4444( u16 A, u16 B)
 static inline u16 INTERPOLATE5551( u16 A, u16 B)
 {
     if (A != B)
-        return  ((A & 0xF7BC) >> 1) + 
+        return  ((A & 0xF7BC) >> 1) +
                 (((B & 0xF7BC) >> 1) |
                 (A & B & 0x0843));
     else
@@ -67,7 +67,7 @@ static inline u16 INTERPOLATE5551( u16 A, u16 B)
 static inline u32 INTERPOLATE8888( u32 A, u32 B)
 {
     if (A != B)
-        return  ((A & 0xFEFEFEFE) >> 1) + 
+        return  ((A & 0xFEFEFEFE) >> 1) +
                 (((B & 0xFEFEFEFE) >> 1) |
                 (A & B & 0x01010101));
     else
@@ -144,7 +144,7 @@ void _2xSaI4444( u16 *srcPtr, u16 *destPtr, u16 width, u16 height, s32 clampS, s
         {
             row2 = width;
 
-            if (y < height - 2) 
+            if (y < height - 2)
                 row3 = width << 1;
             else
                 row3 = clampT ? width : -y * width;
@@ -168,7 +168,7 @@ void _2xSaI4444( u16 *srcPtr, u16 *destPtr, u16 width, u16 height, s32 clampS, s
             {
                 col2 = 1;
 
-                if (x < width - 2) 
+                if (x < width - 2)
                     col3 = 2;
                 else
                     col3 = clampS ? 1 : -x;
@@ -227,7 +227,7 @@ void _2xSaI4444( u16 *srcPtr, u16 *destPtr, u16 width, u16 height, s32 clampS, s
                     product = colorB;
                 else
                     product = INTERPOLATE4444(colorA, colorB);
- 
+
                 if (((colorC == colorH) && (colorA == colorF)) ||
                     ((colorC == colorG) && (colorC == colorD) && (colorA != colorH) && (colorA == colorI)) )
                     product1 = colorC;
@@ -320,7 +320,7 @@ void _2xSaI5551( u16 *srcPtr, u16 *destPtr, u16 width, u16 height, s32 clampS, s
         {
             row2 = width;
 
-            if (y < height - 2) 
+            if (y < height - 2)
                 row3 = width << 1;
             else
                 row3 = clampT ? width : -y * width;
@@ -344,7 +344,7 @@ void _2xSaI5551( u16 *srcPtr, u16 *destPtr, u16 width, u16 height, s32 clampS, s
             {
                 col2 = 1;
 
-                if (x < width - 2) 
+                if (x < width - 2)
                     col3 = 2;
                 else
                     col3 = clampS ? 1 : -x;
@@ -403,7 +403,7 @@ void _2xSaI5551( u16 *srcPtr, u16 *destPtr, u16 width, u16 height, s32 clampS, s
                     product = colorB;
                 else
                     product = INTERPOLATE5551(colorA, colorB);
- 
+
                 if (((colorC == colorH) && (colorA == colorF)) ||
                     ((colorC == colorG) && (colorC == colorD) && (colorA != colorH) && (colorA == colorI)) )
                     product1 = colorC;
@@ -496,7 +496,7 @@ void _2xSaI8888( u32 *srcPtr, u32 *destPtr, u16 width, u16 height, s32 clampS, s
         {
             row2 = width;
 
-            if (y < height - 2) 
+            if (y < height - 2)
                 row3 = width << 1;
             else
                 row3 = clampT ? width : -y * width;
@@ -520,7 +520,7 @@ void _2xSaI8888( u32 *srcPtr, u32 *destPtr, u16 width, u16 height, s32 clampS, s
             {
                 col2 = 1;
 
-                if (x < width - 2) 
+                if (x < width - 2)
                     col3 = 2;
                 else
                     col3 = clampS ? 1 : -x;
@@ -579,7 +579,7 @@ void _2xSaI8888( u32 *srcPtr, u32 *destPtr, u16 width, u16 height, s32 clampS, s
                     product = colorB;
                 else
                     product = INTERPOLATE8888(colorA, colorB);
- 
+
                 if (((colorC == colorH) && (colorA == colorF)) ||
                     ((colorC == colorG) && (colorC == colorD) && (colorA != colorH) && (colorA == colorI)) )
                     product1 = colorC;

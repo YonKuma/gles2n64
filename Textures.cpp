@@ -9,6 +9,7 @@
 #define timeGetTime() time(NULL)
 
 #include "Common.h"
+#include "Config.h"
 #include "OpenGL.h"
 #include "Textures.h"
 #include "GBI.h"
@@ -29,7 +30,6 @@
 #define FORMAT_RGBA8888 5
 
 //#define PRINT_TEXTUREFORMAT
-
 
 TextureCache    cache;
 
@@ -371,10 +371,12 @@ void TextureCache_Init()
     cache.bottom = NULL;
     cache.numCached = 0;
     cache.cachedBytes = 0;
-    cache.enable2xSaI = OGL.texture.SaI2x;
-    cache.bitDepth = OGL.texture.bit_depth;
 
-    if (OGL.texture.useIA) textureFormat = textureFormatIA;
+#ifdef __HASHMAP_OPT
+    cache.hash.init(11);
+#endif
+
+    if (config.texture.useIA) textureFormat = textureFormatIA;
     else textureFormat = textureFormatRGBA;
 
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -459,6 +461,12 @@ void TextureCache_RemoveBottom()
 {
     CachedTexture *newBottom = cache.bottom->higher;
 
+#ifdef __HASHMAP_OPT
+    CachedTexture* tex= cache.hash.find(cache.bottom->crc);
+    if (tex == cache.bottom);
+        cache.hash.insert(cache.bottom->crc, NULL);
+#endif
+
     glDeleteTextures( 1, &cache.bottom->glName );
     cache.cachedBytes -= cache.bottom->textureBytes;
 
@@ -502,6 +510,12 @@ void TextureCache_Remove( CachedTexture *texture )
         texture->lower->higher = texture->higher;
     }
 
+#ifdef __HASHMAP_OPT
+    CachedTexture* tex= cache.hash.find(texture->crc);
+    if (tex == texture);
+        cache.hash.insert(texture->crc, NULL);
+#endif
+
     glDeleteTextures( 1, &texture->glName );
     cache.cachedBytes -= texture->textureBytes;
     free( texture );
@@ -511,7 +525,7 @@ void TextureCache_Remove( CachedTexture *texture )
 
 CachedTexture *TextureCache_AddTop()
 {
-    while (cache.cachedBytes > cache.maxBytes)
+    while (cache.cachedBytes > TEXTURECACHE_MAX)
     {
         if (cache.bottom != cache.dummy)
             TextureCache_RemoveBottom();
@@ -567,6 +581,10 @@ void TextureCache_Destroy()
 
     glDeleteTextures( 32, cache.glNoiseNames );
     glDeleteTextures( 1, &cache.dummy->glName  );
+
+#ifdef __HASHMAP_OPT
+    cache.hash.destroy();
+#endif
 
     cache.top = NULL;
     cache.bottom = NULL;
@@ -637,8 +655,15 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
     bpl = gSP.bgImage.width << gSP.bgImage.size >> 1;
     numBytes = bpl * gSP.bgImage.height;
     swapped = (u8*) malloc(numBytes);
+    dest = (u32*) malloc(texInfo->textureBytes);
+
+    if (!dest || !swapped)
+    {
+        LOG(LOG_ERROR, "Malloc failed!\n");
+        return;
+    }
+
     UnswapCopy(&RDRAM[gSP.bgImage.address], swapped, numBytes);
-    dest = (u32*)cache.textureBuffer;
 
     clampSClamp = texInfo->width - 1;
     clampTClamp = texInfo->height - 1;
@@ -660,9 +685,9 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
         }
     }
 
-    if (!cache.enable2xSaI || (texFormat.format == FORMAT_I8 || texFormat.format == FORMAT_IA88))
+    if (!config.texture.sai2x || (texFormat.format == FORMAT_I8 || texFormat.format == FORMAT_IA88))
     {
-        glTexImage2D( GL_TEXTURE_2D, 0, glFormat, glWidth, glHeight, 0, glFormat, glType, cache.textureBuffer);
+        glTexImage2D( GL_TEXTURE_2D, 0, glFormat, glWidth, glHeight, 0, glFormat, glType, dest);
     }
     else
     {
@@ -683,10 +708,11 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
         free( scaledDest );
     }
 
+    free(dest);
     free(swapped);
 
 
-    if (OGL.texture.mipmap)
+    if (config.texture.enableMipmap)
         glGenerateMipmap(GL_TEXTURE_2D);
 }
 
@@ -751,12 +777,14 @@ void TextureCache_Load( CachedTexture *texInfo )
     texInfo->textureBytes = (glWidth * glHeight) * bytePerPixel;
     getTexel = texFormat.getTexel;
 
-    if (texInfo->textureBytes > TEXTUREBUFFER_SIZE)
+    dest = (u32*)malloc(texInfo->textureBytes);
+
+    if (!dest)
     {
-        LOG(LOG_ERROR, "Texture Exceeds texture buffer dimensions: w=%i h=%i bpp=%i", glWidth, glHeight, bytePerPixel);
+        LOG(LOG_ERROR, "Malloc failed!\n");
+        return;
     }
 
-    dest = (u32*)cache.textureBuffer;
 
     line = texInfo->line;
 
@@ -828,12 +856,12 @@ void TextureCache_Load( CachedTexture *texInfo )
         }
     }
 
-    if (!cache.enable2xSaI || (texFormat.format == FORMAT_I8) || (texFormat.format == FORMAT_IA88))
+    if (!config.texture.sai2x || (texFormat.format == FORMAT_I8) || (texFormat.format == FORMAT_IA88))
     {
 #ifdef PRINT_TEXTUREFORMAT
         printf("j=%i DEST=0x%x SIZE=%i F=0x%x, W=%i, H=%i, T=0x%x\n", j, dest, texInfo->textureBytes,glFormat, glWidth, glHeight, glType); fflush(stdout);
 #endif
-        glTexImage2D( GL_TEXTURE_2D, 0, glFormat, glWidth, glHeight, 0, glFormat, glType, cache.textureBuffer);
+        glTexImage2D( GL_TEXTURE_2D, 0, glFormat, glWidth, glHeight, 0, glFormat, glType, dest);
     }
     else
     {
@@ -853,13 +881,16 @@ void TextureCache_Load( CachedTexture *texInfo )
         glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, texInfo->realWidth << 1, texInfo->realHeight << 1, 0, GL_RGBA, glType, scaledDest );
 
         free( scaledDest );
-        free( dest );
     }
 
-    if (OGL.texture.mipmap)
+    free(dest);
+
+    if (config.texture.enableMipmap)
         glGenerateMipmap(GL_TEXTURE_2D);
 
 }
+
+#define max(a,b) ((a) > (b) ? (a) : (b))
 
 u32 TextureCache_CalculateCRC( u32 t, u32 width, u32 height )
 {
@@ -875,7 +906,14 @@ u32 TextureCache_CalculateCRC( u32 t, u32 width, u32 height )
         line <<= 1;
 
     crc = 0xFFFFFFFF;
-    for (y = 0; y < height; y++)
+
+#ifdef __CRC_OPT
+    unsigned n = (config.texture.fastCRC) ? max(1, height / 8) : 1;
+#else
+    unsigned n = 1;
+#endif
+
+    for (y = 0; y < height; y += n)
     {
         src = (void*) &TMEM[(gSP.textureTile[t]->tmem + (y * line)) & 511];
         crc = CRC_Calculate( crc, src, bpl );
@@ -893,11 +931,16 @@ u32 TextureCache_CalculateCRC( u32 t, u32 width, u32 height )
 
 void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
 {
+
+#ifdef __HASHMAP_OPT
+    cache.hash.insert(texture->crc, texture);
+#endif
+
     glActiveTexture( GL_TEXTURE0 + t );
     glBindTexture( GL_TEXTURE_2D, texture->glName );
 
     // Set filter mode. Almost always bilinear, but check anyways
-    if ((gDP.otherMode.textureFilter == G_TF_BILERP) || (gDP.otherMode.textureFilter == G_TF_AVERAGE) || (OGL.texture.force_bilinear))
+    if ((gDP.otherMode.textureFilter == G_TF_BILERP) || (gDP.otherMode.textureFilter == G_TF_AVERAGE) || (config.texture.forceBilinear))
     {
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
@@ -912,9 +955,9 @@ void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, (texture->clampS) ? GL_CLAMP_TO_EDGE : GL_REPEAT );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, (texture->clampT) ? GL_CLAMP_TO_EDGE : GL_REPEAT );
 
-    if (OGL.texture.max_anisotropy > 0)
+    if (config.texture.maxAnisotropy > 0)
     {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, OGL.texture.max_anisotropy);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, config.texture.maxAnisotropy);
     }
 
     texture->lastDList = RSP.DList;
@@ -964,6 +1007,19 @@ void TextureCache_UpdateBackground()
         return;
     }
 
+#ifdef __HASHMAP_OPT
+    CachedTexture *tex = cache.hash.find(crc);
+    if (tex)
+    {
+        if (_background_compare(tex, crc))
+        {
+            TextureCache_ActivateTexture(0, tex);
+            cache.hits++;
+            return;
+        }
+    }
+#endif
+
     CachedTexture *current = cache.top;
     while (current)
     {
@@ -977,7 +1033,6 @@ void TextureCache_UpdateBackground()
     }
     cache.misses++;
 
-    // If multitexturing, set the appropriate texture
     glActiveTexture(GL_TEXTURE0);
     cache.current[0] = TextureCache_AddTop();
 
@@ -1000,8 +1055,10 @@ void TextureCache_UpdateBackground()
     cache.current[0]->line = 0;
     cache.current[0]->tMem = 0;
     cache.current[0]->lastDList = RSP.DList;
-    cache.current[0]->realWidth = pow2( gSP.bgImage.width );
-    cache.current[0]->realHeight = pow2( gSP.bgImage.height );
+
+    cache.current[0]->realWidth = (config.texture.pow2) ? pow2(gSP.bgImage.width ) : gSP.bgImage.width;
+    cache.current[0]->realHeight = (config.texture.pow2) ? pow2(gSP.bgImage.height) : gSP.bgImage.height;
+
     cache.current[0]->scaleS = 1.0f / (f32)(cache.current[0]->realWidth);
     cache.current[0]->scaleT = 1.0f / (f32)(cache.current[0]->realHeight);
     cache.current[0]->shiftScaleS = 1.0f;
@@ -1038,24 +1095,10 @@ int _texture_compare(u32 t, CachedTexture *current, u32 crc,  u32 width, u32 hei
 void TextureCache_Update( u32 t )
 {
     CachedTexture *current;
-    //s32 i, j, k;
-    u32 crc, /*bpl, cacheNum,*/ maxTexels;
+
+    u32 crc, maxTexels;
     u32 tileWidth, maskWidth, loadWidth, lineWidth, clampWidth, height;
     u32 tileHeight, maskHeight, loadHeight, lineHeight, clampHeight, width;
-
-#if 0
-    if (cache.enable2xSaI != (unsigned int) OGL.texture.SaI2x)
-    {
-        TextureCache_Destroy();
-        TextureCache_Init();
-    }
-
-    if (cache.bitDepth != (unsigned int)OGL.texture.bit_depth)
-    {
-        TextureCache_Destroy();
-        TextureCache_Init();
-    }
-#endif
 
     if (gDP.textureMode == TEXTUREMODE_BGIMAGE)
     {
@@ -1067,7 +1110,6 @@ void TextureCache_Update( u32 t )
     __texture_format(gSP.textureTile[t]->size, gSP.textureTile[t]->format, &texFormat);
 
     maxTexels = texFormat.maxTexels;
-    //maxTexels = textureFormat[gSP.textureTile[t]->size][gSP.textureTile[t]->format].maxTexels;
 
     // Here comes a bunch of code that just calculates the texture size...I wish there was an easier way...
     tileWidth = gSP.textureTile[t]->lrs - gSP.textureTile[t]->uls + 1;
@@ -1080,7 +1122,6 @@ void TextureCache_Update( u32 t )
     loadHeight = gDP.loadTile->lrt - gDP.loadTile->ult + 1;
 
     lineWidth = gSP.textureTile[t]->line << texFormat.lineShift;
-    //lineWidth = gSP.textureTile[t]->line << textureFormat[gSP.textureTile[t]->size][gSP.textureTile[t]->format].lineShift;
 
     if (lineWidth) // Don't allow division by zero
         lineHeight = min( maxTexels / lineWidth, tileHeight );
@@ -1125,13 +1166,13 @@ void TextureCache_Update( u32 t )
     else
     {
         if (gSP.textureTile[t]->masks && ((maskWidth * maskHeight) <= maxTexels))
-            width = maskWidth; // Use mask width if set and valid
+            width = maskWidth;
         else if ((tileWidth * tileHeight) <= maxTexels)
-            width = tileWidth; // else use tile width if valid
+            width = tileWidth;
         else if (gDP.loadType == LOADTYPE_TILE)
-            width = loadWidth; // else use load width if load done with LoadTile
+            width = loadWidth;
         else
-            width = lineWidth; // else use line-based width
+            width = lineWidth;
 
         if (gSP.textureTile[t]->maskt && ((maskWidth * maskHeight) <= maxTexels))
             height = maskHeight;
@@ -1169,8 +1210,22 @@ void TextureCache_Update( u32 t )
     //before we traverse cache, check to see if texture is already bound:
     if (_texture_compare(t, cache.current[t], crc, width, height, clampWidth, clampHeight))
     {
+        cache.hits++;
         return;
     }
+
+#ifdef __HASHMAP_OPT
+    CachedTexture *tex = cache.hash.find(crc);
+    if (tex)
+    {
+        if (_texture_compare(t, tex, crc, width, height, clampWidth, clampHeight))
+        {
+            TextureCache_ActivateTexture( t, tex);
+            cache.hits++;
+            return;
+        }
+    }
+#endif
 
     current = cache.top;
     while (current)
@@ -1219,28 +1274,41 @@ void TextureCache_Update( u32 t )
     cache.current[t]->tMem = gSP.textureTile[t]->tmem;
     cache.current[t]->lastDList = RSP.DList;
 
+
     if (cache.current[t]->clampS)
-        cache.current[t]->realWidth = pow2( clampWidth );
+        cache.current[t]->realWidth = (config.texture.pow2) ? pow2(clampWidth) : clampWidth;
     else if (cache.current[t]->mirrorS)
         cache.current[t]->realWidth = maskWidth << 1;
     else
-        cache.current[t]->realWidth = pow2( width );
+        cache.current[t]->realWidth = (config.texture.pow2) ? pow2(width) : width;
 
     if (cache.current[t]->clampT)
-        cache.current[t]->realHeight = pow2( clampHeight );
+        cache.current[t]->realHeight = (config.texture.pow2) ? pow2(clampHeight) : clampHeight;
     else if (cache.current[t]->mirrorT)
         cache.current[t]->realHeight = maskHeight << 1;
     else
-        cache.current[t]->realHeight = pow2( height );
+        cache.current[t]->realHeight = (config.texture.pow2) ? pow2(height) : height;
+
 
     cache.current[t]->scaleS = 1.0f / (f32)(cache.current[t]->realWidth);
     cache.current[t]->scaleT = 1.0f / (f32)(cache.current[t]->realHeight);
 
+    // Hack for Zelda Sun
+    if ((config.hackZelda) && (gDP.combine.mux == 0x00262a60150c937fLL))
+    {
+        if ((cache.current[t]->format = G_IM_FMT_I) && (cache.current[t]->size == G_IM_SIZ_8b) &&
+            (cache.current[t]->width == 64))
+        {
+            cache.current[t]->scaleS *= 0.5f;
+            cache.current[t]->scaleT *= 0.5f;
+        }
+    }
+
     cache.current[t]->shiftScaleS = 1.0f;
     cache.current[t]->shiftScaleT = 1.0f;
 
-    cache.current[t]->offsetS = OGL.texture.SaI2x ? 0.25f : 0.5f;
-    cache.current[t]->offsetT = OGL.texture.SaI2x ? 0.25f : 0.5f;
+    cache.current[t]->offsetS = config.texture.sai2x ? 0.25f : 0.5f;
+    cache.current[t]->offsetT = config.texture.sai2x ? 0.25f : 0.5f;
 
     if (gSP.textureTile[t]->shifts > 10)
         cache.current[t]->shiftScaleS = (f32)(1 << (16 - gSP.textureTile[t]->shifts));
@@ -1252,14 +1320,13 @@ void TextureCache_Update( u32 t )
     else if (gSP.textureTile[t]->shiftt > 0)
         cache.current[t]->shiftScaleT /= (f32)(1 << gSP.textureTile[t]->shiftt);
 
-
     TextureCache_Load( cache.current[t] );
     TextureCache_ActivateTexture( t, cache.current[t] );
 
     cache.cachedBytes += cache.current[t]->textureBytes;
 }
 
-void TextureCache_ActivateNoise( u32 t )
+void TextureCache_ActivateNoise(u32 t)
 {
     glActiveTexture(GL_TEXTURE0 + t);
     glBindTexture(GL_TEXTURE_2D, cache.glNoiseNames[RSP.DList & 0x1F]);

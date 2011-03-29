@@ -86,44 +86,10 @@ void F3DEX2_MoveWord( u32 w0, u32 w1 )
             gSPSegment( _SHIFTR( w0, 0, 16 ) >> 2, w1 & 0x00FFFFFF );
             break;
         case G_MW_FOG:
-/*          s16 fm, fo, min, max;
-
-            fm = _SHIFTR( w1, 16, 16 );
-            fo = _SHIFTR( w1, 0, 16 );
-
-            min = 500 - (fo * (128000 / fm)) / 256;
-            max = (128000 / fm) + min;*/
-
             gSPFogFactor( (s16)_SHIFTR( w1, 16, 16 ), (s16)_SHIFTR( w1, 0, 16 ) );
             break;
         case G_MW_LIGHTCOL:
-            switch (_SHIFTR( w0, 0, 16 ))
-            {
-                case F3DEX2_MWO_aLIGHT_1:
-                    gSPLightColor( LIGHT_1, w1 );
-                    break;
-                case F3DEX2_MWO_aLIGHT_2:
-                    gSPLightColor( LIGHT_2, w1 );
-                    break;
-                case F3DEX2_MWO_aLIGHT_3:
-                    gSPLightColor( LIGHT_3, w1 );
-                    break;
-                case F3DEX2_MWO_aLIGHT_4:
-                    gSPLightColor( LIGHT_4, w1 );
-                    break;
-                case F3DEX2_MWO_aLIGHT_5:
-                    gSPLightColor( LIGHT_5, w1 );
-                    break;
-                case F3DEX2_MWO_aLIGHT_6:
-                    gSPLightColor( LIGHT_6, w1 );
-                    break;
-                case F3DEX2_MWO_aLIGHT_7:
-                    gSPLightColor( LIGHT_7, w1 );
-                    break;
-                case F3DEX2_MWO_aLIGHT_8:
-                    gSPLightColor( LIGHT_8, w1 );
-                    break;
-            }
+            gSPLightColor((_SHIFTR( w0, 0, 16 ) / 24) + 1, w1 );
             break;
         case G_MW_PERSPNORM:
             gSPPerspNormalize( w1 );

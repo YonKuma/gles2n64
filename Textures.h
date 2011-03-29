@@ -3,6 +3,7 @@
 
 #include <GLES2/gl2.h>
 
+#include "Hash.h"
 #include "convert.h"
 
 struct CachedTexture
@@ -31,22 +32,22 @@ struct CachedTexture
 
 };
 
-#define TEXTUREBUFFER_SIZE (128 * 1024)
+#define TEXTURECACHE_MAX (8 * 1024 * 1024)
+#define TEXTUREBUFFER_SIZE (512 * 1024)
 
 struct TextureCache
 {
+    CachedTexture   *current[2];
     CachedTexture   *bottom, *top;
+    CachedTexture   *dummy;
 
-    CachedTexture   *(current[2]);
-    u32             maxBytes;
     u32             cachedBytes;
     u32             numCached;
     u32             hits, misses;
     GLuint          glNoiseNames[32];
-    //GLuint            glDummyName;
-    CachedTexture   *dummy;
-    u32             enable2xSaI, bitDepth;
-    u8              textureBuffer[TEXTUREBUFFER_SIZE];    //buffer for texture conversion
+
+    HashMap<CachedTexture>  hash;
+
 };
 
 extern TextureCache cache;

@@ -22,7 +22,7 @@ HWND        hToolBar;
 HINSTANCE   hInstance;
 #endif // !__LINUX__
 
-char        pluginName[] = "gles2n64 v0.0.4";
+char        pluginName[] = "gles2n64 v0.0.5";
 char        *screenDirectory;
 u32         last_good_ucode = (u32) -1;
 void        (*CheckInterrupts)( void );
@@ -32,24 +32,12 @@ void        (*renderCallback)() = NULL;
 void _init( void )
 {
     Config_LoadConfig();
-#ifdef RSPTHREAD
-    RSP.thread = NULL;
-#endif
 }
 
 EXPORT void CALL CaptureScreen ( char * Directory )
 {
     screenDirectory = Directory;
-#ifdef RSPTHREAD
-    if (RSP.thread)
-    {
-        RSP.threadIdle = 0;
-        RSP.threadEvents.push(RSPMSG_CAPTURESCREEN);
-        while(!RSP.threadIdle){SDL_Delay(1);};
-    }
-#else
     OGL_SaveScreenshot();
-#endif
 }
 
 EXPORT void CALL ChangeWindow (void)
@@ -90,13 +78,9 @@ EXPORT void CALL GetDllInfo ( PLUGIN_INFO * PluginInfo )
 
 EXPORT BOOL CALL InitiateGFX (GFX_INFO Gfx_Info)
 {
+
+
     hWnd = Gfx_Info.hWnd;
-
-    Config_LoadConfig();
-
-# ifdef RSPTHREAD
-    RSP.thread = NULL;
-# endif
 
     DMEM = Gfx_Info.DMEM;
     IMEM = Gfx_Info.IMEM;
@@ -129,6 +113,9 @@ EXPORT BOOL CALL InitiateGFX (GFX_INFO Gfx_Info)
 
     CheckInterrupts = Gfx_Info.CheckInterrupts;
 
+    Config_LoadConfig();
+    Config_LoadRomConfig(Gfx_Info.HEADER);
+
     return TRUE;
 }
 
@@ -139,27 +126,39 @@ EXPORT void CALL MoveScreen (int xpos, int ypos)
 
 EXPORT void CALL ProcessDList(void)
 {
-    //printf("PROCESS DLIST dl=%i vysnc=%i \n", OGL.frame_dl, OGL.frame_vsync);
-#ifdef RSPTHREAD
-    if (RSP.thread)
-    {
-        RSP.threadIdle = 0;
-        RSP.threadEvents.push(RSPMSG_PROCESSDLIST);
-        //while(!RSP.threadIdle){SDL_Delay(1);};
-    }
-#else
-
     OGL.frame_dl++;
-    if ((OGL.frame_vsync % OGL.frameskip) != 0)
+
+    if (config.autoFrameSkip)
     {
+        OGL_UpdateFrameTime();
+
+        if (OGL.consecutiveSkips < 1)
+        {
+            unsigned t = 0;
+            for(int i = 0; i < OGL_FRAMETIME_NUM; i++) t += OGL.frameTime[i];
+            t *= config.targetFPS;
+            if (config.romPAL) t = (t * 5) / 6;
+            if (t > (OGL_FRAMETIME_NUM * 1000))
+            {
+                OGL.consecutiveSkips++;
+                OGL.frameSkipped++;
+                RSP.busy = FALSE;
+                RSP.DList++;
+                return;
+            }
+        }
+    }
+    else if ((OGL.frame_vsync % config.frameRenderRate) != 0)
+    {
+        OGL.frameSkipped++;
         RSP.busy = FALSE;
         RSP.DList++;
         return;
     }
 
+    OGL.consecutiveSkips = 0;
     RSP_ProcessDList();
     OGL.mustRenderDlist = true;
-#endif
 }
 
 EXPORT void CALL ProcessRDPList(void)
@@ -169,55 +168,16 @@ EXPORT void CALL ProcessRDPList(void)
 
 EXPORT void CALL RomClosed (void)
 {
-#ifdef RSPTHREAD
-    int i;
-    if (RSP.thread)
-    {
-//      if (OGL.fullscreen)
-//          ChangeWindow();
-
-        if (RSP.busy)
-        {
-            RSP.halt = TRUE;
-            RSP.threadIdle = 0;
-            while(!RSP.threadIdle){SDL_Delay(1);};
-        }
-
-        RSP.threadIdle = 0;
-        RSP.threadEvents.push(RSPMSG_CLOSE);
-        while(!RSP.threadIdle){SDL_Delay(1);};
-        SDL_KillThread(RSP.thread);
-    }
-
-    RSP.thread = NULL;
-#else
     OGL_Stop();
-#endif
-
-#ifdef DEBUG
-    CloseDebugDlg();
-#endif
 }
 
 EXPORT void CALL RomOpen (void)
 {
-#ifdef RSPTHREAD
-    RSP.threadIdle = 1;
-    while(!RSP.threadEvents.empty()){RSP.threadEvents.pop();}
-    RSP.thread = SDL_CreateThread(RSP_ThreadProc, NULL);
-#else
     RSP_Init();
-#endif
     OGL.frame_vsync = 0;
     OGL.frame_dl = 0;
     OGL.frame_prevdl = -1;
     OGL.mustRenderDlist = false;
-
-    OGL_ResizeWindow();
-
-#ifdef DEBUG
-    OpenDebugDlg();
-#endif
 }
 
 EXPORT void CALL ShowCFB (void)
@@ -226,23 +186,11 @@ EXPORT void CALL ShowCFB (void)
 
 EXPORT void CALL UpdateScreen (void)
 {
-    //printf("UPDATE SCREEN dl=%i prevdl=%i vysnc=%i must=%i\n", OGL.frame_dl, OGL.frame_prevdl, OGL.frame_vsync, OGL.mustRenderDlist);
-
-#ifdef RSPTHREAD
-    if (RSP.thread)
-    {
-        RSP.threadIdle = 0;
-        RSP.threadEvents.push(RSPMSG_UPDATESCREEN);
-//        while(!RSP.threadIdle){SDL_Delay(1);};
-    }
-#else
-
     //has there been any display lists since last update
     if (OGL.frame_prevdl == OGL.frame_dl) return;
 
     OGL.frame_prevdl = OGL.frame_dl;
 
-    //only  update if we have encountered > 10 DLIST.
     if (OGL.frame_dl > 0) OGL.frame_vsync++;
 
     if (OGL.mustRenderDlist)
@@ -251,7 +199,6 @@ EXPORT void CALL UpdateScreen (void)
         VI_UpdateScreen();
         OGL.mustRenderDlist = false;
     }
-#endif
 }
 
 EXPORT void CALL ViStatusChanged (void)
@@ -261,7 +208,6 @@ EXPORT void CALL ViStatusChanged (void)
 EXPORT void CALL ViWidthChanged (void)
 {
 }
-
 
 EXPORT void CALL ReadScreen (void **dest, int *width, int *height)
 {

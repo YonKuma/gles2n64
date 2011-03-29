@@ -56,15 +56,7 @@ struct SPVertex
 {
     f32     x, y, z, w;
     f32     nx, ny, nz, __pad0;
-#ifdef __PACKVERTEX_OPT
-    union
-    {
-        struct {u8 r, g, b, a;};
-        u32 col;
-    };
-#else
     f32     r, g, b, a;
-#endif
     f32     s, t;
 
     u32     clip;

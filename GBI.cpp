@@ -45,7 +45,8 @@ SpecialMicrocodeInfo specialMicrocodes[] =
     {F3DDKR, FALSE, 0xbde9d1fb, "Jet Force Gemini"},
     {F3DPD, FALSE, 0x1c4f7869, "Perfect Dark"},
     {F3DEX, FALSE, 0x0ace4c3f, "Mario Kart"},
-    {F3DCBFD, FALSE, 0x1b4ace88, "RSP Gfx ucode F3DEXBG.NoN fifo 2.08  Yoshitaka Yasumoto 1999 Nintendo."},
+    //{F3DEX, FALSE, 0xda51ccdb, "Rogue Squadron"},
+    //{F3DCBFD, FALSE, 0x1b4ace88, "RSP Gfx ucode F3DEXBG.NoN fifo 2.08  Yoshitaka Yasumoto 1999 Nintendo."},
 };
 
 u32 G_RDPHALF_1, G_RDPHALF_2, G_RDPHALF_CONT;
@@ -297,6 +298,7 @@ MicrocodeInfo *GBI_AddMicrocode()
 
     GBI.numMicrocodes++;
 
+
     return newtop;
 }
 
@@ -335,20 +337,17 @@ void GBI_Destroy()
     }
 }
 
-void
-GBI_ProfileInit()
+void GBI_ProfileInit()
 {
     GBI_ProfileReset();
 }
 
-void
-GBI_ProfileBegin(u32 cmd)
+void GBI_ProfileBegin(u32 cmd)
 {
     GBI.profileTmp = SDL_GetTicks();
 }
 
-void
-GBI_ProfileEnd(u32 cmd)
+void GBI_ProfileEnd(u32 cmd)
 {
     unsigned int i = 256*GBI.current->type + cmd;
     GBI.profileNum[i]++;
@@ -635,9 +634,9 @@ GBI_GetFuncName(unsigned int ucode, unsigned int cmd)
 //        F3DEX2_ENDDL            0xDF
         case 0xDF:                  return "F3DEX2_ENDDL";
 //        F3DEX2_DL               0xDE
-        case 0xDE:                  return "F3DEX2_LOAD_UCODE";
+        case 0xDE:                  return "F3DEX2_DL";
 //        F3DEX2_LOAD_UCODE       0xDD
-        case 0xDD:                  return "F3DEX2_MOVEMEM";
+        case 0xDD:                  return "F3DEX2_LOAD_UCODE";
 /*
         F3DEX2_MOVEMEM          0xDC
         S2DEX2_OBJ_MOVEMEM      0xDC
@@ -829,8 +828,8 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
     current->type = NONE;
 
     // See if we can identify it by CRC
-    uc_crc = CRC_Calculate( 0xFFFFFFFF, &RDRAM[uc_start & 0x1FFFFFFF], 4096 );
-    LOG(LOG_VERBOSE, "UCODE CRC=0x%x\n", uc_crc);
+    uc_crc = CRC_Calculate( 0xFFFFFFFF, &RDRAM[uc_start & 0x1FFFFFFF], 4096);
+    LOG(LOG_MINIMAL, "UCODE CRC=0x%x\n", uc_crc);
 
     for (u32 i = 0; i < sizeof( specialMicrocodes ) / sizeof( SpecialMicrocodeInfo ); i++)
     {
@@ -845,7 +844,6 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
     char uc_data[2048];
     UnswapCopy( &RDRAM[uc_dstart & 0x1FFFFFFF], uc_data, 2048 );
     strcpy( uc_str, "Not Found" );
-
 
     for (u32 i = 0; i < 2048; i++)
     {
@@ -916,16 +914,15 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
     }
 
     // Let the user choose the microcode
-#if 0
-    current->type = DialogBox( hInstance, MAKEINTRESOURCE( IDD_MICROCODEDLG ), hWnd, MicrocodeDlgProc );
-#else // !__LINUX__
-    printf( "glN64: Warning - unknown ucode!!!\n" );
-    if(last_good_ucode != (u32)-1) {
+    LOG(LOG_ERROR, "[gles2n64]: Warning - unknown ucode!!!\n");
+    if(last_good_ucode != (u32)-1)
+    {
         current->type=last_good_ucode;
-    } else {
+    }
+    else
+    {
         current->type = MicrocodeDialog();
     }
-#endif // __LINUX__
     return current;
 }
 
@@ -952,6 +949,7 @@ void GBI_MakeCurrent( MicrocodeInfo *current )
 
     if (!GBI.current || (GBI.current->type != current->type))
     {
+
         for (int i = 0; i <= 0xFF; i++)
             GBI.cmd[i] = GBI_Unknown;
 

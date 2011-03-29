@@ -21,9 +21,7 @@
 #include "Textures.h"
 
 //#define PRINT_DISPLAYLIST
-#define PRINT_DISPLAYLIST_NUM 10
-//#define PROFILE_GBI
-
+//#define PRINT_DISPLAYLIST_NUM 1
 
 RSPInfo     RSP;
 
@@ -104,7 +102,7 @@ void RSP_ProcessDList()
     RSP.busy = TRUE;
 
 #ifdef __TRIBUFFER_OPT
-    __indexmap_init();
+    __indexmap_clear();
 #endif
 
     gSP.matrix.stackSize = min( 32, *(u32*)&DMEM[0x0FE4] >> 6 );
@@ -127,22 +125,20 @@ void RSP_ProcessDList()
     if ((uc_start != RSP.uc_start) || (uc_dstart != RSP.uc_dstart))
         gSPLoadUcodeEx( uc_start, uc_dstart, uc_dsize );
 
-    gDPSetAlphaCompare( G_AC_NONE );
-    gDPSetDepthSource( G_ZS_PIXEL );
-    gDPSetRenderMode( 0, 0 );
-    gDPSetAlphaDither( G_AD_DISABLE );
-    gDPSetColorDither( G_CD_DISABLE );
-    gDPSetCombineKey( G_CK_NONE );
-    gDPSetTextureConvert( G_TC_FILT );
-    gDPSetTextureFilter( G_TF_POINT );
-    gDPSetTextureLUT( G_TT_NONE );
-    gDPSetTextureLOD( G_TL_TILE );
-    gDPSetTextureDetail( G_TD_CLAMP );
-    gDPSetTexturePersp( G_TP_PERSP );
-    gDPSetCycleType( G_CYC_1CYCLE );
-    gDPPipelineMode( G_PM_NPRIMITIVE );
-
-
+    gDPSetAlphaCompare(G_AC_NONE);
+    gDPSetDepthSource(G_ZS_PIXEL);
+    gDPSetRenderMode(0, 0);
+    gDPSetAlphaDither(G_AD_DISABLE);
+    gDPSetColorDither(G_CD_DISABLE);
+    gDPSetCombineKey(G_CK_NONE);
+    gDPSetTextureConvert(G_TC_FILT);
+    gDPSetTextureFilter(G_TF_POINT);
+    gDPSetTextureLUT(G_TT_NONE);
+    gDPSetTextureLOD(G_TL_TILE);
+    gDPSetTextureDetail(G_TD_CLAMP);
+    gDPSetTexturePersp(G_TP_PERSP);
+    gDPSetCycleType(G_CYC_1CYCLE);
+    gDPPipelineMode(G_PM_NPRIMITIVE);
 
 #ifdef PRINT_DISPLAYLIST
     if ((RSP.DList%PRINT_DISPLAYLIST_NUM) == 0) LOG(LOG_VERBOSE, "BEGIN DISPLAY LIST %i \n", RSP.DList);

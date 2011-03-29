@@ -1,3 +1,4 @@
+#include "Common.h"
 #include "gles2N64.h"
 #include "Debug.h"
 #include "F3D.h"
@@ -13,7 +14,7 @@
 #include "gDP.h"
 #include "GBI.h"
 #include "OpenGL.h"
-#include "Common.h"
+#include "Config.h"
 
 //BASED ON GLIDE64 Implementation
 
@@ -54,7 +55,7 @@ void F3DCBFD_Vtx(u32 w0, u32 w1)
 		OGL.triangles.vertices[v].s = _FIXED2FLOAT(vertex->s, 5);
 		OGL.triangles.vertices[v].t = _FIXED2FLOAT(vertex->t, 5);
 
-        if (OGL.enableLighting && gSP.geometryMode & G_LIGHTING)
+        if (config.enableLighting && gSP.geometryMode & G_LIGHTING)
 		{
 			OGL.triangles.vertices[v].nx = ((s8*)RDRAM)[(normal_address + (i<<2) + (v0<<1) + 0)^3];
 			OGL.triangles.vertices[v].ny = ((s8*)RDRAM)[(normal_address + (i<<2) + (v0<<1) + 1)^3];
@@ -63,7 +64,7 @@ void F3DCBFD_Vtx(u32 w0, u32 w1)
 
         gSPProcessVertex(v);
 
-        if (OGL.enableLighting && gSP.geometryMode & G_LIGHTING)
+        if (config.enableLighting && gSP.geometryMode & G_LIGHTING)
 		{
             OGL.triangles.vertices[v].r = OGL.triangles.vertices[v].r * vertex->color.r * 0.0039215689f;
             OGL.triangles.vertices[v].g = OGL.triangles.vertices[v].g * vertex->color.g * 0.0039215689f;
